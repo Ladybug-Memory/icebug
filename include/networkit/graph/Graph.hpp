@@ -1818,22 +1818,42 @@ void Graph::forNeighborsOf(node u, L handle) const {
 
 template <typename L>
 void Graph::forEdgesOf(node u, L handle) const {
-    switch (weighted + 2 * edgesIndexed) {
-    case 0: // not weighted, no edge ids
-        forOutEdgesOfImpl<true, false, false, L>(u, handle);
-        break;
+    if (directed) {
+        switch (weighted + 2 * edgesIndexed) {
+        case 0: // not weighted, no edge ids
+            forOutEdgesOfImpl<true, false, false, L>(u, handle);
+            break;
 
-    case 1: // weighted, no edge ids
-        forOutEdgesOfImpl<true, true, false, L>(u, handle);
-        break;
+        case 1: // weighted, no edge ids
+            forOutEdgesOfImpl<true, true, false, L>(u, handle);
+            break;
 
-    case 2: // not weighted, with edge ids
-        forOutEdgesOfImpl<true, false, true, L>(u, handle);
-        break;
+        case 2: // not weighted, with edge ids
+            forOutEdgesOfImpl<true, false, true, L>(u, handle);
+            break;
 
-    case 3: // weighted, with edge ids
-        forOutEdgesOfImpl<true, true, true, L>(u, handle);
-        break;
+        case 3: // weighted, with edge ids
+            forOutEdgesOfImpl<true, true, true, L>(u, handle);
+            break;
+        }
+    } else {
+        switch (weighted + 2 * edgesIndexed) {
+        case 0: // not weighted, no edge ids
+            forOutEdgesOfImpl<false, false, false, L>(u, handle);
+            break;
+
+        case 1: // weighted, no edge ids
+            forOutEdgesOfImpl<false, true, false, L>(u, handle);
+            break;
+
+        case 2: // not weighted, with edge ids
+            forOutEdgesOfImpl<false, false, true, L>(u, handle);
+            break;
+
+        case 3: // weighted, with edge ids
+            forOutEdgesOfImpl<false, true, true, L>(u, handle);
+            break;
+        }
     }
 }
 
