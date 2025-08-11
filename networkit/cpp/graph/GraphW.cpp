@@ -780,4 +780,21 @@ void GraphW::preallocateDirectedInEdges(node u, size_t inSize) {
     }
 }
 
+void GraphW::setWeightAtIthNeighbor(Unsafe, node u, index i, edgeweight ew) {
+    if (!weighted) {
+        throw std::runtime_error("Cannot set weight in unweighted graph");
+    }
+    outEdgeWeights[u][i] = ew;
+}
+
+void GraphW::setWeightAtIthInNeighbor(Unsafe, node u, index i, edgeweight ew) {
+    if (!weighted) {
+        throw std::runtime_error("Cannot set weight in unweighted graph");
+    }
+    if (!directed) {
+        throw std::runtime_error("Cannot access in-edges in undirected graph");
+    }
+    inEdgeWeights[u][i] = ew;
+}
+
 } /* namespace NetworKit */
