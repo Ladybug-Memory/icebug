@@ -29,61 +29,41 @@ Graph::Graph(count n, bool weighted, bool directed, bool edgesIndexed)
       edgesIndexed(edgesIndexed), deletedID(none),
       // edges are not indexed by default
 
-      exists(n, true),
+      exists(n, true), usingCSR(false), nodeAttributeMap(this), edgeAttributeMap(this) {}
 
-      /* for directed graphs inEdges stores an adjacency list only considering
-         incoming edges, for undirected graphs inEdges is not used*/
-      inEdges(directed ? n : 0),
+// CSR constructor for zero-copy Arrow arrays
+Graph::Graph(count n, bool directed, std::shared_ptr<arrow::UInt64Array> outIndices,
+             std::shared_ptr<arrow::UInt64Array> outIndptr,
+             std::shared_ptr<arrow::UInt64Array> inIndices,
+             std::shared_ptr<arrow::UInt64Array> inIndptr)
+    : n(n), m(0), storedNumberOfSelfLoops(0), z(n), omega(0), t(0),
+      weighted(false),                         // CSR graphs are unweighted for now
+      directed(directed), edgesIndexed(false), // CSR graphs don't use edge IDs
+      deletedID(none), exists(n, true), inEdges(0), outEdges(0), // empty vectors since we use CSR
+      inEdgeWeights(0), outEdgeWeights(0), inEdgeIds(0), outEdgeIds(0),
+      outEdgesCSRIndices(outIndices), outEdgesCSRIndptr(outIndptr), inEdgesCSRIndices(inIndices),
+      inEdgesCSRIndptr(inIndptr), usingCSR(true), nodeAttributeMap(this), edgeAttributeMap(this) {
 
-      /* for directed graphs outEdges stores an adjacency list only considering
-      outgoing edges, for undirected graphs outEdges stores the adjacency list of
-      undirected edges*/
-      outEdges(n), inEdgeWeights(weighted && directed ? n : 0), outEdgeWeights(weighted ? n : 0),
-      inEdgeIds(edgesIndexed && directed ? n : 0), outEdgeIds(edgesIndexed ? n : 0),
-      nodeAttributeMap(this), edgeAttributeMap(this) {}
-
-void Graph::preallocateUndirected(node u, size_t size) {
-    assert(!directed);
-    assert(exists[u]);
-    outEdges[u].reserve(size);
-    if (weighted) {
-        outEdgeWeights[u].reserve(size);
+    // Calculate number of edges from CSR data
+    if (outIndices) {
+        m = outIndices->length();
     }
-    if (edgesIndexed) {
-        outEdgeIds[u].reserve(size);
+
+    // For directed graphs, we need both in and out CSR arrays
+    if (directed && (!inIndices || !inIndptr)) {
+        throw std::invalid_argument(
+            "Directed CSR graphs require both incoming and outgoing arrays");
     }
-}
 
-void Graph::preallocateDirected(node u, size_t outSize, size_t inSize) {
-    preallocateDirectedOutEdges(u, outSize);
-    preallocateDirectedInEdges(u, inSize);
-}
-
-void Graph::preallocateDirectedOutEdges(node u, size_t outSize) {
-    assert(directed);
-    assert(exists[u]);
-    outEdges[u].reserve(outSize);
-
-    if (weighted) {
-        outEdgeWeights[u].reserve(outSize);
+    // Validate CSR arrays
+    if (outIndptr && static_cast<size_t>(outIndptr->length()) != n + 1) {
+        throw std::invalid_argument("outIndptr must have length n+1");
     }
-    if (edgesIndexed) {
-        outEdges[u].reserve(outSize);
+    if (directed && inIndptr && static_cast<size_t>(inIndptr->length()) != n + 1) {
+        throw std::invalid_argument("inIndptr must have length n+1");
     }
 }
 
-void Graph::preallocateDirectedInEdges(node u, size_t inSize) {
-    assert(directed);
-    assert(exists[u]);
-    inEdges[u].reserve(inSize);
-
-    if (weighted) {
-        inEdgeWeights[u].reserve(inSize);
-    }
-    if (edgesIndexed) {
-        inEdgeIds[u].reserve(inSize);
-    }
-}
 /** PRIVATE HELPERS **/
 
 index Graph::indexInInEdgeArray(node v, node u) const {
@@ -196,6 +176,12 @@ bool Graph::hasEdge(node u, node v) const noexcept {
     if (u >= z || v >= z) {
         return false;
     }
+
+    // Use CSR if available
+    if (usingCSR) {
+        return hasEdgeCSR(u, v);
+    }
+
     if (!directed && outEdges[u].size() > outEdges[v].size()) {
         return indexInOutEdgeArray(v, u) != none;
     } else if (directed && outEdges[u].size() > inEdges[v].size()) {
@@ -279,6 +265,52 @@ bool Graph::checkConsistency() const {
         DEBUG("Saved number of edges is incorrect!");
 
     return noMultiEdges && correctNodeUpperbound && correctNumberOfEdges;
+}
+
+// CSR helper methods
+bool Graph::hasEdgeCSR(node u, node v) const {
+    if (!usingCSR || u >= z || v >= z) {
+        return false;
+    }
+
+    // Use outgoing edges for search
+    if (!outEdgesCSRIndices || !outEdgesCSRIndptr) {
+        return false;
+    }
+
+    auto start_idx = outEdgesCSRIndptr->Value(u);
+    auto end_idx = outEdgesCSRIndptr->Value(u + 1);
+
+    // Binary search for neighbor v in sorted adjacency list
+    for (auto idx = start_idx; idx < end_idx; ++idx) {
+        auto neighbor = outEdgesCSRIndices->Value(idx);
+        if (neighbor == v) {
+            return true;
+        }
+        if (neighbor > v) {
+            break; // assuming sorted neighbors
+        }
+    }
+
+    return false;
+}
+
+count Graph::degreeCSR(node u, bool incoming) const {
+    if (!usingCSR || u >= z) {
+        return 0;
+    }
+
+    if (incoming && directed) {
+        if (!inEdgesCSRIndptr) {
+            return 0;
+        }
+        return inEdgesCSRIndptr->Value(u + 1) - inEdgesCSRIndptr->Value(u);
+    } else {
+        if (!outEdgesCSRIndptr) {
+            return 0;
+        }
+        return outEdgesCSRIndptr->Value(u + 1) - outEdgesCSRIndptr->Value(u);
+    }
 }
 
 } /* namespace NetworKit */

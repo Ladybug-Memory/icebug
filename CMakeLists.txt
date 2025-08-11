@@ -139,6 +139,9 @@ endif()
 # finding or creating OpenMP target. This is likely to fail for CMake Version < 3.12.
 find_package(OpenMP)
 
+# Find Apache Arrow
+find_package(Arrow REQUIRED)
+
 # FindOpenMP.cmake does not reliably find a user installed openmp library for clang/llvm on
 # both Linux- and macOS-systems (even for CMake Version >= 3.12). The following section
 # manually sets the required fields for clang-like compiler.
@@ -264,7 +267,7 @@ if(NETWORKIT_BUILD_CORE AND NETWORKIT_MONOLITH)
 		target_include_directories(networkit_state BEFORE PUBLIC "${PROJECT_SOURCE_DIR}/include")
 	endif()
 
-	target_link_libraries(networkit PRIVATE OpenMP::OpenMP_CXX PUBLIC tlx)
+	target_link_libraries(networkit PRIVATE OpenMP::OpenMP_CXX PUBLIC tlx Arrow::arrow_shared)
 
 	set_target_properties(networkit PROPERTIES
 			CXX_STANDARD ${NETWORKIT_CXX_STANDARD}

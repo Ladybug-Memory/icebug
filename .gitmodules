@@ -7,3 +7,6 @@
 [submodule "extlibs/ttmath"]
 	path = extlibs/ttmath
 	url = https://github.com/networkit/ttmath
+[submodule "supercsr"]
+	path = supercsr
+	url = https://github.com/adsharma/supercsr

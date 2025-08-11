@@ -39,6 +39,9 @@
 
 #include <tlx/define/deprecated.hpp>
 
+#include <arrow/api.h>
+#include <arrow/compute/api.h>
+
 namespace NetworKit {
 
 struct Edge {
@@ -143,22 +146,19 @@ protected:
     //!< exists[v] is true if node v has not been removed from the graph
     std::vector<bool> exists;
 
-    //!< only used for directed graphs, inEdges[v] contains all nodes u that
-    //!< have an edge (u, v)
-    std::vector<std::vector<node>> inEdges;
-    //!< (outgoing) edges, for each edge (u, v) v is saved in outEdges[u] and
-    //!< for undirected also u in outEdges[v]
-    std::vector<std::vector<node>> outEdges;
-
-    //!< only used for directed graphs, same schema as inEdges
-    std::vector<std::vector<edgeweight>> inEdgeWeights;
-    //!< same schema (and same order!) as outEdges
-    std::vector<std::vector<edgeweight>> outEdgeWeights;
-
-    //!< only used for directed graphs, same schema as inEdges
-    std::vector<std::vector<edgeid>> inEdgeIds;
-    //!< same schema (and same order!) as outEdges
-    std::vector<std::vector<edgeid>> outEdgeIds;
+    // CSR arrays for memory-efficient graph storage (zero-copy from Arrow)
+    //!< Arrow array for CSR indices (neighbor node IDs) for outgoing edges
+    std::shared_ptr<arrow::UInt64Array> outEdgesCSRIndices;
+    //!< Arrow array for CSR indptr (offsets into indices array) for outgoing edges
+    std::shared_ptr<arrow::UInt64Array> outEdgesCSRIndptr;
+    //!< Arrow array for CSR indices (neighbor node IDs) for incoming edges - only for directed
+    //!< graphs
+    std::shared_ptr<arrow::UInt64Array> inEdgesCSRIndices;
+    //!< Arrow array for CSR indptr (offsets into indices array) for incoming edges - only for
+    //!< directed graphs
+    std::shared_ptr<arrow::UInt64Array> inEdgesCSRIndptr;
+    //!< flag to indicate if CSR arrays are being used instead of vectors
+    bool usingCSR;
 
 private:
     AttributeMap<PerNode, Graph> nodeAttributeMap;
@@ -263,6 +263,27 @@ protected:
      * Returns the index of node v in the array of outgoing edges of node u.
      */
     index indexInOutEdgeArray(node u, node v) const;
+
+    // CSR helper methods
+    /**
+     * Get neighbors of node u using CSR format for outgoing edges
+     */
+    std::pair<const node *, count> getCSROutNeighbors(node u) const;
+
+    /**
+     * Get neighbors of node u using CSR format for incoming edges
+     */
+    std::pair<const node *, count> getCSRInNeighbors(node u) const;
+
+    /**
+     * Check if edge (u,v) exists using CSR format
+     */
+    bool hasEdgeCSR(node u, node v) const;
+
+    /**
+     * Get degree of node using CSR format
+     */
+    count degreeCSR(node u, bool incoming = false) const;
 
 private:
     /**
@@ -795,6 +816,21 @@ public:
     Graph(std::initializer_list<WeightedEdge> edges);
 
     /**
+     * Create a graph from CSR arrays for memory-efficient storage.
+     *
+     * @param n Number of nodes.
+     * @param directed If set to @c true, the graph will be directed.
+     * @param outIndices CSR indices array containing neighbor node IDs for outgoing edges
+     * @param outIndptr CSR indptr array containing offsets into outIndices for each node
+     * @param inIndices CSR indices array containing neighbor node IDs for incoming edges (directed
+     * only)
+     * @param inIndptr CSR indptr array containing offsets into inIndices for each node (directed
+     * only)
+     */
+    Graph(count n, bool directed, std::vector<node> outIndices, std::vector<index> outIndptr,
+          std::vector<node> inIndices = {}, std::vector<index> inIndptr = {});
+
+    /**
      * Create a graph as copy of @a other.
      * @param other The graph to copy.
      */
@@ -827,6 +863,22 @@ public:
 
     /** Default destructor */
     ~Graph() = default;
+
+    /**
+     * Constructor that creates a graph from Arrow CSR arrays for zero-copy memory efficiency.
+     * @param n Number of nodes.
+     * @param directed If set to @c true, the graph will be directed.
+     * @param outIndices Arrow array containing neighbor node IDs for outgoing edges (CSR indices).
+     * @param outIndptr Arrow array containing offsets into outIndices for each node (CSR indptr).
+     * @param inIndices Arrow array containing neighbor node IDs for incoming edges (only for
+     * directed graphs).
+     * @param inIndptr Arrow array containing offsets into inIndices for each node (only for
+     * directed graphs).
+     */
+    Graph(count n, bool directed, std::shared_ptr<arrow::UInt64Array> outIndices,
+          std::shared_ptr<arrow::UInt64Array> outIndptr,
+          std::shared_ptr<arrow::UInt64Array> inIndices = nullptr,
+          std::shared_ptr<arrow::UInt64Array> inIndptr = nullptr);
 
     /** move assignment operator */
     Graph &operator=(Graph &&other) noexcept {
@@ -883,51 +935,6 @@ public:
 
         return *this;
     };
-
-    /**
-     * Reserves memory in the node's edge containers for undirected graphs.
-     *
-     * @param u the node memory should be reserved for
-     * @param size the amount of memory to reserve
-     *
-     * This function is thread-safe if called from different
-     * threads on different nodes.
-     */
-    void preallocateUndirected(node u, size_t size);
-
-    /**
-     * Reserves memory in the node's edge containers for directed graphs.
-     *
-     * @param u the node memory should be reserved for
-     * @param inSize the amount of memory to reserve for in edges
-     * @param outSize the amount of memory to reserve for out edges
-     *
-     * This function is thread-safe if called from different
-     * threads on different nodes.
-     */
-    void preallocateDirected(node u, size_t outSize, size_t inSize);
-
-    /**
-     * Reserves memory in the node's edge containers for directed graphs.
-     *
-     * @param u the node memory should be reserved for
-     * @param outSize the amount of memory to reserve for out edges
-     *
-     * This function is thread-safe if called from different
-     * threads on different nodes.
-     */
-    void preallocateDirectedOutEdges(node u, size_t outSize);
-
-    /**
-     * Reserves memory in the node's edge containers for directed graphs.
-     *
-     * @param u the node memory should be reserved for
-     * @param inSize the amount of memory to reserve for in edges
-     *
-     * This function is thread-safe if called from different
-     * threads on different nodes.
-     */
-    void preallocateDirectedInEdges(node u, size_t inSize);
 
     /** EDGE IDS **/
 
@@ -1019,9 +1026,14 @@ public:
      * @note The existence of the node is not checked. Calling this function with a non-existing
      * node results in a segmentation fault. Node existence can be checked by calling hasNode(u).
      */
-    count degree(node v) const {
+    virtual count degree(node v) const {
         assert(hasNode(v));
-        return outEdges[v].size();
+        if (usingCSR) {
+            return degreeCSR(v, false);
+        }
+        // Base Graph only supports CSR, GraphW will override for vector access
+        throw std::runtime_error(
+            "Base Graph class only supports CSR format. Use GraphW for mutable graphs.");
     }
 
     /**
@@ -1035,6 +1047,9 @@ public:
      */
     count degreeIn(node v) const {
         assert(hasNode(v));
+        if (usingCSR) {
+            return directed ? degreeCSR(v, true) : degreeCSR(v, false);
+        }
         return directed ? inEdges[v].size() : outEdges[v].size();
     }
 

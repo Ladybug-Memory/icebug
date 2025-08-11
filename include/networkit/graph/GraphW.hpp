@@ -10,8 +10,46 @@ namespace NetworKit {
  * A writable graph that extends Graph with mutation operations.
  * This class provides all read operations from Graph plus write operations
  * like addNode, addEdge, removeNode, removeEdge, etc.
+ *
+ * GraphW uses traditional vector-based adjacency lists for mutable operations,
+ * while the base Graph class uses memory-efficient Arrow CSR arrays.
  */
 class GraphW final : public Graph {
+
+protected:
+    // Vector-based adjacency data structures for mutable operations
+    //!< only used for directed graphs, inEdges[v] contains all nodes u that
+    //!< have an edge (u, v)
+    std::vector<std::vector<node>> inEdges;
+    //!< (outgoing) edges, for each edge (u, v) v is saved in outEdges[u] and
+    //!< for undirected also u in outEdges[v]
+    std::vector<std::vector<node>> outEdges;
+
+    //!< only used for directed graphs, same schema as inEdges
+    std::vector<std::vector<edgeweight>> inEdgeWeights;
+    //!< same schema (and same order!) as outEdges
+    std::vector<std::vector<edgeweight>> outEdgeWeights;
+
+    //!< only used for directed graphs, same schema as inEdges
+    std::vector<std::vector<edgeid>> inEdgeIds;
+    //!< same schema (and same order!) as outEdges
+    std::vector<std::vector<edgeid>> outEdgeIds;
+
+private:
+    /**
+     * Initialize vector-based data structures based on graph properties
+     */
+    void initializeVectorStructures() {
+        count nodeCount = upperNodeIdBound();
+
+        inEdges.resize(isDirected() ? nodeCount : 0);
+        outEdges.resize(nodeCount);
+        inEdgeWeights.resize(isWeighted() && isDirected() ? nodeCount : 0);
+        outEdgeWeights.resize(isWeighted() ? nodeCount : 0);
+        inEdgeIds.resize(hasEdgeIds() && isDirected() ? nodeCount : 0);
+        outEdgeIds.resize(hasEdgeIds() ? nodeCount : 0);
+    }
+
 public:
     /**
      * Create a graph of @a n nodes. The graph has assignable edge weights if @a
@@ -24,7 +62,9 @@ public:
      * @param edgesIndexed If set to @c true, the graph will have indexed edges.
      */
     GraphW(count n = 0, bool weighted = false, bool directed = false, bool edgesIndexed = false)
-        : Graph(n, weighted, directed, edgesIndexed) {}
+        : Graph(n, weighted, directed, edgesIndexed), inEdges(directed ? n : 0), outEdges(n),
+          inEdgeWeights(weighted && directed ? n : 0), outEdgeWeights(weighted ? n : 0),
+          inEdgeIds(edgesIndexed && directed ? n : 0), outEdgeIds(edgesIndexed ? n : 0) {}
 
     /**
      * Generate a weighted graph from a list of edges. (Useful for small
@@ -38,13 +78,19 @@ public:
      * Create a graph as copy of @a other.
      * @param other The graph to copy.
      */
-    GraphW(const GraphW &other) : Graph(other) {}
+    GraphW(const GraphW &other)
+        : Graph(other), inEdges(other.inEdges), outEdges(other.outEdges),
+          inEdgeWeights(other.inEdgeWeights), outEdgeWeights(other.outEdgeWeights),
+          inEdgeIds(other.inEdgeIds), outEdgeIds(other.outEdgeIds) {}
 
     /**
      * Create a graph as copy of @a other.
      * @param other The graph to copy.
      */
-    GraphW(const Graph &other) : Graph(other) {}
+    GraphW(const Graph &other) : Graph(other) {
+        // Initialize vector structures for writable graph
+        initializeVectorStructures();
+    }
 
     /**
      * Create a graph as copy of @a other with modified properties.
@@ -59,10 +105,14 @@ public:
         : Graph(other, weighted, directed, edgesIndexed, edgeMerger) {}
 
     /** move constructor */
-    GraphW(GraphW &&other) noexcept : Graph(std::move(other)) {}
+    GraphW(GraphW &&other) noexcept
+        : Graph(std::move(other)), inEdges(std::move(other.inEdges)),
+          outEdges(std::move(other.outEdges)), inEdgeWeights(std::move(other.inEdgeWeights)),
+          outEdgeWeights(std::move(other.outEdgeWeights)), inEdgeIds(std::move(other.inEdgeIds)),
+          outEdgeIds(std::move(other.outEdgeIds)) {}
 
     /** move constructor */
-    GraphW(Graph &&other) noexcept : Graph(std::move(other)) {}
+    GraphW(Graph &&other) noexcept : Graph(std::move(other)) { initializeVectorStructures(); }
 
     /** Default destructor */
     ~GraphW() = default;
@@ -70,24 +120,38 @@ public:
     /** move assignment operator */
     GraphW &operator=(GraphW &&other) noexcept {
         Graph::operator=(std::move(other));
+        inEdges = std::move(other.inEdges);
+        outEdges = std::move(other.outEdges);
+        inEdgeWeights = std::move(other.inEdgeWeights);
+        outEdgeWeights = std::move(other.outEdgeWeights);
+        inEdgeIds = std::move(other.inEdgeIds);
+        outEdgeIds = std::move(other.outEdgeIds);
         return *this;
     }
 
     /** move assignment operator */
     GraphW &operator=(Graph &&other) noexcept {
         Graph::operator=(std::move(other));
+        initializeVectorStructures();
         return *this;
     }
 
     /** copy assignment operator */
     GraphW &operator=(const GraphW &other) {
         Graph::operator=(other);
+        inEdges = other.inEdges;
+        outEdges = other.outEdges;
+        inEdgeWeights = other.inEdgeWeights;
+        outEdgeWeights = other.outEdgeWeights;
+        inEdgeIds = other.inEdgeIds;
+        outEdgeIds = other.outEdgeIds;
         return *this;
     }
 
     /** copy assignment operator */
     GraphW &operator=(const Graph &other) {
         Graph::operator=(other);
+        initializeVectorStructures();
         return *this;
     }
 
