@@ -7,6 +7,7 @@ from libcpp.vector cimport vector
 from libcpp.utility cimport pair
 from libcpp.string cimport string
 from libcpp.unordered_set cimport unordered_set
+from libcpp.memory cimport shared_ptr
 from .base cimport _Algorithm, Algorithm
 from .structures cimport edgeid, index, count, node, edgeweight
 
@@ -21,6 +22,10 @@ cdef extern from "cython_helper.h":
 cdef extern from "<networkit/Globals.hpp>" namespace "NetworKit":
 
 	index _none "NetworKit::none"
+
+cdef extern from "<arrow/api.h>" namespace "arrow":
+	cdef cppclass UInt64Array:
+		pass
 
 cdef extern from "<networkit/graph/Graph.hpp>":
 
@@ -38,6 +43,8 @@ cdef extern from "<networkit/graph/Graph.hpp>":
 		_Graph(count, bool_t, bool_t, bool_t) except +
 		_Graph(const _Graph& other) except +
 		_Graph(const _Graph& other, bool_t weighted, bool_t directed, bool_t edgesIndexed) except +
+		_Graph(count n, bool_t directed, shared_ptr[UInt64Array] outIndices, shared_ptr[UInt64Array] outIndptr, shared_ptr[UInt64Array] inIndices, shared_ptr[UInt64Array] inIndptr) except +
+		_Graph(count n, bool_t directed, vector[node] outIndices, vector[index] outIndptr, vector[node] inIndices, vector[index] inIndptr) except +
 		bool_t hasEdgeIds() except +
 		edgeid edgeId(node, node) except +
 		count numberOfNodes() except +
@@ -195,7 +202,7 @@ cdef extern from "<networkit/graph/Graph.hpp>":
 		void write(string) except +
 		void read(string) except +
 		void swap(_NodeIntAttribute& other)
-		string getName() except +	
+		string getName() except +
 
 cdef extern from "<networkit/graph/Graph.hpp>":
 	cdef cppclass _NodeDoubleAttribute "NetworKit::Graph::NodeDoubleAttribute":

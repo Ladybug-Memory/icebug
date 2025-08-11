@@ -1584,16 +1584,95 @@ inline bool Graph::useEdgeInIteration<false>(node u, node v) const {
 
 template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
 inline void Graph::forOutEdgesOfImpl(node u, L handle) const {
-    // Base Graph class only supports CSR format
-    throw std::runtime_error(
-        "forOutEdgesOfImpl not supported in base Graph class - use GraphW for mutable operations");
+    if (!exists[u])
+        return;
+
+    if (usingCSR) {
+        // CSR-based implementation
+        auto [neighbors, degree] = getCSROutNeighbors(u);
+        if (neighbors == nullptr || degree == 0)
+            return;
+
+        for (count i = 0; i < degree; ++i) {
+            node v = neighbors[i];
+            if (!exists[v])
+                continue;
+
+            // For undirected graphs, only process edge if u >= v to avoid duplicates
+            if constexpr (!graphIsDirected) {
+                if (!useEdgeInIteration<graphIsDirected>(u, v))
+                    continue;
+            }
+
+            // Get edge weight (currently CSR graphs are unweighted, so use defaultEdgeWeight)
+            edgeweight weight = hasWeights ? defaultEdgeWeight : defaultEdgeWeight;
+
+            // Get edge ID (CSR graphs don't currently support edge IDs)
+            edgeid eid = graphHasEdgeIds ? none : none;
+
+            // Call the appropriate lambda based on its signature
+            edgeLambda(handle, u, v, weight, eid);
+        }
+    } else {
+        // Vector-based graphs should use GraphW
+        throw std::runtime_error("forOutEdgesOfImpl not supported for vector-based graphs in base "
+                                 "Graph class - use GraphW");
+    }
 }
 
 template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
 inline void Graph::forInEdgesOfImpl(node u, L handle) const {
-    // Base Graph class only supports CSR format
-    throw std::runtime_error(
-        "forInEdgesOfImpl not supported in base Graph class - use GraphW for mutable operations");
+    if (!exists[u])
+        return;
+
+    if (usingCSR) {
+        if constexpr (graphIsDirected) {
+            // For directed graphs, use incoming edges
+            auto [neighbors, degree] = getCSRInNeighbors(u);
+            if (neighbors == nullptr || degree == 0)
+                return;
+
+            for (count i = 0; i < degree; ++i) {
+                node v = neighbors[i];
+                if (!exists[v])
+                    continue;
+
+                // Get edge weight (currently CSR graphs are unweighted)
+                edgeweight weight = hasWeights ? defaultEdgeWeight : defaultEdgeWeight;
+
+                // Get edge ID (CSR graphs don't currently support edge IDs)
+                edgeid eid = graphHasEdgeIds ? none : none;
+
+                // For incoming edges, v is the source and u is the target
+                edgeLambda(handle, v, u, weight, eid);
+            }
+        } else {
+            // For undirected graphs, incoming edges are the same as outgoing edges
+            // but we need to swap u and v in the handle call
+            auto [neighbors, degree] = getCSROutNeighbors(u);
+            if (neighbors == nullptr || degree == 0)
+                return;
+
+            for (count i = 0; i < degree; ++i) {
+                node v = neighbors[i];
+                if (!exists[v])
+                    continue;
+
+                // Get edge weight (currently CSR graphs are unweighted)
+                edgeweight weight = hasWeights ? defaultEdgeWeight : defaultEdgeWeight;
+
+                // Get edge ID (CSR graphs don't currently support edge IDs)
+                edgeid eid = graphHasEdgeIds ? none : none;
+
+                // For undirected graphs, call with v, u (swapped)
+                edgeLambda(handle, v, u, weight, eid);
+            }
+        }
+    } else {
+        // Vector-based graphs should use GraphW
+        throw std::runtime_error("forInEdgesOfImpl not supported for vector-based graphs in base "
+                                 "Graph class - use GraphW");
+    }
 }
 
 template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
@@ -1613,9 +1692,47 @@ inline void Graph::parallelForEdgesImpl(L handle) const {
 
 template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
 inline double Graph::parallelSumForEdgesImpl(L handle) const {
-    // Base Graph class only supports CSR format
-    throw std::runtime_error("parallelSumForEdgesImpl not supported in base Graph class - use "
-                             "GraphW for mutable operations");
+    double sum = 0.0;
+
+    if (usingCSR) {
+        // CSR-based parallel implementation
+#pragma omp parallel for schedule(guided) reduction(+ : sum)
+        for (omp_index u = 0; u < static_cast<omp_index>(z); ++u) {
+            if (!exists[u])
+                continue;
+
+            auto [neighbors, degree] = getCSROutNeighbors(u);
+            if (neighbors == nullptr || degree == 0)
+                continue;
+
+            for (count i = 0; i < degree; ++i) {
+                node v = neighbors[i];
+                if (!exists[v])
+                    continue;
+
+                // For undirected graphs, only process edge if u >= v to avoid duplicates
+                if constexpr (!graphIsDirected) {
+                    if (!useEdgeInIteration<graphIsDirected>(u, v))
+                        continue;
+                }
+
+                // Get edge weight (currently CSR graphs are unweighted)
+                edgeweight weight = hasWeights ? defaultEdgeWeight : defaultEdgeWeight;
+
+                // Get edge ID (CSR graphs don't currently support edge IDs)
+                edgeid eid = graphHasEdgeIds ? none : none;
+
+                // Call the lambda and add result to sum
+                sum += edgeLambda(handle, u, v, weight, eid);
+            }
+        }
+    } else {
+        // Vector-based graphs should use GraphW
+        throw std::runtime_error("parallelSumForEdgesImpl not supported for vector-based graphs in "
+                                 "base Graph class - use GraphW");
+    }
+
+    return sum;
 }
 
 template <typename L>

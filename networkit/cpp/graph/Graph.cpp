@@ -233,4 +233,46 @@ count Graph::degreeCSR(node u, bool incoming) const {
     }
 }
 
+std::pair<const node *, count> Graph::getCSROutNeighbors(node u) const {
+    if (!usingCSR || u >= z || !outEdgesCSRIndices || !outEdgesCSRIndptr) {
+        return {nullptr, 0};
+    }
+
+    auto start_idx = outEdgesCSRIndptr->Value(u);
+    auto end_idx = outEdgesCSRIndptr->Value(u + 1);
+    count degree = end_idx - start_idx;
+
+    if (degree == 0) {
+        return {nullptr, 0};
+    }
+
+    // Return pointer to the beginning of this node's neighbors in the CSR indices array
+    const node *neighbors =
+        reinterpret_cast<const node *>(outEdgesCSRIndices->raw_values()) + start_idx;
+    return {neighbors, degree};
+}
+
+std::pair<const node *, count> Graph::getCSRInNeighbors(node u) const {
+    if (!usingCSR || u >= z || !directed || !inEdgesCSRIndices || !inEdgesCSRIndptr) {
+        // For undirected graphs, incoming neighbors are the same as outgoing neighbors
+        if (!directed) {
+            return getCSROutNeighbors(u);
+        }
+        return {nullptr, 0};
+    }
+
+    auto start_idx = inEdgesCSRIndptr->Value(u);
+    auto end_idx = inEdgesCSRIndptr->Value(u + 1);
+    count degree = end_idx - start_idx;
+
+    if (degree == 0) {
+        return {nullptr, 0};
+    }
+
+    // Return pointer to the beginning of this node's incoming neighbors in the CSR indices array
+    const node *neighbors =
+        reinterpret_cast<const node *>(inEdgesCSRIndices->raw_values()) + start_idx;
+    return {neighbors, degree};
+}
+
 } /* namespace NetworKit */

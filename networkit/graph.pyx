@@ -73,6 +73,72 @@ cdef class Graph:
 		newG = graphio.NetworkitBinaryReader().readFromBuffer(state)
 		self._this = move(_Graph((<Graph>newG)._this, <bool_t>(newG.isWeighted()), <bool_t>(newG.isDirected()), <bool_t>(newG.hasEdgeIds())))
 
+	@classmethod
+	def fromCSR(cls, count n, bool_t directed, out_indices, out_indptr, in_indices=None, in_indptr=None):
+		"""
+		fromCSR(n, directed, out_indices, out_indptr, in_indices=None, in_indptr=None)
+
+		Create a graph from CSR (Compressed Sparse Row) arrays.
+
+		Parameters
+		----------
+		n : int
+			Number of nodes
+		directed : bool
+			If True, the graph will be directed
+		out_indices : pyarrow.Array or list
+			CSR indices array containing neighbor node IDs for outgoing edges
+		out_indptr : pyarrow.Array or list
+			CSR indptr array containing offsets into out_indices for each node
+		in_indices : pyarrow.Array or list, optional
+			CSR indices array for incoming edges (only needed for directed graphs)
+		in_indptr : pyarrow.Array or list, optional
+			CSR indptr array for incoming edges (only needed for directed graphs)
+
+		Returns
+		-------
+		Graph
+			A new Graph instance using CSR storage
+		"""
+		# Convert to Python lists (efficient for CSR construction)
+		if hasattr(out_indices, 'to_pylist'):
+			out_indices_list = out_indices.to_pylist()
+		else:
+			out_indices_list = list(out_indices)
+
+		if hasattr(out_indptr, 'to_pylist'):
+			out_indptr_list = out_indptr.to_pylist()
+		else:
+			out_indptr_list = list(out_indptr)
+
+		# Handle incoming arrays for directed graphs
+		cdef vector[node] in_indices_vec
+		cdef vector[index] in_indptr_vec
+
+		if directed and in_indices is not None and in_indptr is not None:
+			if hasattr(in_indices, 'to_pylist'):
+				in_indices_list = in_indices.to_pylist()
+			else:
+				in_indices_list = list(in_indices)
+
+			if hasattr(in_indptr, 'to_pylist'):
+				in_indptr_list = in_indptr.to_pylist()
+			else:
+				in_indptr_list = list(in_indptr)
+
+			in_indices_vec = in_indices_list
+			in_indptr_vec = in_indptr_list
+
+		# Create CSR vectors
+		cdef vector[node] out_indices_vec = out_indices_list
+		cdef vector[index] out_indptr_vec = out_indptr_list
+
+		# Create Graph using vector-based CSR constructor
+		cdef Graph result = Graph.__new__(Graph)
+		result._this = _Graph(n, directed, out_indices_vec, out_indptr_vec, in_indices_vec, in_indptr_vec)
+
+		return result
+
 	def hasEdgeIds(self):
 		"""
 		hasEdgeIds()
