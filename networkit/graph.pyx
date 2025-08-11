@@ -8,6 +8,9 @@ from scipy.sparse import coo_matrix
 cimport numpy as cnp
 cnp.import_array()
 
+# PyArrow imports
+import pyarrow as pa
+
 from .base import Algorithm
 from .helpers import stdstring, pystring
 from .traversal import Traversal
@@ -78,7 +81,7 @@ cdef class Graph:
 		"""
 		fromCSR(n, directed, out_indices, out_indptr, in_indices=None, in_indptr=None)
 
-		Create a graph from CSR (Compressed Sparse Row) arrays.
+		Create a graph from CSR (Compressed Sparse Row) arrays using zero-copy Arrow arrays.
 
 		Parameters
 		----------
@@ -86,13 +89,13 @@ cdef class Graph:
 			Number of nodes
 		directed : bool
 			If True, the graph will be directed
-		out_indices : pyarrow.Array or list
+		out_indices : pyarrow.Array
 			CSR indices array containing neighbor node IDs for outgoing edges
-		out_indptr : pyarrow.Array or list
+		out_indptr : pyarrow.Array
 			CSR indptr array containing offsets into out_indices for each node
-		in_indices : pyarrow.Array or list, optional
+		in_indices : pyarrow.Array, optional
 			CSR indices array for incoming edges (only needed for directed graphs)
-		in_indptr : pyarrow.Array or list, optional
+		in_indptr : pyarrow.Array, optional
 			CSR indptr array for incoming edges (only needed for directed graphs)
 
 		Returns
@@ -100,42 +103,89 @@ cdef class Graph:
 		Graph
 			A new Graph instance using CSR storage
 		"""
-		# Convert to Python lists (efficient for CSR construction)
-		if hasattr(out_indices, 'to_pylist'):
-			out_indices_list = out_indices.to_pylist()
-		else:
-			out_indices_list = list(out_indices)
+		import pyarrow as pa
 
-		if hasattr(out_indptr, 'to_pylist'):
-			out_indptr_list = out_indptr.to_pylist()
-		else:
-			out_indptr_list = list(out_indptr)
+		# Declare all variables at the beginning
+		cdef CResult[shared_ptr[CArray]] out_indices_result
+		cdef CResult[shared_ptr[CArray]] out_indptr_result
+		cdef CResult[shared_ptr[CArray]] in_indices_result
+		cdef CResult[shared_ptr[CArray]] in_indptr_result
+		cdef shared_ptr[UInt64Array] out_indices_ptr
+		cdef shared_ptr[UInt64Array] out_indptr_ptr
+		cdef shared_ptr[UInt64Array] in_indices_ptr
+		cdef shared_ptr[UInt64Array] in_indptr_ptr
+		cdef Graph result
+
+		# Ensure arrays are UInt64Arrays
+		if not isinstance(out_indices, pa.UInt64Array):
+			out_indices = pa.array(out_indices, type=pa.uint64())
+		if not isinstance(out_indptr, pa.UInt64Array):
+			out_indptr = pa.array(out_indptr, type=pa.uint64())
+
+		# Convert using C Data Interface - keep Python objects alive
+		# Get C interface data and keep references alive
+		out_indices_c_data = out_indices.__arrow_c_array__()
+		out_indices_schema_capsule, out_indices_array_capsule = out_indices_c_data
+
+		out_indptr_c_data = out_indptr.__arrow_c_array__()
+		out_indptr_schema_capsule, out_indptr_array_capsule = out_indptr_c_data
+
+		# Import arrays from C Data Interface
+		out_indices_result = ImportArray(<ArrowArray*>PyCapsule_GetPointer(out_indices_array_capsule, "arrow_array"),
+		                                  <ArrowSchema*>PyCapsule_GetPointer(out_indices_schema_capsule, "arrow_schema"))
+		if not out_indices_result.ok():
+			error_msg = f"Failed to import out_indices array: {out_indices_result.status().ToString().decode()}"
+			raise RuntimeError(error_msg)
+		out_indices_ptr = static_pointer_cast[UInt64Array, CArray](out_indices_result.ValueOrDie())
+
+		out_indptr_result = ImportArray(<ArrowArray*>PyCapsule_GetPointer(out_indptr_array_capsule, "arrow_array"),
+		                                <ArrowSchema*>PyCapsule_GetPointer(out_indptr_schema_capsule, "arrow_schema"))
+		if not out_indptr_result.ok():
+			error_msg = f"Failed to import out_indptr array: {out_indptr_result.status().ToString().decode()}"
+			raise RuntimeError(error_msg)
+		out_indptr_ptr = static_pointer_cast[UInt64Array, CArray](out_indptr_result.ValueOrDie())
 
 		# Handle incoming arrays for directed graphs
-		cdef vector[node] in_indices_vec
-		cdef vector[index] in_indptr_vec
-
 		if directed and in_indices is not None and in_indptr is not None:
-			if hasattr(in_indices, 'to_pylist'):
-				in_indices_list = in_indices.to_pylist()
-			else:
-				in_indices_list = list(in_indices)
+			if not isinstance(in_indices, pa.UInt64Array):
+				in_indices = pa.array(in_indices, type=pa.uint64())
+			if not isinstance(in_indptr, pa.UInt64Array):
+				in_indptr = pa.array(in_indptr, type=pa.uint64())
 
-			if hasattr(in_indptr, 'to_pylist'):
-				in_indptr_list = in_indptr.to_pylist()
-			else:
-				in_indptr_list = list(in_indptr)
+			# Convert using C Data Interface - keep Python objects alive
+			in_indices_c_data = in_indices.__arrow_c_array__()
+			in_indices_schema_capsule, in_indices_array_capsule = in_indices_c_data
 
-			in_indices_vec = in_indices_list
-			in_indptr_vec = in_indptr_list
+			in_indptr_c_data = in_indptr.__arrow_c_array__()
+			in_indptr_schema_capsule, in_indptr_array_capsule = in_indptr_c_data
 
-		# Create CSR vectors
-		cdef vector[node] out_indices_vec = out_indices_list
-		cdef vector[index] out_indptr_vec = out_indptr_list
+			# Import arrays from C Data Interface
+			in_indices_result = ImportArray(<ArrowArray*>PyCapsule_GetPointer(in_indices_array_capsule, "arrow_array"),
+			                                <ArrowSchema*>PyCapsule_GetPointer(in_indices_schema_capsule, "arrow_schema"))
+			if not in_indices_result.ok():
+				error_msg = f"Failed to import in_indices array: {in_indices_result.status().ToString().decode()}"
+				raise RuntimeError(error_msg)
+			in_indices_ptr = static_pointer_cast[UInt64Array, CArray](in_indices_result.ValueOrDie())
 
-		# Create Graph using vector-based CSR constructor
-		cdef Graph result = Graph.__new__(Graph)
-		result._this = _Graph(n, directed, out_indices_vec, out_indptr_vec, in_indices_vec, in_indptr_vec)
+			in_indptr_result = ImportArray(<ArrowArray*>PyCapsule_GetPointer(in_indptr_array_capsule, "arrow_array"),
+			                               <ArrowSchema*>PyCapsule_GetPointer(in_indptr_schema_capsule, "arrow_schema"))
+			if not in_indptr_result.ok():
+				error_msg = f"Failed to import in_indptr array: {in_indptr_result.status().ToString().decode()}"
+				raise RuntimeError(error_msg)
+			in_indptr_ptr = static_pointer_cast[UInt64Array, CArray](in_indptr_result.ValueOrDie())
+
+		# Create Graph using Arrow CSR constructor
+		result = Graph.__new__(Graph)
+		print(f"Creating Graph with CSR constructor: n={n}, directed={directed}")
+		# Force the correct constructor by explicitly casting parameters
+		result._this = _Graph(
+			<count>n,
+			<bool_t>directed,
+			<shared_ptr[UInt64Array]>out_indices_ptr,
+			<shared_ptr[UInt64Array]>out_indptr_ptr,
+			<shared_ptr[UInt64Array]>in_indices_ptr,
+			<shared_ptr[UInt64Array]>in_indptr_ptr
+		)
 
 		return result
 

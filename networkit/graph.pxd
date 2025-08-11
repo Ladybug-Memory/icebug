@@ -11,10 +11,53 @@ from libcpp.memory cimport shared_ptr
 from .base cimport _Algorithm, Algorithm
 from .structures cimport edgeid, index, count, node, edgeweight
 
+# PyArrow C++ interface declarations
+cdef extern from "arrow/api.h" namespace "arrow":
+	cdef cppclass UInt64Array:
+		pass
+	cdef cppclass CArray "arrow::Array":
+		pass
+
+	# Result type for Arrow operations
+	cdef cppclass CStatus "arrow::Status":
+		string ToString()
+
+	cdef cppclass CResult "arrow::Result" [T]:
+		bool_t ok()
+		T ValueOrDie() except +
+		CStatus status()
+
+# Python C API
+cdef extern from "Python.h":
+	void* PyCapsule_GetPointer(object capsule, const char* name) except NULL
+
+# PyArrow C Data Interface
+cdef extern from "arrow/c/abi.h":
+	cdef struct ArrowArray:
+		pass
+	cdef struct ArrowSchema:
+		pass
+
+cdef extern from "arrow/c/bridge.h" namespace "arrow":
+	CResult[shared_ptr[CArray]] ImportArray "arrow::ImportArray" (ArrowArray* c_array, ArrowSchema* c_schema) except +
+
+cdef extern from "arrow/type.h" namespace "arrow":
+	cdef cppclass DataType:
+		pass
+	shared_ptr[DataType] uint64 "arrow::uint64" () except +
+
+# Note: PyArrow integration was complex due to missing headers
+# Use vector-based approach for now as fallback
+# cdef extern from "arrow/python/pyarrow.h" namespace "arrow::py":
+# 	shared_ptr[UInt64Array] unwrap_array "arrow::py::unwrap_array" (object) except +
+
 cdef extern from "<algorithm>" namespace "std":
 	void swap[T](T &a,  T &b)
 	_Graph move( _Graph t ) nogil
 	vector[double] move(vector[double])
+
+cdef extern from "<memory>" namespace "std":
+	shared_ptr[T] static_pointer_cast[T, U](shared_ptr[U] ptr) nogil
 
 cdef extern from "cython_helper.h":
 	void throw_runtime_error(string message)
@@ -22,10 +65,6 @@ cdef extern from "cython_helper.h":
 cdef extern from "<networkit/Globals.hpp>" namespace "NetworKit":
 
 	index _none "NetworKit::none"
-
-cdef extern from "<arrow/api.h>" namespace "arrow":
-	cdef cppclass UInt64Array:
-		pass
 
 cdef extern from "<networkit/graph/Graph.hpp>":
 
@@ -44,7 +83,6 @@ cdef extern from "<networkit/graph/Graph.hpp>":
 		_Graph(const _Graph& other) except +
 		_Graph(const _Graph& other, bool_t weighted, bool_t directed, bool_t edgesIndexed) except +
 		_Graph(count n, bool_t directed, shared_ptr[UInt64Array] outIndices, shared_ptr[UInt64Array] outIndptr, shared_ptr[UInt64Array] inIndices, shared_ptr[UInt64Array] inIndptr) except +
-		_Graph(count n, bool_t directed, vector[node] outIndices, vector[index] outIndptr, vector[node] inIndices, vector[index] inIndptr) except +
 		bool_t hasEdgeIds() except +
 		edgeid edgeId(node, node) except +
 		count numberOfNodes() except +
