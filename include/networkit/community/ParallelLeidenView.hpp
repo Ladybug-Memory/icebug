@@ -54,6 +54,8 @@ public:
     explicit ParallelLeidenView(const Graph &graph, int iterations = 3, bool randomize = true,
                                 double gamma = 1);
 
+    ~ParallelLeidenView();
+
     void run() override;
 
     int VECTOR_OVERSIZE = 10000;

@@ -16,6 +16,13 @@ ParallelLeidenView::ParallelLeidenView(const Graph &graph, int iterations, bool 
     this->result.allToSingletons();
 }
 
+ParallelLeidenView::~ParallelLeidenView() {
+    // Explicitly clear resources in proper order to avoid double-free
+    coarsenedGraphs.clear();
+    mappings.clear();
+    communityVolumes.clear();
+}
+
 void ParallelLeidenView::run() {
     if (VECTOR_OVERSIZE < 1) {
         throw std::invalid_argument("VECTOR_OVERSIZE cant be smaller than 1");

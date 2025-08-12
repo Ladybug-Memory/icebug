@@ -130,9 +130,11 @@ edgeweight Graph::weightedDegreeIn(node u, bool countSelfLoopsTwice) const {
 /** EDGE MODIFIERS **/
 
 edgeweight Graph::weight(node u, node v) const {
-    // Base Graph class only supports CSR format
-    throw std::runtime_error(
-        "weight method not supported in base Graph class - use GraphW for vector-based operations");
+    // For CSR-based graphs, return default weight of 1.0 if edge exists
+    if (hasEdge(u, v)) {
+        return 1.0;
+    }
+    return 0.0;  // No edge
 }
 
 void Graph::setWeightAtIthNeighbor(Unsafe, node u, index i, edgeweight ew) {
