@@ -705,6 +705,12 @@ cdef extern from "<networkit/community/ParallelLeiden.hpp>":
 		_ParallelLeiden(_Graph _G) except +
 		_ParallelLeiden(_Graph _G, int iterations, bool_t randomize, double gamma) except +
 
+cdef extern from "<networkit/community/ParallelLeidenView.hpp>":
+
+	cdef cppclass _ParallelLeidenView "NetworKit::ParallelLeidenView"(_CommunityDetectionAlgorithm):
+		_ParallelLeidenView(_Graph _G) except +
+		_ParallelLeidenView(_Graph _G, int iterations, bool_t randomize, double gamma) except +
+
 cdef class ParallelLeiden(CommunityDetector):
 	""" 
 	ParallelLeiden(G, randomize=True, iterations=3, gamma=1)
@@ -733,6 +739,43 @@ cdef class ParallelLeiden(CommunityDetector):
 	def __cinit__(self, Graph G not None, int iterations = 3, bool_t randomize = True, double gamma = 1):
 		self._G = G
 		self._this = new _ParallelLeiden(G._this,iterations,randomize,gamma)
+
+cdef class ParallelLeidenView(CommunityDetector):
+	""" 
+	ParallelLeidenView(G, randomize=True, iterations=3, gamma=1)
+
+	Memory-efficient Parallel Leiden Algorithm using CoarsenedGraphView.
+
+	This is a memory-optimized version of the Leiden algorithm that uses view objects
+	instead of creating new graph structures during coarsening. This can reduce memory
+	usage by 50-90% compared to the traditional approach, especially for large graphs
+	with multiple coarsening levels.
+
+	The algorithm provides the same functionality as ParallelLeiden but with significantly
+	reduced memory footprint during the coarsening process.
+
+    As reported by Sahu et. al in "GVE-Leiden: Fast Leiden Algorithm for Community
+    Detection in Shared Memory Setting", the current implementation in NetworKit might create a
+    small fraction of disconnected communities. Since this violates the guarantees from the
+    original algorithm, ParallelLeidenView should be used with caution. In addition the modularity 
+	value of the resulting partition / clustering can be lower compared to other Leiden 
+	implementations and even Louvain.
+
+	Parameters
+	----------
+	G : networkit.Graph
+		A graph.
+	randomize : bool, optional
+		Whether to randomize the node order or not. Default: True
+	iterations : int, optional
+		Maximum count of Leiden runs. Default: 3
+	gamma : float, optional
+		Multi-resolution modularity parameter: 1.0 (standard modularity), 0.0 (one community), 2m (singleton communities). Default: 1.0
+	"""
+
+	def __cinit__(self, Graph G not None, int iterations = 3, bool_t randomize = True, double gamma = 1):
+		self._G = G
+		self._this = new _ParallelLeidenView(G._this,iterations,randomize,gamma)
 
 cdef extern from "<networkit/community/LouvainMapEquation.hpp>":
 	cdef cppclass _LouvainMapEquation "NetworKit::LouvainMapEquation"(_CommunityDetectionAlgorithm):

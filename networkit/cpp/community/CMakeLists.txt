@@ -37,6 +37,7 @@ networkit_add_module(community
     StablePartitionNodes.cpp
     LouvainMapEquation.cpp
     ParallelLeiden.cpp
+    ParallelLeidenView.cpp
     )
 
 networkit_module_link_modules(community
