@@ -46,6 +46,9 @@ cdef class Graph:
 		else:
 			self._this = move(_Graph(<count>n, weighted, directed, edgesIndexed))
 
+		# Keep Arrow arrays alive for CSR graphs
+		self._arrow_arrays = {}
+
 	cdef setThis(self, _Graph& other):
 		swap[_Graph](self._this, other)
 		return self
@@ -177,6 +180,16 @@ cdef class Graph:
 		# Create Graph using Arrow CSR constructor
 		result = Graph.__new__(Graph)
 		print(f"Creating Graph with CSR constructor: n={n}, directed={directed}")
+
+		# Store Arrow arrays in the graph to keep them alive
+		result._arrow_arrays = {
+			'out_indices': out_indices,
+			'out_indptr': out_indptr,
+		}
+		if directed and in_indices is not None and in_indptr is not None:
+			result._arrow_arrays['in_indices'] = in_indices
+			result._arrow_arrays['in_indptr'] = in_indptr
+
 		# Force the correct constructor by explicitly casting parameters
 		result._this = _Graph(
 			<count>n,

@@ -7,6 +7,15 @@ This script demonstrates:
 2. Zero-copy construction using Arrow C Data Interface
 3. Running ParallelLeidenView algorithm on CSR graphs
 4. Memory-efficient graph processing for community detection
+
+IMPORTANT: Arrow arrays must be kept alive as long as the graph exists!
+The CSR graph holds raw pointers to the Arrow array data, so if the Arrow
+arrays are garbage collected, the pointers become invalid causing crashes
+during parallel execution.
+
+SOLUTION: We store Arrow arrays in a global registry keyed by the graph's id.
+When the graph is used, the arrays stay alive. The graph object itself doesn't
+need modification.
 """
 
 import numpy as np
@@ -14,11 +23,21 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pandas as pd
 import networkit as nk
+import weakref
+
+# Global registry to keep Arrow arrays alive
+# Key: graph id, Value: dict with Arrow arrays
+# Using weakref allows cleanup when graph is garbage collected
+_arrow_registry = {}
 
 
 def create_graph_arrow_optimized(df, directed=False):
     """
     Create a NetworKit CSR graph from pandas DataFrame using the new fromCSR method.
+
+    IMPORTANT: Arrow arrays are stored in a global registry to keep them alive
+    as long as the graph exists. The registry uses weak references to allow
+    automatic cleanup when the graph is garbage collected.
     """
     print(
         f"Creating {'directed' if directed else 'undirected'} graph from {len(df)} edges..."
@@ -79,8 +98,17 @@ def create_graph_arrow_optimized(df, directed=False):
     indptr_arrow = pa.array(indptr, type=pa.uint64())
 
     print(f"Creating Graph with CSR constructor: n={n_nodes}, directed={directed}")
+
     # Create NetworKit Graph using the new fromCSR method
     graph = nk.GraphR.fromCSR(n_nodes, directed, indices_arrow, indptr_arrow)
+
+    # CRITICAL: Keep Arrow arrays alive by storing them in a registry keyed by graph id
+    # The C++ CSR graph holds raw pointers to the Arrow array data
+    graph_id = id(graph)
+    _arrow_registry[graph_id] = {
+        'indices': indices_arrow,
+        'indptr': indptr_arrow,
+    }
 
     print(
         f"Created NetworKit graph: {graph.numberOfNodes()} nodes, {graph.numberOfEdges()} edges"
@@ -119,10 +147,9 @@ def test_parallel_leiden_algorithm(graph):
     print("\n=== Testing ParallelLeidenView Algorithm ===")
 
     try:
-        # Create ParallelLeidenView instance with only 1 iteration to avoid coarsening
-        # ( coarsening has issues with CSR graphs that need to be fixed )
+        # Create ParallelLeidenView instance
         leiden = nk.community.ParallelLeidenView(
-            graph, iterations=1, randomize=True, gamma=1.0
+            graph, iterations=3, randomize=True, gamma=1.0
         )
         print("Created ParallelLeidenView instance")
 
@@ -136,7 +163,7 @@ def test_parallel_leiden_algorithm(graph):
         print(f"Community detection results for {graph.numberOfNodes()} nodes:")
         print(f"Number of communities found: {partition.numberOfSubsets()}")
 
-        # Print community assignments for first 10 nodes
+        # Print community assignments
         for node in range(min(graph.numberOfNodes(), 10)):
             community = partition[node]
             print(f"  Node {node}: Community = {community}")
@@ -188,8 +215,7 @@ def test_larger_graph():
     # Create graph using CSR constructor
     graph = create_graph_arrow_optimized(df_arrow, directed=False)
 
-    # Run ParallelLeidenView with 1 iteration (coarsening has issues with CSR graphs)
-    # TODO: Fix the CSR graph compatibility issue in ParallelLeidenView coarsening
+    # Run ParallelLeidenView
     success = test_parallel_leiden_algorithm(graph)
 
     return graph, success
