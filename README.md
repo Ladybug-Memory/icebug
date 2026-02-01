@@ -39,6 +39,7 @@ package:
 - [CMake] version 3.6 or higher (Advised to use system packages if available. Alternative: `pip3 install cmake`)
 - Build system: [Make] or [Ninja]
 - Cython version 0.29 or higher (e.g., `pip3 install cython`)
+- Apache Arrow development libraries (libarrow-dev)
 
 ## Install
 
