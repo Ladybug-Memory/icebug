@@ -295,9 +295,23 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
-      - name: Install Apache Arrow
+      - name: Create vcpkg manifest
+        shell: bash
         run: |
-          vcpkg install arrow:x64-windows
+          cat > vcpkg.json << 'EOF'
+          {
+            "name": "networkit-deps",
+            "version": "1.0.0",
+            "dependencies": [
+              "arrow"
+            ]
+          }
+          EOF
+      - name: Setup vcpkg and install Apache Arrow
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: 'b322364f06308bdd24823f9d8f03fe0cc86fd46f'
+          runVcpkgInstall: true
       - name: Setup devCmd (vstools)
         uses: ilammy/msvc-dev-cmd@v1
       - name: Prepare environment and run checks
@@ -329,9 +343,23 @@ jobs:
         with:
           repository: tlx/tlx
           path: tlx
-      - name: Install Apache Arrow
+      - name: Create vcpkg manifest
+        shell: bash
         run: |
-          vcpkg install arrow:x64-windows
+          cat > vcpkg.json << 'EOF'
+          {
+            "name": "networkit-deps",
+            "version": "1.0.0",
+            "dependencies": [
+              "arrow"
+            ]
+          }
+          EOF
+      - name: Setup vcpkg and install Apache Arrow
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: 'b322364f06308bdd24823f9d8f03fe0cc86fd46f'
+          runVcpkgInstall: true
       - name: Setup devCmd (vstools)
         uses: ilammy/msvc-dev-cmd@v1
       - name: Prepare environment and run checks
