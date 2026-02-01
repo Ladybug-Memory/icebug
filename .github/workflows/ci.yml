@@ -213,7 +213,7 @@ jobs:
 
   linux-build-misc:
     name: "Linux (${{ matrix.compiler }}): core"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         compiler: ['llvm-19']
@@ -265,7 +265,7 @@ jobs:
 
   linux-build-clang-tidy:
     name: "Linux (llvm-17): clang-tidy"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     env:
       CC: clang-17
       CXX: clang++-17
@@ -362,7 +362,7 @@ jobs:
 
   documentation-build:
     name: "Linux (gcc-11, CPython 3.13): documentation"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     env:
       CC: gcc-11
       CXX: g++-11
@@ -400,7 +400,7 @@ jobs:
 
   style-guide-compliance-build:
     name: "Linux (default): code-style"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Install prerequisites
         run: |
