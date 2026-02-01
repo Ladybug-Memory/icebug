@@ -576,24 +576,52 @@ public:
     class NeighborRange {
         const Graph *G;
         node u{none};
+        mutable std::vector<node> neighborBuffer;
+        mutable bool initialized{false};
+
+        void initialize() const {
+            if (initialized)
+                return;
+
+            std::pair<const node *, count> neighbors;
+            if (InEdges) {
+                neighbors = G->getCSRInNeighbors(u);
+            } else {
+                neighbors = G->getCSROutNeighbors(u);
+            }
+
+            neighborBuffer.clear();
+            neighborBuffer.reserve(neighbors.second);
+            for (count i = 0; i < neighbors.second; ++i) {
+                if (G->exists[neighbors.first[i]]) {
+                    neighborBuffer.push_back(neighbors.first[i]);
+                }
+            }
+            initialized = true;
+        }
 
     public:
-        NeighborRange(const Graph &G, node u) : G(&G), u(u) { assert(G.hasNode(u)); };
-
-        NeighborRange() : G(nullptr){};
+        NeighborRange(const Graph &G, node u) : G(&G), u(u) {}
+        NeighborRange() : G(nullptr) {}
 
         NeighborIterator begin() const {
             assert(G);
-            // Base Graph class only supports CSR format
-            throw std::runtime_error("NeighborRange iterators not supported in base Graph class - "
-                                     "use GraphW for mutable operations");
+            if (!G->usingCSR) {
+                throw std::runtime_error("NeighborRange iterators require CSR format");
+            }
+
+            initialize();
+            return NeighborIterator(neighborBuffer.begin());
         }
 
         NeighborIterator end() const {
             assert(G);
-            // Base Graph class only supports CSR format
-            throw std::runtime_error("NeighborRange iterators not supported in base Graph class - "
-                                     "use GraphW for mutable operations");
+            if (!G->usingCSR) {
+                throw std::runtime_error("NeighborRange iterators require CSR format");
+            }
+
+            initialize();
+            return NeighborIterator(neighborBuffer.end());
         }
     };
 
@@ -607,27 +635,64 @@ public:
      */
     template <bool InEdges = false>
     class NeighborWeightRange {
-
         const Graph *G;
         node u{none};
+        mutable std::vector<node> neighborBuffer;
+        mutable std::vector<edgeweight> weightBuffer;
+        mutable bool initialized{false};
+
+        void initialize() const {
+            if (initialized)
+                return;
+
+            std::pair<const node *, count> neighbors;
+            if (InEdges) {
+                neighbors = G->getCSRInNeighbors(u);
+            } else {
+                neighbors = G->getCSROutNeighbors(u);
+            }
+
+            neighborBuffer.clear();
+            weightBuffer.clear();
+            neighborBuffer.reserve(neighbors.second);
+            weightBuffer.reserve(neighbors.second);
+
+            for (count i = 0; i < neighbors.second; ++i) {
+                if (G->exists[neighbors.first[i]]) {
+                    neighborBuffer.push_back(neighbors.first[i]);
+                    // For CSR graphs, all edges have default weight
+                    weightBuffer.push_back(defaultEdgeWeight);
+                }
+            }
+            initialized = true;
+        }
 
     public:
-        NeighborWeightRange(const Graph &G, node u) : G(&G), u(u) { assert(G.hasNode(u)); };
-
-        NeighborWeightRange() : G(nullptr){};
+        NeighborWeightRange(const Graph &G, node u) : G(&G), u(u) {}
+        NeighborWeightRange() : G(nullptr) {}
 
         NeighborWeightIterator begin() const {
             assert(G);
-            // Base Graph class only supports CSR format
-            throw std::runtime_error("NeighborWeightRange iterators not supported in base Graph "
-                                     "class - use GraphW for mutable operations");
+            if (!G->usingCSR) {
+                throw std::runtime_error("NeighborWeightRange iterators require CSR format");
+            }
+
+            initialize();
+            return NeighborWeightIterator(
+                typename std::vector<node>::const_iterator(neighborBuffer.begin()),
+                typename std::vector<edgeweight>::const_iterator(weightBuffer.begin()));
         }
 
         NeighborWeightIterator end() const {
             assert(G);
-            // Base Graph class only supports CSR format
-            throw std::runtime_error("NeighborWeightRange iterators not supported in base Graph "
-                                     "class - use GraphW for mutable operations");
+            if (!G->usingCSR) {
+                throw std::runtime_error("NeighborWeightRange iterators require CSR format");
+            }
+
+            initialize();
+            return NeighborWeightIterator(
+                typename std::vector<node>::const_iterator(neighborBuffer.end()),
+                typename std::vector<edgeweight>::const_iterator(weightBuffer.end()));
         }
     };
 

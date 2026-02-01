@@ -65,24 +65,103 @@ Graph::Graph(count n, bool directed, std::shared_ptr<arrow::UInt64Array> outIndi
 
 /** PRIVATE HELPERS **/
 
-index Graph::indexInInEdgeArray([[maybe_unused]] node v, [[maybe_unused]] node u) const {
-    // Base Graph class only supports CSR format
-    throw std::runtime_error("indexInInEdgeArray not supported in base Graph class - use GraphW "
-                             "for vector-based operations");
+index Graph::indexInInEdgeArray(node v, node u) const {
+    // For CSR-based graphs, find index of node u in incoming edges of node v
+    if (!usingCSR) {
+        throw std::runtime_error("indexInInEdgeArray requires CSR format");
+    }
+
+    // For undirected graphs, incoming edges are the same as outgoing
+    if (!directed) {
+        return indexInOutEdgeArray(v, u);
+    }
+
+    // Use incoming CSR arrays for directed graphs
+    if (!inEdgesCSRIndices || !inEdgesCSRIndptr || v >= z || u >= z) {
+        return none;
+    }
+
+    auto start_idx = inEdgesCSRIndptr->Value(v);
+    auto end_idx = inEdgesCSRIndptr->Value(v + 1);
+
+    // Linear search for node u in the incoming adjacency list
+    for (auto idx = start_idx; idx < end_idx; ++idx) {
+        auto neighbor = inEdgesCSRIndices->Value(idx);
+        if (neighbor == u) {
+            return idx - start_idx; // Return index within the adjacency list
+        }
+        if (neighbor > u) {
+            break; // Assuming sorted neighbors
+        }
+    }
+
+    return none; // Node u not found in incoming edges of v
 }
 
-index Graph::indexInOutEdgeArray([[maybe_unused]] node u, [[maybe_unused]] node v) const {
-    // Base Graph class only supports CSR format
-    throw std::runtime_error("indexInOutEdgeArray not supported in base Graph class - use GraphW "
-                             "for vector-based operations");
+index Graph::indexInOutEdgeArray(node u, node v) const {
+    // For CSR-based graphs, find index of node v in outgoing edges of node u
+    if (!usingCSR) {
+        throw std::runtime_error("indexInOutEdgeArray requires CSR format");
+    }
+
+    if (!outEdgesCSRIndices || !outEdgesCSRIndptr || u >= z || v >= z) {
+        return none;
+    }
+
+    auto start_idx = outEdgesCSRIndptr->Value(u);
+    auto end_idx = outEdgesCSRIndptr->Value(u + 1);
+
+    // Linear search for node v in the outgoing adjacency list
+    for (auto idx = start_idx; idx < end_idx; ++idx) {
+        auto neighbor = outEdgesCSRIndices->Value(idx);
+        if (neighbor == v) {
+            return idx - start_idx; // Return index within the adjacency list
+        }
+        if (neighbor > v) {
+            break; // Assuming sorted neighbors
+        }
+    }
+
+    return none; // Node v not found in outgoing edges of u
 }
 
 /** EDGE IDS **/
 
-edgeid Graph::edgeId([[maybe_unused]] node u, [[maybe_unused]] node v) const {
-    // Base Graph class only supports CSR format
-    throw std::runtime_error(
-        "edgeId not supported in base Graph class - use GraphW for vector-based operations");
+edgeid Graph::edgeId(node u, node v) const {
+    // For CSR-based graphs, calculate edge ID based on position in CSR array
+    if (!usingCSR) {
+        throw std::runtime_error("edgeId requires CSR format");
+    }
+
+    if (!hasEdge(u, v)) {
+        return none;
+    }
+
+    // For undirected graphs, ensure consistent ordering (u <= v)
+    if (!directed && u > v) {
+        std::swap(u, v);
+    }
+
+    // Find the global index of this edge in the CSR indices array
+    if (!outEdgesCSRIndptr || !outEdgesCSRIndices) {
+        return none;
+    }
+
+    // Sum up the degrees of all nodes before u to get the offset
+    edgeid edgeIndex = 0;
+    for (node i = 0; i < u; ++i) {
+        edgeIndex += outEdgesCSRIndptr->Value(i + 1) - outEdgesCSRIndptr->Value(i);
+    }
+
+    // Add the position within u's adjacency list
+    auto start_idx = outEdgesCSRIndptr->Value(u);
+    for (auto idx = start_idx; idx < outEdgesCSRIndptr->Value(u + 1); ++idx) {
+        if (outEdgesCSRIndices->Value(idx) == v) {
+            return edgeIndex + (idx - start_idx);
+        }
+    }
+
+    return none; // Should not reach here if hasEdge returned true
 }
 
 /** GRAPH INFORMATION **/
@@ -137,18 +216,73 @@ edgeweight Graph::weight(node u, node v) const {
     return 0.0; // No edge
 }
 
-void Graph::setWeightAtIthNeighbor(Unsafe, [[maybe_unused]] node u, [[maybe_unused]] index i,
-                                   [[maybe_unused]] edgeweight ew) {
-    // Base Graph class only supports CSR format
-    throw std::runtime_error("setWeightAtIthNeighbor not supported in base Graph class - use "
-                             "GraphW for mutable operations");
+void Graph::setWeightAtIthNeighbor(Unsafe, node u, index i, [[maybe_unused]] edgeweight ew) {
+    // For CSR-based graphs, this operation requires modifying the CSR structure
+    // Currently CSR graphs are unweighted, so this operation is not directly supported
+    // For weighted graphs, you would need to:
+    // 1. Store weights in a separate CSR array
+    // 2. Update the weight at the specified position
+
+    if (!usingCSR) {
+        throw std::runtime_error("setWeightAtIthNeighbor requires CSR format");
+    }
+
+    // Validate indices
+    if (u >= z || !outEdgesCSRIndptr) {
+        throw std::out_of_range("Invalid node index in setWeightAtIthNeighbor");
+    }
+
+    auto start_idx = outEdgesCSRIndptr->Value(u);
+    auto end_idx = outEdgesCSRIndptr->Value(u + 1);
+    count degree = end_idx - start_idx;
+
+    if (i >= degree) {
+        throw std::out_of_range("Invalid neighbor index in setWeightAtIthNeighbor");
+    }
+
+    // For now, CSR graphs don't support weights
+    // In a full implementation, you would update a separate weights CSR array
+    // For unweighted CSR graphs, setting weights doesn't make sense
+    throw std::runtime_error("setWeightAtIthNeighbor not supported for unweighted CSR graphs. "
+                             "Use GraphW for weighted mutable graphs.");
 }
 
-void Graph::setWeightAtIthInNeighbor(Unsafe, [[maybe_unused]] node u, [[maybe_unused]] index i,
-                                     [[maybe_unused]] edgeweight ew) {
-    // Base Graph class only supports CSR format
-    throw std::runtime_error("setWeightAtIthInNeighbor not supported in base Graph class - use "
-                             "GraphW for mutable operations");
+void Graph::setWeightAtIthInNeighbor(Unsafe, node u, index i, [[maybe_unused]] edgeweight ew) {
+    // For CSR-based graphs, this operation requires modifying the CSR structure
+    // Currently CSR graphs are unweighted, so this operation is not directly supported
+
+    if (!usingCSR) {
+        throw std::runtime_error("setWeightAtIthInNeighbor requires CSR format");
+    }
+
+    // For directed graphs, use incoming CSR arrays
+    if (directed) {
+        if (!inEdgesCSRIndptr) {
+            throw std::runtime_error("setWeightAtIthInNeighbor requires incoming CSR arrays");
+        }
+
+        // Validate indices
+        if (u >= z) {
+            throw std::out_of_range("Invalid node index in setWeightAtIthInNeighbor");
+        }
+
+        auto start_idx = inEdgesCSRIndptr->Value(u);
+        auto end_idx = inEdgesCSRIndptr->Value(u + 1);
+        count degree = end_idx - start_idx;
+
+        if (i >= degree) {
+            throw std::out_of_range("Invalid neighbor index in setWeightAtIthInNeighbor");
+        }
+    } else {
+        // For undirected graphs, incoming neighbors are the same as outgoing neighbors
+        // Just redirect to the outgoing neighbor version
+        setWeightAtIthNeighbor(Unsafe{}, u, i, ew);
+        return;
+    }
+
+    // For now, CSR graphs don't support weights
+    throw std::runtime_error("setWeightAtIthInNeighbor not supported for unweighted CSR graphs. "
+                             "Use GraphW for weighted mutable graphs.");
 }
 
 edgeweight Graph::totalEdgeWeight() const noexcept {
