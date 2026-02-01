@@ -315,11 +315,13 @@ jobs:
             ]
           }
           EOF
-      - name: Setup vcpkg and install Apache Arrow
+      - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgGitCommitId: 'b322364f06308bdd24823f9d8f03fe0cc86fd46f'
           runVcpkgInstall: true
+        env:
+          VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
       - name: Setup devCmd (vstools)
         uses: ilammy/msvc-dev-cmd@v1
       - name: Prepare environment and run checks
@@ -363,11 +365,13 @@ jobs:
             ]
           }
           EOF
-      - name: Setup vcpkg and install Apache Arrow
+      - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgGitCommitId: 'b322364f06308bdd24823f9d8f03fe0cc86fd46f'
           runVcpkgInstall: true
+        env:
+          VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
       - name: Setup devCmd (vstools)
         uses: ilammy/msvc-dev-cmd@v1
       - name: Prepare environment and run checks
