@@ -323,6 +323,7 @@ if(NETWORKIT_PYTHON)
 		target_include_directories(${TARGET_LIB} PRIVATE "${PROJECT_SOURCE_DIR}/extlibs/ttmath/")
 		target_include_directories(${TARGET_LIB} PRIVATE "${NETWORKIT_PYTHON}")
 		target_include_directories(${TARGET_LIB} PUBLIC "${NETWORKIT_NUMPY}")
+		target_compile_definitions(${TARGET_LIB} PRIVATE NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION)
 
 		if(NOT NETWORKIT_BUILD_CORE)
 			if(NOT EXTERNAL_NETWORKIT_CORE)

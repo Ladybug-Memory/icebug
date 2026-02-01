@@ -65,13 +65,13 @@ Graph::Graph(count n, bool directed, std::shared_ptr<arrow::UInt64Array> outIndi
 
 /** PRIVATE HELPERS **/
 
-index Graph::indexInInEdgeArray(node v, node u) const {
+index Graph::indexInInEdgeArray([[maybe_unused]] node v, [[maybe_unused]] node u) const {
     // Base Graph class only supports CSR format
     throw std::runtime_error("indexInInEdgeArray not supported in base Graph class - use GraphW "
                              "for vector-based operations");
 }
 
-index Graph::indexInOutEdgeArray(node u, node v) const {
+index Graph::indexInOutEdgeArray([[maybe_unused]] node u, [[maybe_unused]] node v) const {
     // Base Graph class only supports CSR format
     throw std::runtime_error("indexInOutEdgeArray not supported in base Graph class - use GraphW "
                              "for vector-based operations");
@@ -79,7 +79,7 @@ index Graph::indexInOutEdgeArray(node u, node v) const {
 
 /** EDGE IDS **/
 
-edgeid Graph::edgeId(node u, node v) const {
+edgeid Graph::edgeId([[maybe_unused]] node u, [[maybe_unused]] node v) const {
     // Base Graph class only supports CSR format
     throw std::runtime_error(
         "edgeId not supported in base Graph class - use GraphW for vector-based operations");
@@ -134,16 +134,18 @@ edgeweight Graph::weight(node u, node v) const {
     if (hasEdge(u, v)) {
         return 1.0;
     }
-    return 0.0;  // No edge
+    return 0.0; // No edge
 }
 
-void Graph::setWeightAtIthNeighbor(Unsafe, node u, index i, edgeweight ew) {
+void Graph::setWeightAtIthNeighbor(Unsafe, [[maybe_unused]] node u, [[maybe_unused]] index i,
+                                   [[maybe_unused]] edgeweight ew) {
     // Base Graph class only supports CSR format
     throw std::runtime_error("setWeightAtIthNeighbor not supported in base Graph class - use "
                              "GraphW for mutable operations");
 }
 
-void Graph::setWeightAtIthInNeighbor(Unsafe, node u, index i, edgeweight ew) {
+void Graph::setWeightAtIthInNeighbor(Unsafe, [[maybe_unused]] node u, [[maybe_unused]] index i,
+                                     [[maybe_unused]] edgeweight ew) {
     // Base Graph class only supports CSR format
     throw std::runtime_error("setWeightAtIthInNeighbor not supported in base Graph class - use "
                              "GraphW for mutable operations");
@@ -155,7 +157,7 @@ edgeweight Graph::totalEdgeWeight() const noexcept {
     return numberOfEdges() * defaultEdgeWeight;
 }
 
-bool Graph::hasEdge(node u, node v) const noexcept {
+bool Graph::hasEdge(node u, node v) const {
     if (u >= z || v >= z) {
         return false;
     }
@@ -179,10 +181,12 @@ bool Graph::checkConsistency() const {
     }
 
     // For CSR graphs, we can do basic checks
-    if (outEdgesCSRIndptr && outEdgesCSRIndptr->length() != z + 1) {
+    if (outEdgesCSRIndptr
+        && static_cast<int64_t>(outEdgesCSRIndptr->length()) != static_cast<int64_t>(z) + 1) {
         return false;
     }
-    if (directed && inEdgesCSRIndptr && inEdgesCSRIndptr->length() != z + 1) {
+    if (directed && inEdgesCSRIndptr
+        && static_cast<int64_t>(inEdgesCSRIndptr->length()) != static_cast<int64_t>(z) + 1) {
         return false;
     }
 

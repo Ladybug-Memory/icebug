@@ -1376,14 +1376,6 @@ cdef class GraphW:
 		self._this.swapEdge(s1, t1, s2, t2)
 		return self
 
-	def compactEdges(self):
-		"""
-		compactEdges()
-
-		Compact the edge storage, this should be called after executing many edge deletions.
-		"""
-		self._this.compactEdges()
-
 	def sortEdges(self):
 		"""
 		sortEdges()

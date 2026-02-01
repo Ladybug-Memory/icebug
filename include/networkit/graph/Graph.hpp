@@ -648,7 +648,7 @@ public:
 
     template <class EdgeMerger = std::plus<edgeweight>>
     Graph(const Graph &G, bool weighted, bool directed, bool edgesIndexed = false,
-          EdgeMerger edgeMerger = std::plus<edgeweight>())
+          [[maybe_unused]] EdgeMerger edgeMerger = std::plus<edgeweight>())
         : n(G.n), m(G.m), storedNumberOfSelfLoops(G.storedNumberOfSelfLoops), z(G.z),
           omega(edgesIndexed ? G.omega : 0), t(G.t), weighted(weighted), directed(directed),
           edgesIndexed(edgesIndexed),        // edges are not indexed by default
@@ -695,9 +695,9 @@ public:
         : n(other.n), m(other.m), storedNumberOfSelfLoops(other.storedNumberOfSelfLoops),
           z(other.z), omega(other.omega), t(other.t), weighted(other.weighted),
           directed(other.directed), edgesIndexed(other.edgesIndexed), deletedID(other.deletedID),
-          exists(other.exists), usingCSR(other.usingCSR),
-          outEdgesCSRIndices(other.outEdgesCSRIndices), outEdgesCSRIndptr(other.outEdgesCSRIndptr),
-          inEdgesCSRIndices(other.inEdgesCSRIndices), inEdgesCSRIndptr(other.inEdgesCSRIndptr),
+          exists(other.exists), outEdgesCSRIndices(other.outEdgesCSRIndices),
+          outEdgesCSRIndptr(other.outEdgesCSRIndptr), inEdgesCSRIndices(other.inEdgesCSRIndices),
+          inEdgesCSRIndptr(other.inEdgesCSRIndptr), usingCSR(other.usingCSR),
           // call special constructors to copy attribute maps
           nodeAttributeMap(other.nodeAttributeMap, this),
           edgeAttributeMap(other.edgeAttributeMap, this) {
@@ -714,11 +714,10 @@ public:
         : n(other.n), m(other.m), storedNumberOfSelfLoops(other.storedNumberOfSelfLoops),
           z(other.z), omega(other.omega), t(other.t), weighted(other.weighted),
           directed(other.directed), edgesIndexed(other.edgesIndexed), deletedID(other.deletedID),
-          exists(std::move(other.exists)), usingCSR(other.usingCSR),
-          outEdgesCSRIndices(std::move(other.outEdgesCSRIndices)),
+          exists(std::move(other.exists)), outEdgesCSRIndices(std::move(other.outEdgesCSRIndices)),
           outEdgesCSRIndptr(std::move(other.outEdgesCSRIndptr)),
           inEdgesCSRIndices(std::move(other.inEdgesCSRIndices)),
-          inEdgesCSRIndptr(std::move(other.inEdgesCSRIndptr)),
+          inEdgesCSRIndptr(std::move(other.inEdgesCSRIndptr)), usingCSR(other.usingCSR),
           nodeAttributeMap(std::move(other.nodeAttributeMap)),
           edgeAttributeMap(std::move(other.edgeAttributeMap)) {
         // attributes: set graph pointer to this new graph
@@ -726,8 +725,7 @@ public:
         edgeAttributeMap.theGraph = this;
     };
 
-    /** Default destructor */
-    ~Graph() = default;
+    virtual ~Graph() = default;
 
     /**
      * Constructor that creates a graph from Arrow CSR arrays for zero-copy memory efficiency.
@@ -862,7 +860,7 @@ public:
      * @param v Second endpoint of edge.
      * @return @c true if edge exists, @c false otherwise.
      */
-    bool hasEdge(node u, node v) const noexcept;
+    bool hasEdge(node u, node v) const;
 
     /**
      * Remove adjacent edges satisfying a condition.
@@ -1084,7 +1082,7 @@ public:
      * @return @a i-th (outgoing) neighbor of @a u, or @c none if no such
      * neighbor exists.
      */
-    node getIthNeighbor(Unsafe, node u, index i) const {
+    node getIthNeighbor(Unsafe, [[maybe_unused]] node u, [[maybe_unused]] index i) const {
         // Base Graph class only supports CSR format
         throw std::runtime_error(
             "getIthNeighbor not supported in base Graph class - use GraphW for mutable operations");
@@ -1098,7 +1096,8 @@ public:
      * @return @a edge weight to the i-th (outgoing) neighbor of @a u, or @c +inf if no such
      * neighbor exists.
      */
-    edgeweight getIthNeighborWeight(Unsafe, node u, index i) const {
+    edgeweight getIthNeighborWeight(Unsafe, [[maybe_unused]] node u,
+                                    [[maybe_unused]] index i) const {
         // Base Graph class only supports CSR format
         throw std::runtime_error("getIthNeighborWeight not supported in base Graph class - use "
                                  "GraphW for mutable operations");
@@ -1193,7 +1192,7 @@ public:
      * @return @a i-th (outgoing) neighbor of @a u, or @c none if no such
      * neighbor exists.
      */
-    node getIthNeighbor(node u, index i) const {
+    node getIthNeighbor([[maybe_unused]] node u, [[maybe_unused]] index i) const {
         // Base Graph class only supports CSR format
         throw std::runtime_error(
             "getIthNeighbor not supported in base Graph class - use GraphW for mutable operations");
@@ -1207,7 +1206,7 @@ public:
      * @return @a i-th (incoming) neighbor of @a u, or @c none if no such
      * neighbor exists.
      */
-    node getIthInNeighbor(node u, index i) const {
+    node getIthInNeighbor([[maybe_unused]] node u, [[maybe_unused]] index i) const {
         // Base Graph class only supports CSR format
         throw std::runtime_error("getIthInNeighbor not supported in base Graph class - use GraphW "
                                  "for mutable operations");
@@ -1221,7 +1220,7 @@ public:
      * @return @a edge weight to the i-th (outgoing) neighbor of @a u, or @c +inf if no such
      * neighbor exists.
      */
-    edgeweight getIthNeighborWeight(node u, index i) const {
+    edgeweight getIthNeighborWeight([[maybe_unused]] node u, [[maybe_unused]] index i) const {
         // Base Graph class only supports CSR format
         throw std::runtime_error("getIthNeighborWeight not supported in base Graph class - use "
                                  "GraphW for mutable operations");
@@ -1235,7 +1234,8 @@ public:
      * @return pair: i-th (outgoing) neighbor of @a u and the corresponding
      * edge weight, or @c defaultEdgeWeight if unweighted.
      */
-    std::pair<node, edgeweight> getIthNeighborWithWeight(node u, index i) const {
+    std::pair<node, edgeweight> getIthNeighborWithWeight([[maybe_unused]] node u,
+                                                         [[maybe_unused]] index i) const {
         // Base Graph class only supports CSR format
         throw std::runtime_error("getIthNeighborWithWeight not supported in base Graph class - use "
                                  "GraphW for mutable operations");
@@ -1249,7 +1249,8 @@ public:
      * @return pair: i-th (outgoing) neighbor of @a u and the corresponding
      * edge weight, or @c defaultEdgeWeight if unweighted.
      */
-    std::pair<node, edgeweight> getIthNeighborWithWeight(Unsafe, node u, index i) const {
+    std::pair<node, edgeweight> getIthNeighborWithWeight(Unsafe, [[maybe_unused]] node u,
+                                                         [[maybe_unused]] index i) const {
         // Base Graph class only supports CSR format
         throw std::runtime_error("getIthNeighborWithWeight not supported in base Graph class - use "
                                  "GraphW for mutable operations");
@@ -1263,7 +1264,8 @@ public:
      * @return pair: i-th (outgoing) neighbor of @a u and the corresponding
      * edge id, or @c none if no such neighbor exists.
      */
-    std::pair<node, edgeid> getIthNeighborWithId(node u, index i) const {
+    std::pair<node, edgeid> getIthNeighborWithId([[maybe_unused]] node u,
+                                                 [[maybe_unused]] index i) const {
         // Base Graph class only supports CSR format
         throw std::runtime_error("getIthNeighborWithId not supported in base Graph class - use "
                                  "GraphW for mutable operations");
@@ -1516,7 +1518,7 @@ template <typename T>
 void erase(node u, index idx, std::vector<std::vector<T>> &vec);
 // implementation for weighted == true
 template <bool hasWeights>
-inline edgeweight Graph::getOutEdgeWeight(node u, index i) const {
+inline edgeweight Graph::getOutEdgeWeight([[maybe_unused]] node u, [[maybe_unused]] index i) const {
     // Base Graph class only supports CSR format
     throw std::runtime_error(
         "getOutEdgeWeight not supported in base Graph class - use GraphW for mutable operations");
@@ -1530,7 +1532,7 @@ inline edgeweight Graph::getOutEdgeWeight<false>(node, index) const {
 
 // implementation for weighted == true
 template <bool hasWeights>
-inline edgeweight Graph::getInEdgeWeight(node u, index i) const {
+inline edgeweight Graph::getInEdgeWeight([[maybe_unused]] node u, [[maybe_unused]] index i) const {
     // Base Graph class only supports CSR format
     throw std::runtime_error(
         "getInEdgeWeight not supported in base Graph class - use GraphW for mutable operations");
@@ -1544,7 +1546,7 @@ inline edgeweight Graph::getInEdgeWeight<false>(node, index) const {
 
 // implementation for hasEdgeIds == true
 template <bool graphHasEdgeIds>
-inline edgeid Graph::getOutEdgeId(node u, index i) const {
+inline edgeid Graph::getOutEdgeId([[maybe_unused]] node u, [[maybe_unused]] index i) const {
     // Base Graph class only supports CSR format
     throw std::runtime_error(
         "getOutEdgeId not supported in base Graph class - use GraphW for mutable operations");
@@ -1558,7 +1560,7 @@ inline edgeid Graph::getOutEdgeId<false>(node, index) const {
 
 // implementation for hasEdgeIds == true
 template <bool graphHasEdgeIds>
-inline edgeid Graph::getInEdgeId(node u, index i) const {
+inline edgeid Graph::getInEdgeId([[maybe_unused]] node u, [[maybe_unused]] index i) const {
     // Base Graph class only supports CSR format
     throw std::runtime_error(
         "getInEdgeId not supported in base Graph class - use GraphW for mutable operations");
@@ -1959,7 +1961,9 @@ double Graph::parallelSumForEdges(L handle) const {
 /* EDGE MODIFIERS */
 
 template <typename Condition>
-std::pair<count, count> Graph::removeAdjacentEdges(node u, Condition condition, bool edgesIn) {
+std::pair<count, count> Graph::removeAdjacentEdges([[maybe_unused]] node u,
+                                                   [[maybe_unused]] Condition condition,
+                                                   [[maybe_unused]] bool edgesIn) {
     // Base Graph class only supports CSR format and is immutable
     throw std::runtime_error("removeAdjacentEdges not supported in base Graph class - use GraphW "
                              "for mutable operations");

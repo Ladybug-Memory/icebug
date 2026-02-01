@@ -108,7 +108,7 @@ public:
         // Copy all edges using the public API
         if (other.isDirected() == directed) {
             // Same directedness - straightforward copy
-            other.forEdges([&](node u, node v, edgeweight w, edgeid id) {
+            other.forEdges([&](node u, node v, edgeweight w, [[maybe_unused]] edgeid id) {
                 addEdge(u, v, weighted ? w : defaultEdgeWeight);
             });
         } else if (other.isDirected() && !directed) {
@@ -117,7 +117,7 @@ public:
                  "graphs.");
 
             std::set<std::pair<node, node>> addedEdges;
-            other.forEdges([&](node u, node v, edgeweight w, edgeid id) {
+            other.forEdges([&](node u, node v, edgeweight w, [[maybe_unused]] edgeid id) {
                 std::pair<node, node> edge = {std::min(u, v), std::max(u, v)};
                 if (addedEdges.find(edge) == addedEdges.end()) {
                     addEdge(edge.first, edge.second, weighted ? w : defaultEdgeWeight);
@@ -133,7 +133,7 @@ public:
             WARN("Edge attributes are currently not preserved when converting from undirected to "
                  "directed graphs.");
 
-            other.forEdges([&](node u, node v, edgeweight w, edgeid id) {
+            other.forEdges([&](node u, node v, edgeweight w, [[maybe_unused]] edgeid id) {
                 addEdge(u, v, weighted ? w : defaultEdgeWeight);
                 if (u != v) {
                     addEdge(v, u, weighted ? w : defaultEdgeWeight);
