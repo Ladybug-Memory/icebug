@@ -157,17 +157,19 @@ public:
     GraphW(Graph &&other) noexcept : Graph(std::move(other)) { initializeVectorStructures(); }
 
     /** Default destructor */
-    ~GraphW() = default;
+    ~GraphW() override = default;
 
     /** move assignment operator */
     GraphW &operator=(GraphW &&other) noexcept {
-        Graph::operator=(std::move(other));
-        inEdges = std::move(other.inEdges);
-        outEdges = std::move(other.outEdges);
-        inEdgeWeights = std::move(other.inEdgeWeights);
-        outEdgeWeights = std::move(other.outEdgeWeights);
-        inEdgeIds = std::move(other.inEdgeIds);
-        outEdgeIds = std::move(other.outEdgeIds);
+        if (this != &other) {
+            Graph::operator=(std::move(other));
+            inEdges = std::move(other.inEdges);
+            outEdges = std::move(other.outEdges);
+            inEdgeWeights = std::move(other.inEdgeWeights);
+            outEdgeWeights = std::move(other.outEdgeWeights);
+            inEdgeIds = std::move(other.inEdgeIds);
+            outEdgeIds = std::move(other.outEdgeIds);
+        }
         return *this;
     }
 

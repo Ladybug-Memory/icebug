@@ -41,7 +41,7 @@ class GraphW;
 template <typename NodeOrEdge, typename GraphType>
 class AttributeStorageBase { // alias ASB
 public:
-    AttributeStorageBase(std::string name, std::type_index type)
+    AttributeStorageBase(const std::string &name, std::type_index type)
         : name{std::move(name)}, type{type}, validStorage{true} {}
 
     void invalidateStorage() { validStorage = false; }
@@ -101,7 +101,7 @@ template <typename NodeOrEdge, typename GraphType, template <typename, typename>
           typename T>
 class AttributeStorage final : public Base<NodeOrEdge, GraphType> {
 public:
-    AttributeStorage(std::string name) : Base<NodeOrEdge, GraphType>{std::move(name), typeid(T)} {}
+    AttributeStorage(const std::string &name) : Base<NodeOrEdge, GraphType>{name, typeid(T)} {}
 
     std::shared_ptr<Base<NodeOrEdge, GraphType>> clone() const override {
         return std::make_shared<AttributeStorage>(*this);
