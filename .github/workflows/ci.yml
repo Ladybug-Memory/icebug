@@ -96,6 +96,7 @@ on:
   push:
     branches:
       - master
+  workflow_dispatch:
 
 # Default parameters for all builds.
 env:
