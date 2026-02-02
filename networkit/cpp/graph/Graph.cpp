@@ -437,8 +437,9 @@ void Graph::forEdgesVirtualImpl(bool directed, bool weighted, bool hasEdgeIds,
             if (!directed && !useEdgeInIteration<false>(u, v))
                 continue;
 
-            edgeweight w = weighted ? defaultEdgeWeight : defaultEdgeWeight;
-            edgeid eid = hasEdgeIds ? none : none;
+            // CSR graphs are currently unweighted and don't support edge IDs
+            edgeweight w = defaultEdgeWeight;
+            edgeid eid = none;
             handle(u, v, w, eid);
         }
     }
@@ -454,8 +455,9 @@ void Graph::forEdgesOfVirtualImpl(
         if (!exists[v])
             continue;
 
-        edgeweight w = weighted ? defaultEdgeWeight : defaultEdgeWeight;
-        edgeid eid = hasEdgeIds ? none : none;
+        // CSR graphs are currently unweighted and don't support edge IDs
+        edgeweight w = defaultEdgeWeight;
+        edgeid eid = none;
         handle(u, v, w, eid);
     }
 }
@@ -470,8 +472,9 @@ void Graph::forInEdgesVirtualImpl(
         if (!exists[v])
             continue;
 
-        edgeweight w = weighted ? defaultEdgeWeight : defaultEdgeWeight;
-        edgeid eid = hasEdgeIds ? none : none;
+        // CSR graphs are currently unweighted and don't support edge IDs
+        edgeweight w = defaultEdgeWeight;
+        edgeid eid = none;
         handle(u, v, w, eid);
     }
 }
@@ -500,8 +503,9 @@ double Graph::parallelSumForEdgesVirtualImpl(
             if (!directed && !useEdgeInIteration<false>(u, v))
                 continue;
 
-            edgeweight w = weighted ? defaultEdgeWeight : defaultEdgeWeight;
-            edgeid eid = hasEdgeIds ? none : none;
+            // CSR graphs are currently unweighted and don't support edge IDs
+            edgeweight w = defaultEdgeWeight;
+            edgeid eid = none;
 
             sum += handle(u, v, w, eid);
         }

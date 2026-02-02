@@ -176,6 +176,13 @@ public:
     /** move assignment operator */
     GraphW &operator=(Graph &&other) noexcept {
         Graph::operator=(std::move(other));
+        // Clear existing vectors before reinitializing to avoid keeping old edge data
+        inEdges.clear();
+        outEdges.clear();
+        inEdgeWeights.clear();
+        outEdgeWeights.clear();
+        inEdgeIds.clear();
+        outEdgeIds.clear();
         initializeVectorStructures();
         return *this;
     }
@@ -195,6 +202,13 @@ public:
     /** copy assignment operator */
     GraphW &operator=(const Graph &other) {
         Graph::operator=(other);
+        // Clear existing vectors before reinitializing to avoid keeping old edge data
+        inEdges.clear();
+        outEdges.clear();
+        inEdgeWeights.clear();
+        outEdgeWeights.clear();
+        inEdgeIds.clear();
+        outEdgeIds.clear();
         initializeVectorStructures();
         return *this;
     }
