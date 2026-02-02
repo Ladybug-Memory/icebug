@@ -834,7 +834,6 @@ void GraphW::forEdgesOfVirtualImpl(
     }
 }
 
-
 void GraphW::forInEdgesVirtualImpl(
     node u, bool directed, bool weighted, bool hasEdgeIds,
     std::function<void(node, node, edgeweight, edgeid)> handle) const {
