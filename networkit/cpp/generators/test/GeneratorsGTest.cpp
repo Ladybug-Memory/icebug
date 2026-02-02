@@ -82,7 +82,7 @@ TEST_F(GeneratorsGTest, testClusteredRandomGraphGenerator) {
     const count n = 100, c = 10;
     const double pin = 0.5, pout = 0.01;
     ClusteredRandomGraphGenerator gen(n, c, pin, pout);
-    Graph G = gen.generate();
+    GraphW G = gen.generate();
     Partition part = gen.getCommunities();
     count nCommunities = part.getSubsetIds().size();
     EXPECT_EQ(n, G.numberOfNodes());
@@ -366,7 +366,7 @@ TEST_F(GeneratorsGTest, testStaticPubWebGenerator) {
     float rad = 0.075;
 
     PubWebGenerator gen(n, numCluster, rad, maxNumNeighbors);
-    Graph G = gen.generate();
+    GraphW G = gen.generate();
     auto coordinates = gen.moveCoordinates();
     EXPECT_EQ(n, G.numberOfNodes()) << "number of generated nodes";
 
@@ -774,7 +774,7 @@ TEST_F(GeneratorsGTest, testChungLuGenerator) {
     }
 
     ChungLuGenerator gen(sequence);
-    Graph G = gen.generate();
+    GraphW G = gen.generate();
     EXPECT_TRUE(G.checkConsistency());
 
     EXPECT_EQ(n, G.numberOfNodes());
@@ -835,7 +835,7 @@ TEST_F(GeneratorsGTest, testChungLuGeneratorAlamEtAl) {
     }
 
     ChungLuGeneratorAlamEtAl gen(sequence);
-    Graph G = gen.generate();
+    GraphW G = gen.generate();
     EXPECT_TRUE(G.checkConsistency());
 
     EXPECT_EQ(n, G.numberOfNodes());
@@ -1177,7 +1177,7 @@ TEST_F(GeneratorsGTest, testHyperbolicGenerator) {
     double k = 16;
     count m = k * n / 2;
     HyperbolicGenerator gen(n, k, 7);
-    Graph G = gen.generate();
+    GraphW G = gen.generate();
     EXPECT_EQ(G.numberOfNodes(), n);
     EXPECT_TRUE(G.checkConsistency());
     EXPECT_NEAR(G.numberOfEdges(), m, m / 5);
@@ -1192,7 +1192,7 @@ TEST_F(GeneratorsGTest, testHyperbolicGeneratorConsistency) {
     double k = 6;
     count m = n * k / 2;
     HyperbolicGenerator gen(n, k);
-    Graph G = gen.generate();
+    GraphW G = gen.generate();
     EXPECT_NEAR(G.numberOfEdges(), m, m / 5);
     ASSERT_TRUE(G.checkConsistency());
 }
@@ -1203,7 +1203,7 @@ TEST_F(GeneratorsGTest, testHyperbolicGeneratorMechanicGraphs) {
     double k = 6;
     count m = n * k / 2;
     HyperbolicGenerator gen(n, k, 3, 0.14);
-    Graph G = gen.generate();
+    GraphW G = gen.generate();
     EXPECT_NEAR(G.numberOfEdges(), m, m / 10);
     ASSERT_TRUE(G.checkConsistency());
 }
@@ -1247,7 +1247,7 @@ TEST_F(GeneratorsGTest, debugHyperbolicHighTemperatureGraphs) {
         if (std::abs(T - 1) < 0.00001)
             continue;
         HyperbolicGenerator gen(n, k, gamma, T);
-        Graph G = gen.generate();
+        GraphW G = gen.generate();
         EXPECT_NEAR(G.numberOfEdges(), m, m / 10);
     }
 }
@@ -1259,7 +1259,7 @@ TEST_F(GeneratorsGTest, debugGiganticCollectionOfHyperbolicTemperatureGraphs) {
         double T = 0.1;
         count m = n * k / 2;
         HyperbolicGenerator gen(n, k, 3, T);
-        Graph G = gen.generate();
+        GraphW G = gen.generate();
         EXPECT_NEAR(G.numberOfEdges(), m, m / 10);
     }
 }
@@ -1270,7 +1270,7 @@ TEST_F(GeneratorsGTest, debugGiganticCollectionOfHyperbolicUnitDiskGraphs) {
     for (index i = 0; i < 7; i++) {
         count m = n * k / 2;
         HyperbolicGenerator gen(n, k, 7);
-        Graph G = gen.generate();
+        GraphW G = gen.generate();
         EXPECT_NEAR(G.numberOfEdges(), m, m / 5);
         EXPECT_TRUE(G.checkConsistency());
         k *= 2;

@@ -76,8 +76,8 @@ bool DistanceGTest::isDirected() const noexcept {
 
 TEST_F(DistanceGTest, testVertexDiameterPedantically) {
     DorogovtsevMendesGenerator generator(1000);
-    Graph G1 = generator.generate();
-    Graph G = Graph(G1, true, false);
+    GraphW G1 = generator.generate();
+    GraphW G = GraphW(G1, true, false);
     Diameter diam(G, DiameterAlgo::ESTIMATED_PEDANTIC);
     diam.run();
     count vd = diam.getDiameter().first;
@@ -446,7 +446,7 @@ TEST_F(DistanceGTest, testExactDiameter) {
 
     for (auto testInstance : testInstances) {
         METISGraphReader reader;
-        Graph G = reader.read("input/" + testInstance.first + ".graph");
+        GraphW G = reader.read("input/" + testInstance.first + ".graph");
         Diameter diam(G, DiameterAlgo::EXACT);
         diam.run();
         count diameter = diam.getDiameter().first;
@@ -462,7 +462,7 @@ TEST_F(DistanceGTest, testEstimatedDiameterRange) {
 
     for (auto testInstance : testInstances) {
         METISGraphReader reader;
-        Graph G = reader.read("input/" + testInstance.first + ".graph");
+        GraphW G = reader.read("input/" + testInstance.first + ".graph");
         Diameter diam(G, DiameterAlgo::ESTIMATED_RANGE, 0.1);
         diam.run();
         std::pair<count, count> range = diam.getDiameter();
@@ -473,7 +473,7 @@ TEST_F(DistanceGTest, testEstimatedDiameterRange) {
 TEST_F(DistanceGTest, testPedanticDiameterErdos) {
     count n = 5000;
     ErdosRenyiGenerator gen(n, 0.001);
-    Graph G1 = gen.generate();
+    GraphW G1 = gen.generate();
     Diameter diam(G1, DiameterAlgo::ESTIMATED_PEDANTIC);
     diam.run();
     count diameter = diam.getDiameter().first;
@@ -505,7 +505,7 @@ TEST_F(DistanceGTest, testEffectiveDiameter) {
 
     for (auto testInstance : testInstances) {
         METISGraphReader reader;
-        Graph G = reader.read("input/" + testInstance + ".graph");
+        GraphW G = reader.read("input/" + testInstance + ".graph");
         EffectiveDiameterApproximation aef(G);
         aef.run();
         double effective = aef.getEffectiveDiameter();
@@ -524,7 +524,7 @@ TEST_F(DistanceGTest, testEffectiveDiameterExact) {
 
     for (auto testInstance : testInstances) {
         METISGraphReader reader;
-        Graph G = reader.read("input/" + testInstance + ".graph");
+        GraphW G = reader.read("input/" + testInstance + ".graph");
         EffectiveDiameter ed(G);
         ed.run();
         double effective = ed.getEffectiveDiameter();
@@ -643,7 +643,7 @@ TEST_F(DistanceGTest, testHopPlotApproximation) {
 
     for (auto &testInstance : testInstances) {
         METISGraphReader reader;
-        Graph G = reader.read("input/" + testInstance + ".graph");
+        GraphW G = reader.read("input/" + testInstance + ".graph");
         HopPlotApproximation hp(G);
         hp.run();
         map<count, double> hopPlot = hp.getHopPlot();
@@ -655,7 +655,7 @@ TEST_F(DistanceGTest, testHopPlotApproximation) {
 
 TEST_F(DistanceGTest, testNeighborhoodFunctionApproximation) {
     METISGraphReader reader;
-    Graph G = GraphTools::toUnweighted(reader.read("input/lesmis.graph"));
+    GraphW G = GraphTools::toUnweighted(reader.read("input/lesmis.graph"));
     NeighborhoodFunction nf(G);
     nf.run();
     auto exact = nf.getNeighborhoodFunction();
@@ -667,7 +667,7 @@ TEST_F(DistanceGTest, testNeighborhoodFunctionApproximation) {
 
 TEST_F(DistanceGTest, testNeighborhoodFunctionHeuristic) {
     METISGraphReader reader;
-    Graph G = GraphTools::toUnweighted(reader.read("input/lesmis.graph"));
+    GraphW G = GraphTools::toUnweighted(reader.read("input/lesmis.graph"));
     NeighborhoodFunction nf(G);
     nf.run();
     auto exact = nf.getNeighborhoodFunction();
@@ -810,7 +810,7 @@ TEST_P(DistanceGTest, testMultiTargetDijkstra) {
 
 TEST_P(DistanceGTest, testPrunedLandmarkLabeling) {
     Aux::Random::setSeed(42, false);
-    Graph G = ErdosRenyiGenerator{500, 0.01, isDirected()}.generate();
+    GraphW G = ErdosRenyiGenerator{500, 0.01, isDirected()}.generate();
     PrunedLandmarkLabeling pll(G);
     pll.run();
 

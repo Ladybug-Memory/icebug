@@ -79,7 +79,7 @@ TEST_F(GeneratorsBenchmark, benchBarabasiAlbertGenerator2) {
 TEST_F(GeneratorsBenchmark, benchmarkHyperbolicGenerator) {
     count n = 100000;
     HyperbolicGenerator gen(n);
-    Graph G = gen.generate();
+    GraphW G = gen.generate();
     EXPECT_EQ(G.numberOfNodes(), n);
 }
 
@@ -115,7 +115,7 @@ TEST_F(GeneratorsBenchmark, benchmarkHyperbolicGeneratorWithSortedNodes) {
         radiicopy[j] = radii[permutation[j]];
     }
 
-    Graph G = HyperbolicGenerator().generate(anglecopy, radiicopy, r, R * t);
+    GraphW G = HyperbolicGenerator().generate(anglecopy, radiicopy, r, R * t);
     EXPECT_EQ(G.numberOfNodes(), n);
 }
 
@@ -167,7 +167,7 @@ TEST_F(GeneratorsBenchmark, benchmarkHyperbolicGeneratorMechanicGraphs) {
     count m = n * k / 2;
     HyperbolicGenerator gen(n, k, 3, 0.14);
     gen.setLeafCapacity(10);
-    Graph G = gen.generate();
+    GraphW G = gen.generate();
     EXPECT_NEAR(G.numberOfEdges(), m, m / 10);
 }
 

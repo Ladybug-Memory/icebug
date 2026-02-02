@@ -50,7 +50,7 @@ void GlobalCurveballBenchmark::checkWithGraph(Graph &G) {
     algo.run();
 
     // check degrees
-    Graph outG = algo.getGraph();
+    GraphW outG = algo.getGraph();
     outG.forNodes([&](node u) { ASSERT_EQ(degrees[u], outG.degree(u)); });
 }
 
@@ -59,7 +59,7 @@ TEST_F(GlobalCurveballBenchmark, benchmarkCurveballHyperbolic) {
 
     node numNodes = 1000000;
     HyperbolicGenerator generator(numNodes, 32);
-    Graph G = generator.generate();
+    GraphW G = generator.generate();
 
     this->checkWithGraph(G);
 }
@@ -69,7 +69,7 @@ TEST_F(GlobalCurveballBenchmark, benchmarkErdosRenyiHyperbolic) {
 
     node numNodes = 1000000;
     ErdosRenyiGenerator generator(numNodes, 32. / numNodes);
-    Graph G = generator.generate();
+    GraphW G = generator.generate();
 
     this->checkWithGraph(G);
 }

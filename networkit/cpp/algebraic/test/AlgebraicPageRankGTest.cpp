@@ -20,7 +20,7 @@ class AlgebraicPageRankGTest : public testing::Test {};
 
 TEST(AlgebraicPageRankGTest, testPageRankDirected) {
     SNAPGraphReader reader;
-    Graph G = reader.read("input/wiki-Vote.txt");
+    GraphW G = reader.read("input/wiki-Vote.txt");
 
     Aux::Timer t;
     t.start();

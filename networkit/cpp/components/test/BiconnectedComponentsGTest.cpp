@@ -62,7 +62,7 @@ TEST_F(BiconnectedComponentsGTest, testBiconnectedComponentsTinyDelete) {
 
 TEST_F(BiconnectedComponentsGTest, testBiconnectedComponents) {
     Aux::Random::setSeed(42, false);
-    Graph G = ErdosRenyiGenerator(200, 0.01, false).generate();
+    GraphW G = ErdosRenyiGenerator(200, 0.01, false).generate();
 
     BiconnectedComponents bc(G);
     bc.run();

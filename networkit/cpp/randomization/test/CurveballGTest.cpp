@@ -57,12 +57,12 @@ void CurveballGTest::checkWithGraph(GraphW &G, bool checkBuilder) {
     }
 
     // check degrees
-    Graph outG = algo.getGraph(false); // sequential
+    GraphW outG = algo.getGraph(false); // sequential
     outG.forNodes([&](node u) { ASSERT_EQ(degrees[u], outG.degree(u)); });
 
     // check builder: parallel is equal to sequential
     if (checkBuilder) {
-        Graph outGpar = algo.getGraph(true);
+        GraphW outGpar = algo.getGraph(true);
 
         // check degrees
         outGpar.forNodes([&](node u) { ASSERT_EQ(degrees[u], outGpar.degree(u)); });

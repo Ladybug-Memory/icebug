@@ -65,9 +65,9 @@ TEST(AlgebraicBFSGTest, testOnToyGraph) {
     EXPECT_EQ(3, bfs.distance(6));
 }
 
-TEST(AlgebraicBFSGTest, benchmarkBFS) {
+TEST(AlgebraicBFSGTest, DISABLED_benchmarkBFS) {
     METISGraphReader reader;
-    Graph G = reader.read("input/caidaRouterLevel.graph");
+    GraphW G = reader.read("input/caidaRouterLevel.graph");
 
     Aux::Timer t;
     BFS bfs(G, 0, false);

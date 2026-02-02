@@ -39,7 +39,7 @@ TEST_F(SolverLamgGTest, testSmallGraphs) {
     Aux::Timer timer;
     for (index i = 0; i < GRAPH_INSTANCES.size(); ++i) {
         std::string graph = GRAPH_INSTANCES[i];
-        Graph G = reader.read(graph);
+        GraphW G = reader.read(graph);
         ConnectedComponents con(G);
         con.run();
         Partition comps = con.getPartition();

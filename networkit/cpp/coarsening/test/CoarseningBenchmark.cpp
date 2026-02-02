@@ -24,7 +24,7 @@ TEST_F(CoarseningBenchmark, benchmarkCoarsening) {
     count k = n / redF;
     DEBUG("generating graph with ", n, " nodes");
     auto gen = ErdosRenyiGenerator(n, 0.05);
-    Graph G = gen.generate();
+    GraphW G = gen.generate();
 
     DEBUG("generating random partition");
     ClusteringGenerator clusteringGen;
@@ -38,7 +38,7 @@ TEST_F(CoarseningBenchmark, benchmarkCoarsening) {
     ParallelPartitionCoarsening coarsening(G, zeta, false);
     coarsening.run();
     timer.stop();
-    Graph Gc2 = coarsening.getCoarseGraph();
+    GraphW Gc2 = coarsening.getCoarseGraph();
     INFO("sequential coarsening: ", timer.elapsedTag());
     EXPECT_EQ(k, Gc2.numberOfNodes());
 
@@ -47,7 +47,7 @@ TEST_F(CoarseningBenchmark, benchmarkCoarsening) {
     ParallelPartitionCoarsening gbCoarsening(G, zeta, true);
     gbCoarsening.run();
     timer.stop();
-    Graph Gc3 = gbCoarsening.getCoarseGraph();
+    GraphW Gc3 = gbCoarsening.getCoarseGraph();
     INFO("parallel coarsening: ", timer.elapsedTag());
     EXPECT_EQ(k, Gc3.numberOfNodes());
 }

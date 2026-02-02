@@ -131,7 +131,7 @@ TEST_F(APSPGTest, debugAPSP) {
 
 TEST_F(APSPGTest, testDynAPSPRealGraph) {
     METISGraphReader reader;
-    Graph G_read = reader.read("input/karate.graph");
+    GraphW G_read = reader.read("input/karate.graph");
     GraphW G(G_read);
     DynAPSP apsp(G);
     apsp.run();

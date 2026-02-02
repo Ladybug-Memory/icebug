@@ -157,7 +157,7 @@ TEST_F(LinkPredictionGTest, testLinkThresholderByPercentage) {
 }
 
 TEST_F(LinkPredictionGTest, testTrainingGraphGenerator) {
-    Graph trainingGraph = RandomLinkSampler::byPercentage(G, 0.7);
+    GraphW trainingGraph = RandomLinkSampler::byPercentage(G, 0.7);
     EXPECT_EQ(7, trainingGraph.numberOfEdges());
 }
 
@@ -233,9 +233,9 @@ TEST_F(LinkPredictionGTest, testPRMetric) {
 
 TEST_F(LinkPredictionGTest, testKatzRunOnOrdering) {
     METISGraphReader graphReader;
-    Graph newG = graphReader.read("input/jazz.graph");
+    GraphW newG = graphReader.read("input/jazz.graph");
     KatzIndex katz(newG);
-    Graph trainingGraph = RandomLinkSampler::byPercentage(newG, 0.7);
+    GraphW trainingGraph = RandomLinkSampler::byPercentage(newG, 0.7);
     std::vector<std::pair<node, node>> nodePairs =
         MissingLinksFinder(trainingGraph).findAtDistance(2);
     std::vector<std::pair<std::pair<node, node>, double>> preds = katz.runOn(missingLinks);
@@ -247,7 +247,7 @@ TEST_F(LinkPredictionGTest, testKatzRunOnOrdering) {
 
 TEST_F(LinkPredictionGTest, testAdamicAdarIndex) {
     METISGraphReader graphReader;
-    Graph G = graphReader.read("input/jazz.graph");
+    GraphW G = graphReader.read("input/jazz.graph");
 
     AdamicAdarIndex AAI(G);
     std::vector<NetworKit::LinkPredictor::prediction> preds = AAI.runAll();
@@ -263,7 +263,7 @@ TEST_F(LinkPredictionGTest, testAdamicAdarIndex) {
 
 TEST_F(LinkPredictionGTest, testAdjustedRandIndex) {
     METISGraphReader graphReader;
-    Graph G = graphReader.read("input/tiny_01.graph");
+    GraphW G = graphReader.read("input/tiny_01.graph");
 
     AdjustedRandIndex ARI(G);
     std::vector<NetworKit::LinkPredictor::prediction> preds = ARI.runAll();
@@ -282,7 +282,7 @@ TEST_F(LinkPredictionGTest, testAdjustedRandIndex) {
 
 TEST_F(LinkPredictionGTest, testResourceAllocationIndex) {
     METISGraphReader graphReader;
-    Graph G = graphReader.read("input/jazz.graph");
+    GraphW G = graphReader.read("input/jazz.graph");
 
     ResourceAllocationIndex RAI(G);
     std::vector<NetworKit::LinkPredictor::prediction> preds = RAI.runAll();
@@ -298,7 +298,7 @@ TEST_F(LinkPredictionGTest, testResourceAllocationIndex) {
 
 TEST_F(LinkPredictionGTest, testSameCommunityIndex) {
     METISGraphReader graphReader;
-    Graph G = graphReader.read("input/jazz.graph");
+    GraphW G = graphReader.read("input/jazz.graph");
 
     SameCommunityIndex SCI(G);
     std::vector<NetworKit::LinkPredictor::prediction> preds = SCI.runAll();

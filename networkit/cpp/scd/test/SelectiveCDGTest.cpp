@@ -40,7 +40,7 @@ TEST_F(SelectiveCDGTest, testRunApproximatePageRank) {
 TEST_F(SelectiveCDGTest, testRandomBFS) {
     Aux::Random::setSeed(32, false);
     METISGraphReader reader;
-    Graph g = reader.read("input/hep-th.graph");
+    GraphW g = reader.read("input/hep-th.graph");
     // parameters
     node seed = 50;
     std::set<node> seeds = {seed};
@@ -59,7 +59,7 @@ TEST_F(SelectiveCDGTest, testRandomBFS) {
     EXPECT_EQ(community.size(), 21);
 
     // The community must be connected
-    Graph subGraph = GraphTools::subgraphFromNodes(
+    GraphW subGraph = GraphTools::subgraphFromNodes(
         g, std::unordered_set<node>{community.begin(), community.end()});
     ConnectedComponents components(subGraph);
     components.run();
@@ -69,7 +69,7 @@ TEST_F(SelectiveCDGTest, testRandomBFS) {
 TEST_F(SelectiveCDGTest, testSCD) {
     Aux::Random::setSeed(32, false);
     METISGraphReader reader;
-    Graph G = reader.read("input/hep-th.graph");
+    GraphW G = reader.read("input/hep-th.graph");
     // parameters
     node seed = 50;
     std::set<node> seeds = {seed};
@@ -154,7 +154,7 @@ TEST_F(SelectiveCDGTest, testSCD) {
 
 TEST_F(SelectiveCDGTest, testGCE) {
     METISGraphReader reader;
-    Graph G = reader.read("input/hep-th.graph");
+    GraphW G = reader.read("input/hep-th.graph");
 
     node seed = 50;
     // Use the "M" score to ensure that the conductance we measure below can only improve
@@ -209,7 +209,7 @@ TEST_F(SelectiveCDGTest, testGCE) {
 TEST_F(SelectiveCDGTest, testSCDWeighted) {
     Aux::Random::setSeed(23, false);
     METISGraphReader reader;
-    Graph G = reader.read("input/lesmis.graph");
+    GraphW G = reader.read("input/lesmis.graph");
     // parameters
     node seed = 20;
     std::set<node> seeds;
@@ -359,7 +359,7 @@ TEST_F(SelectiveCDGTest, testSetConductance) {
         ParallelPartitionCoarsening coarsening(G, P);
         coarsening.run();
 
-        Graph coarseGraph = coarsening.getCoarseGraph();
+        GraphW coarseGraph = coarsening.getCoarseGraph();
         std::set<node> nodes{0};
         SetConductance sc(coarseGraph, nodes);
         sc.run();
@@ -373,7 +373,7 @@ TEST_F(SelectiveCDGTest, debugLTE) {
     std::getline(std::cin, graphPath);
 
     METISGraphReader reader;
-    Graph G = reader.read(graphPath);
+    GraphW G = reader.read(graphPath);
 
     CliqueDetect cliqueDetect(G);
     LocalTightnessExpansion lte(G);

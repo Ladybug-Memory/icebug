@@ -51,7 +51,7 @@ TEST_F(MapEquationGTest, testLocalMove) {
 
     count n = 300;
     BarabasiAlbertGenerator generator(50, n);
-    Graph G = generator.generate();
+    GraphW G = generator.generate();
 
     // Generates an std::unordered_set<node> with the sequence of consecutive integers in [start,
     // end).
@@ -62,8 +62,8 @@ TEST_F(MapEquationGTest, testLocalMove) {
     };
 
     GraphW G1 = GraphTools::subgraphFromNodes(G, generateConsecutiveNodes(0, 100));
-    const Graph G2 = GraphTools::subgraphFromNodes(G, generateConsecutiveNodes(100, 200));
-    const Graph G3 = GraphTools::subgraphFromNodes(G, generateConsecutiveNodes(200, 300));
+    const GraphW G2 = GraphTools::subgraphFromNodes(G, generateConsecutiveNodes(100, 200));
+    const GraphW G3 = GraphTools::subgraphFromNodes(G, generateConsecutiveNodes(200, 300));
 
     // generate 3 independent clusterings (=ground truth)
     Partition groundTruth(n);

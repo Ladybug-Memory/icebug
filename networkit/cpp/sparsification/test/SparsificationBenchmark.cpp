@@ -171,7 +171,7 @@ TEST_F(SparsificationBenchmark, SparsificationBenchmarkGraphFile) {
     std::cout << "[BEGIN] global filter (multiscale attribute): " << std::endl;
     runtime.start();
     GlobalThresholdFilter filter(g, multiscale, 0.5, false);
-    Graph b = filter.calculate();
+    GraphW b = filter.calculate();
     runtime.stop();
     std::cout << "[DONE] global filter (multiscale attribute) " << runtime.elapsedTag()
               << std::endl;

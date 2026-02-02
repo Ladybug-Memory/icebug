@@ -76,7 +76,7 @@ TEST_F(SSSPGTest, testSSSPThrowsStorepathNotTrueCallPredecessor) {
 
 TEST_F(SSSPGTest, testShortestPaths) {
     METISGraphReader reader;
-    Graph G = reader.read("input/PGPgiantcompo.graph");
+    GraphW G = reader.read("input/PGPgiantcompo.graph");
     DEBUG("The graph has been read.");
     int source = 2;
     BFS bfs(G, source);

@@ -18,7 +18,7 @@ class GraphDistanceGTest : public testing::Test {};
 // TODO: fix graph
 TEST_F(GraphDistanceGTest, testGraphWeightedDistance) {
     METISGraphReader reader;
-    Graph g = reader.read("input/grid-5x5-dist-arch.graph");
+    GraphW g = reader.read("input/grid-5x5-dist-arch.graph");
 
     GraphDistance gd;
 
@@ -39,7 +39,7 @@ TEST_F(GraphDistanceGTest, testGraphWeightedDistance) {
 
 TEST_F(GraphDistanceGTest, testGraphUnweightedDistance) {
     METISGraphReader reader;
-    Graph g = reader.read("input/grid-5x5-dist-arch.graph");
+    GraphW g = reader.read("input/grid-5x5-dist-arch.graph");
 
     GraphDistance gd;
 

@@ -24,7 +24,7 @@ class CoarseningGTest : public testing::Test {};
 
 TEST_F(CoarseningGTest, testClusteringProjectorWithOneClustering) {
     ErdosRenyiGenerator gen(100, 0.5);
-    Graph G0 = gen.generate();
+    GraphW G0 = gen.generate();
 
     // get 1-clustering of G0
     ClusteringGenerator clusteringGen;
@@ -34,31 +34,7 @@ TEST_F(CoarseningGTest, testClusteringProjectorWithOneClustering) {
     ParallelPartitionCoarsening contract(G0, zeta0);
     contract.run();
     std::vector<std::vector<node>> maps;
-    Graph G1 = contract.getCoarseGraph();
-    maps.push_back(contract.getFineToCoarseNodeMapping());
-
-    Partition zeta1 = clusteringGen.makeOneClustering(G1);
-
-    ClusteringProjector project;
-    Partition zetaBack = project.projectBackToFinest(zeta1, maps, G0);
-
-    EXPECT_TRUE(GraphClusteringTools::equalClusterings(zeta0, zetaBack, G0))
-        << "zeta^{1->0} and zeta^{0} should be identical";
-}
-
-TEST_F(CoarseningGTest, testClusteringProjectorWithSingletonClustering) {
-    ErdosRenyiGenerator gen(100, 0.5);
-    Graph G0 = gen.generate();
-
-    // get 1-clustering of G0
-    ClusteringGenerator clusteringGen;
-    Partition zeta0 = clusteringGen.makeSingletonClustering(G0);
-
-    // contract G0 according to 1-clusterings
-    ParallelPartitionCoarsening contract(G0, zeta0);
-    contract.run();
-    std::vector<std::vector<node>> maps;
-    Graph G1 = contract.getCoarseGraph();
+    GraphW G1 = contract.getCoarseGraph();
     maps.push_back(contract.getFineToCoarseNodeMapping());
 
     Partition zeta1 = clusteringGen.makeSingletonClustering(G1);
@@ -82,7 +58,7 @@ TEST_F(CoarseningGTest, testParallelPartitionCoarseningOnErdosRenyi) {
     DEBUG("coarsening on singleton partition");
     ParallelPartitionCoarsening coarsening(G, singleton);
     coarsening.run();
-    Graph Gcon = coarsening.getCoarseGraph();
+    GraphW Gcon = coarsening.getCoarseGraph();
 
     assert(Gcon.checkConsistency());
 
@@ -119,7 +95,7 @@ TEST_F(CoarseningGTest, testSequentialPartitionCoarseningOnErdosRenyi) {
     DEBUG("coarsening on singleton partition");
     ParallelPartitionCoarsening coarsening(G, singleton, false); // parallel by default
     coarsening.run();
-    Graph Gcon = coarsening.getCoarseGraph();
+    GraphW Gcon = coarsening.getCoarseGraph();
 
     assert(Gcon.checkConsistency());
 

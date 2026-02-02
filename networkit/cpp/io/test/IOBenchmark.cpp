@@ -102,7 +102,7 @@ TEST_F(IOBenchmark, timeMETISGraphReader) {
     INFO("[BEGIN] reading graph: ", path);
     runtime.start();
     METISGraphReader reader;
-    Graph G = reader.read(path);
+    GraphW G = reader.read(path);
     runtime.stop();
     INFO("[DONE] reading graph ", runtime.elapsedTag());
 

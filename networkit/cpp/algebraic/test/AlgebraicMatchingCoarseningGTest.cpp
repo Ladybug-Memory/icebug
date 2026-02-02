@@ -20,7 +20,7 @@ class AlgebraicMatchingCoarseningGTest : public testing::Test {};
 
 TEST_F(AlgebraicMatchingCoarseningGTest, testContraction) {
     METISGraphReader reader;
-    Graph G = reader.read("input/wing.graph");
+    GraphW G = reader.read("input/wing.graph");
 
     LocalMaxMatcher matcher(G);
     matcher.run();

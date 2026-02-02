@@ -70,7 +70,7 @@ TEST_F(ConnectedComponentsGTest, testConnectedComponentsDirected) {
 TEST_F(ConnectedComponentsGTest, testConnectedComponents) {
     // construct graph
     METISGraphReader reader;
-    Graph G = reader.read("input/astro-ph.graph");
+    GraphW G = reader.read("input/astro-ph.graph");
     ConnectedComponents cc(G);
     cc.run();
     DEBUG("Number of components: ", cc.numberOfComponents());
@@ -87,7 +87,7 @@ TEST_F(ConnectedComponentsGTest, testParallelConnectedComponents) {
     std::vector<std::string> graphs = {"PGPgiantcompo", "celegans_metabolic", "hep-th", "jazz"};
 
     for (auto graphName : graphs) {
-        Graph G = reader.read("input/" + graphName + ".graph");
+        GraphW G = reader.read("input/" + graphName + ".graph");
         ConnectedComponents cc(G);
         cc.run();
         count seqNum = cc.numberOfComponents();
@@ -134,7 +134,7 @@ TEST_F(ConnectedComponentsGTest, testParallelConnectedComponentsWithDeletedNodes
 TEST_F(ConnectedComponentsGTest, benchConnectedComponents) {
     // construct graph
     METISGraphReader reader;
-    Graph G = reader.read("input/coAuthorsDBLP.graph");
+    GraphW G = reader.read("input/coAuthorsDBLP.graph");
     ConnectedComponents cc(G);
     cc.run();
     DEBUG("Number of components: ", cc.numberOfComponents());
@@ -412,9 +412,9 @@ TEST_F(ConnectedComponentsGTest, testConnectedComponentsUndirected) {
 TEST_F(ConnectedComponentsGTest, testWeaklyConnectedComponents) {
     // construct graph
     EdgeListReader directReader(' ', 0, "%", false, true);
-    Graph G = directReader.read("input/johnson8-4-4.edgelist");
+    GraphW G = directReader.read("input/johnson8-4-4.edgelist");
     EdgeListReader undirectReader(' ', 0, "%", false, false);
-    Graph Gu = undirectReader.read("input/johnson8-4-4.edgelist");
+    GraphW Gu = undirectReader.read("input/johnson8-4-4.edgelist");
     WeaklyConnectedComponents wc(G);
     ConnectedComponents cc(Gu);
     wc.run();

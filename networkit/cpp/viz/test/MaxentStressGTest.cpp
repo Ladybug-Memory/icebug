@@ -50,7 +50,7 @@ TEST_F(MaxentStressGTest, benchMaxentStressCoordinatesLAMG) {
     METISGraphReader reader;
 
     for (std::string_view graphFile : graphFiles) {
-        Graph graph = reader.read(graphFile);
+        GraphW graph = reader.read(graphFile);
 
         double runtime = 0;
         double fullStress = 0;
@@ -84,7 +84,7 @@ TEST_F(MaxentStressGTest, benchMaxentStressConjGradIdPrecAlgebraicDistance) {
     METISGraphReader reader;
 
     for (std::string_view graphFile : graphFiles) {
-        Graph graph = reader.read(graphFile);
+        GraphW graph = reader.read(graphFile);
 
         double runtime = 0;
         double fullStress = 0;
@@ -118,7 +118,7 @@ TEST_F(MaxentStressGTest, benchMaxentStressConjGradDiagPrecond) {
     METISGraphReader reader;
 
     for (std::string_view graphFile : graphFiles) {
-        Graph graph = reader.read(graphFile);
+        GraphW graph = reader.read(graphFile);
 
         double runtime = 0;
         double fullStress = 0;
@@ -151,7 +151,7 @@ TEST_F(MaxentStressGTest, benchMaxentStressCoordConjGradIdPrecond) {
     METISGraphReader reader;
 
     for (std::string_view graphFile : graphFiles) {
-        Graph graph = reader.read(graphFile);
+        GraphW graph = reader.read(graphFile);
 
         double runtime = 0;
         double fullStress = 0;

@@ -59,7 +59,7 @@ protected:
 
 TEST_F(MatcherGTest, testLocalMaxMatching) {
     {
-        Graph G(10, true, true);
+        GraphW G(10, true, true);
         EXPECT_THROW(LocalMaxMatcher{G}, std::runtime_error);
     }
 
@@ -81,7 +81,7 @@ TEST_F(MatcherGTest, testLocalMaxMatching) {
 
 #if !defined _WIN32 && !defined _WIN64 && !defined WIN32 && !defined WIN64
     DibapGraphReader reader;
-    Graph airfoil1 = reader.read("input/airfoil1.gi");
+    GraphW airfoil1 = reader.read("input/airfoil1.gi");
     LocalMaxMatcher lmm(airfoil1);
     lmm.run();
     M = lmm.getMatching();
@@ -132,7 +132,7 @@ TEST_F(MatcherGTest, testPgaMatching) {
 
 #if !defined _WIN32 && !defined _WIN64 && !defined WIN32 && !defined WIN64
     DibapGraphReader reader;
-    Graph airfoil1 = reader.read("input/airfoil1.gi");
+    GraphW airfoil1 = reader.read("input/airfoil1.gi");
     PathGrowingMatcher pga2(airfoil1);
     pga2.run();
     M = pga2.getMatching();
@@ -157,7 +157,7 @@ TEST_F(MatcherGTest, testValidMatching) {
 
 TEST_F(MatcherGTest, testSuitorMatcher) {
     { // Directed graphs are not supported
-        Graph G(10, true, true);
+        GraphW G(10, true, true);
         EXPECT_THROW(SuitorMatcher{G}, std::runtime_error);
     }
 
@@ -216,7 +216,7 @@ TEST_F(MatcherGTest, testSuitorMatcher) {
 }
 
 TEST_F(MatcherGTest, testBSuitorMatcherInvalidGraphDirected) {
-    Graph G(10, true, true);
+    GraphW G(10, true, true);
     EXPECT_THROW(BSuitorMatcher(G, 2), std::runtime_error);
 }
 

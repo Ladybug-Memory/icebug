@@ -160,10 +160,10 @@ TEST_P(GraphGTest, testCopyConstructorWithIndexedEdgeIds) {
 }
 
 TEST_P(GraphGTest, testCopyConstructor) {
-    Graph G = Graph(this->Ghouse, false, false);
-    Graph GW = Graph(this->Ghouse, true, false);
-    Graph D = Graph(this->Ghouse, false, true);
-    Graph DW = Graph(this->Ghouse, true, true);
+    GraphW G = GraphW(this->Ghouse, false, false);
+    GraphW GW = GraphW(this->Ghouse, true, false);
+    GraphW D = GraphW(this->Ghouse, false, true);
+    GraphW DW = GraphW(this->Ghouse, true, true);
 
     ASSERT_FALSE(G.isWeighted());
     ASSERT_FALSE(G.isDirected());
@@ -1376,7 +1376,7 @@ TEST_P(GraphGTest, testParallelForNodes) {
 
 TEST_P(GraphGTest, forNodesWhile) {
     count n = 100;
-    Graph G = createGraph(n);
+    GraphW G = createGraph(n);
     count stopAfter = 10;
     count nodesSeen = 0;
 
@@ -1389,7 +1389,7 @@ TEST_P(GraphGTest, testForNodesInRandomOrder) {
     count n = 1000;
     count samples = 100;
     double maxAbsoluteError = 0.005;
-    Graph G = createGraph(n);
+    GraphW G = createGraph(n);
 
     node lastNode = n / 2;
     count greaterLastNode = 0;
@@ -1839,7 +1839,7 @@ TEST_P(GraphGTest, testForWeightedInEdgesOf) {
 
 TEST_P(GraphGTest, testParallelSumForNodes) {
     count n = 10;
-    Graph G = createGraph(n);
+    GraphW G = createGraph(n);
     double sum = G.parallelSumForNodes([](node v) { return 2 * v + 0.5; });
 
     double expected_sum = n * (n - 1) + n * 0.5;
@@ -2135,7 +2135,7 @@ TEST_P(GraphGTest, testParallelForWeightedEdgesWithIds) {
 
 /*TEST_P(GraphGTest, testInForEdgesUndirected) {
   METISGraphReader reader;
-  Graph G = reader.read("input/PGPgiantcompo.graph");
+  GraphW G = reader.read("input/PGPgiantcompo.graph");
   DEBUG(G.upperNodeIdBound());
   node u = 5474;
   G.forInEdgesOf(u, [&](node u, node z, edgeweight w){
@@ -2188,7 +2188,7 @@ TEST_P(GraphGTest, testSortEdges) {
             G.indexEdges();
         }
 
-        Graph origG = G;
+        GraphW origG = G;
 
         G.sortEdges();
 

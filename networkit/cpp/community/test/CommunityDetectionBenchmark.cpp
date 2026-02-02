@@ -44,12 +44,12 @@ TEST_F(CommunityDetectionBenchmark, benchClusteringAlgos) {
 
     DEBUG("Reading graph file ", graph.c_str(), " ...");
     timer.start();
-    const Graph G = this->metisReader.read(graph);
+    const GraphW G = this->metisReader.read(graph);
     timer.stop();
     DEBUG("Reading graph took ", timer.elapsedMilliseconds() / 1000.0, "s");
 
     for (int r = 0; r < runs; r++) {
-        Graph Gcopy = G;
+        GraphW Gcopy = G;
         PLP algo(Gcopy);
 
         timer.start();
@@ -65,7 +65,7 @@ TEST_F(CommunityDetectionBenchmark, benchClusteringAlgos) {
     }
 
     for (int r = 0; r < runs; r++) {
-        Graph Gcopy = G;
+        GraphW Gcopy = G;
         PLM algo(Gcopy);
 
         timer.start();
@@ -87,7 +87,7 @@ TEST_F(CommunityDetectionBenchmark, benchPageRankCentrality) {
     // std::string graph = "../graphs/uk-2002.graph";
     std::string graph = "input/polblogs.graph";
 
-    const Graph G = this->metisReader.read(graph);
+    const GraphW G = this->metisReader.read(graph);
 
     for (int r = 0; r < runs; r++) {
         PageRank cen(G, 1e-6);
@@ -109,7 +109,7 @@ TEST_F(CommunityDetectionBenchmark, benchBetweennessCentrality) {
     // std::string graph = "../graphs/cond-mat-2005.graph";
     std::string graph = "input/polblogs.graph";
 
-    const Graph G = this->metisReader.read(graph);
+    const GraphW G = this->metisReader.read(graph);
 
     for (int r = 0; r < runs; r++) {
         Betweenness cen(G);

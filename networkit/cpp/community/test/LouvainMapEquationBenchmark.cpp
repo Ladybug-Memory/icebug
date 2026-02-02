@@ -22,7 +22,7 @@ public:
 
 TEST_F(MapEquationBenchmark, benchLarge) {
     ClusteredRandomGraphGenerator generator(5000, 200, 0.5, 0.002);
-    Graph G = generator.generate();
+    GraphW G = generator.generate();
     Partition groundTruth = generator.getCommunities();
     Aux::Timer timer{};
     timer.start();
@@ -41,7 +41,7 @@ TEST_F(MapEquationBenchmark, benchLargeHierarchical) {
     std::string graphPath;
     std::getline(std::cin, graphPath);
     SNAPGraphReader reader;
-    Graph G = reader.read(graphPath);
+    GraphW G = reader.read(graphPath);
     Aux::Random::setSeed(420, true);
     Aux::Timer timer{};
     timer.start();

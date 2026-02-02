@@ -58,7 +58,7 @@ class CommunityGTest : public testing::Test {};
 
 TEST_F(CommunityGTest, testLabelPropagationOnUniformGraph) {
     ErdosRenyiGenerator graphGen(100, 0.2);
-    Graph G = graphGen.generate();
+    GraphW G = graphGen.generate();
 
     PLP lp(G);
     lp.run();
@@ -82,7 +82,7 @@ TEST_F(CommunityGTest, testAdjustedRandMeasure) {
 
     ClusteredRandomGraphGenerator graphGen(n, k, pin, pout);
     Aux::Random::setSeed(42, false);
-    Graph G = graphGen.generate();
+    GraphW G = graphGen.generate();
 
     ClusteringGenerator clusteringGenerator;
     Partition twelve = clusteringGenerator.makeContinuousBalancedClustering(G, 12);
@@ -95,7 +95,7 @@ TEST_F(CommunityGTest, testAdjustedRandMeasure) {
 
 TEST_F(CommunityGTest, testCutClustering) {
     METISGraphReader reader;
-    Graph G = reader.read("input/jazz.graph");
+    GraphW G = reader.read("input/jazz.graph");
 
     ClusteringGenerator clusteringGenerator;
     Partition halves = clusteringGenerator.makeContinuousBalancedClustering(G, 2);
@@ -127,7 +127,7 @@ TEST_F(CommunityGTest, testCommunicationGraph) {
     ClusteringGenerator clusteringGenerator;
     Partition halves = clusteringGenerator.makeContinuousBalancedClustering(G, parts);
 
-    Graph cg = GraphClusteringTools::communicationGraph(G, halves);
+    GraphW cg = GraphClusteringTools::communicationGraph(G, halves);
     // only intra partition edges are (0,3, 2.5) and (1,2, 3.0) -> commGraph edgeweight=5.5
     EXPECT_EQ(cg.numberOfNodes(), parts);
     EXPECT_EQ(cg.totalEdgeWeight(), 5.5);
@@ -206,7 +206,7 @@ TEST_F(CommunityGTest, testLabelPropagationOnClusteredGraph_ForNumberOfClusters)
     count k = 3; // number of clusters
 
     ClusteredRandomGraphGenerator graphGen(n, k, 1.0, 0.00);
-    Graph G = graphGen.generate();
+    GraphW G = graphGen.generate();
 
     PLP lp(G);
     lp.run();
@@ -224,7 +224,7 @@ TEST_F(CommunityGTest, testLabelPropagationOnDisconnectedGraph) {
     count n = 100;
     count k = 2; // number of clusters
     ClusteredRandomGraphGenerator graphGen(n, k, 1.0, 0.00);
-    Graph G = graphGen.generate();
+    GraphW G = graphGen.generate();
 
     PLP lp(G);
     lp.run();
@@ -264,7 +264,7 @@ TEST_F(CommunityGTest, testLabelPropagationOnManySmallClusters) {
 
     ClusteredRandomGraphGenerator graphGen(n, k, pin, pout);
     Aux::Random::setSeed(42, false);
-    Graph G = graphGen.generate();
+    GraphW G = graphGen.generate();
     Partition reference = graphGen.getCommunities();
 
     PLP lp(G);

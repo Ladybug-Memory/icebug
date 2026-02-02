@@ -19,7 +19,7 @@ class GlobalGTest : public testing::Test {};
 TEST_F(GlobalGTest, testClusteringCoefficient) {
 
     ErdosRenyiGenerator graphGen(10, 1.0);
-    Graph G = graphGen.generate();
+    GraphW G = graphGen.generate();
 
     ClusteringCoefficient clusteringCoefficient;
     double cc = clusteringCoefficient.avgLocal(G);

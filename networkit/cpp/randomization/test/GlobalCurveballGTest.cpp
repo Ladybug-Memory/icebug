@@ -51,7 +51,7 @@ void GlobalCurveballGTest::checkWithUndirectedGraph(GraphW &G) {
     algo.run();
 
     // check degrees
-    Graph outG = algo.getGraph();
+    GraphW outG = algo.getGraph();
     outG.forNodes([&](node u) { ASSERT_EQ(degrees[u], outG.degree(u)); });
 }
 
@@ -88,7 +88,7 @@ void GlobalCurveballGTest::checkWithDirectedGraph(GraphW &G, bool selfLoops) {
     algo.run();
 
     // check degrees
-    Graph outG = algo.getGraph();
+    GraphW outG = algo.getGraph();
     outG.forNodes([&](node u) {
         ASSERT_EQ(degreesIn[u], outG.degreeIn(u));
         ASSERT_EQ(degreesOut[u], outG.degreeOut(u));

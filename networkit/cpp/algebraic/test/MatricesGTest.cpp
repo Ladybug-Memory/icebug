@@ -37,7 +37,7 @@ protected:
         return {4, triplets};
     }
 
-    Graph graph;
+    GraphW graph;
 };
 
 using Matrices = testing::Types<DynamicMatrix, CSRMatrix, DenseMatrix>;

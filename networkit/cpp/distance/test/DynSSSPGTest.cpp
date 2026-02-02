@@ -370,7 +370,7 @@ TEST_F(DynSSSPGTest, testDynamicDijkstraGeneratedGraph) {
 TEST_F(DynSSSPGTest, testDynamicDijkstraGeneratedGraphEdgeDeletion) {
     Aux::Random::setSeed(1, true);
     DorogovtsevMendesGenerator generator(1000);
-    Graph G1 = generator.generate();
+    GraphW G1 = generator.generate();
     GraphW G(G1, true, false);
     DEBUG("Generated graph of dimension ", G.upperNodeIdBound());
     DynDijkstra dyn_dij(G, 0);
@@ -400,7 +400,7 @@ TEST_F(DynSSSPGTest, testDynamicDijkstraBatches) {
     std::default_random_engine random_generator;
     std::normal_distribution<double> distribution(100, 10);
     DorogovtsevMendesGenerator generator(100);
-    Graph G1 = generator.generate();
+    GraphW G1 = generator.generate();
     GraphW G(G1, true, false);
     DEBUG("Generated graph of dimension ", G.upperNodeIdBound());
     // add random normal weights to G
@@ -446,7 +446,7 @@ TEST_F(DynSSSPGTest, testDynamicDijkstraBatches) {
 TEST_F(DynSSSPGTest, testDynamicDijkstraBatchesEdgeDeletions) {
     Aux::Random::setSeed(1, true);
     ErdosRenyiGenerator generator(100, 0.25, false, false);
-    Graph G1 = generator.generate();
+    GraphW G1 = generator.generate();
     GraphW G(G1, true, false);
     DEBUG("Generated graph of dimension ", G.upperNodeIdBound());
     // delete random edges from G

@@ -28,7 +28,7 @@ Graph initGraph() {
 }
 
 TEST_F(TriangleScoreGTest, testChanceCorrectedTriangleScore) {
-    Graph G = initGraph();
+    GraphW G = initGraph();
 
     // edges 0,1,3,4 are contained in one triangle, edge 2 is contained in two triangles
     std::vector<count> triangles = {1, 1, 2, 1, 1, 0};
@@ -44,7 +44,7 @@ TEST_F(TriangleScoreGTest, testChanceCorrectedTriangleScore) {
 }
 
 TEST_F(TriangleScoreGTest, testSCANStructuralSimiliarityScore) {
-    Graph G = initGraph();
+    GraphW G = initGraph();
 
     std::vector<count> triangles = {1, 1, 2, 1, 1, 0};
     std::vector<double> expectedRes = {0.57, 0.51, 0.67, 0.57, 0.51, 0.31};

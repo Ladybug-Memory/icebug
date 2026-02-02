@@ -29,7 +29,7 @@ TEST_F(VizGTest, testPostscriptWriterOnRandomGraph) {
     double pout = 0.05;
 
     ClusteredRandomGraphGenerator graphGen(n, numClusters, pin, pout);
-    Graph G = graphGen.generate();
+    GraphW G = graphGen.generate();
     std::vector<Point2D> coordinates(G.upperNodeIdBound());
 
     // create coordinates
@@ -54,7 +54,7 @@ TEST_F(VizGTest, testPostscriptWriterOnRandomGraph) {
 TEST_F(VizGTest, testPostscriptWriterOnRealGraph) {
     // read graph and coordinates from binary file
     DibapGraphReader reader;
-    Graph G = reader.read("input/airfoil1.gi");
+    GraphW G = reader.read("input/airfoil1.gi");
     const auto coordinates = reader.moveCoordinates();
 
     // write graph to file

@@ -532,7 +532,7 @@ TEST_F(GraphToolsGTest, testRestoreGraph) {
     EXPECT_EQ(reference, invertedNodeMap);
 
     auto Gcompact = GraphTools::getCompactedGraph(G, nodeMap);
-    Graph Goriginal = GraphTools::restoreGraph(invertedNodeMap, Gcompact);
+    GraphW Goriginal = GraphTools::restoreGraph(invertedNodeMap, Gcompact);
 
     EXPECT_DOUBLE_EQ(Goriginal.totalEdgeWeight(), Gcompact.totalEdgeWeight());
     EXPECT_NE(Goriginal.upperNodeIdBound(), Gcompact.upperNodeIdBound());
@@ -547,7 +547,7 @@ TEST_F(GraphToolsGTest, testAugmentedGraph) {
     const count n = 500;
     auto G = ErdosRenyiGenerator(n, 0.05).generate();
     node root;
-    Graph augG;
+    GraphW augG;
     std::tie(augG, root) = GraphTools::createAugmentedGraph(G);
 
     EXPECT_TRUE(augG.hasNode(root));
@@ -819,7 +819,7 @@ TEST_P(GraphToolsGTest, testTranspose) {
     if (!G.isDirected()) {
         EXPECT_ANY_THROW(GraphTools::transpose(G));
     } else {
-        Graph Gtrans = GraphTools::transpose(G);
+        GraphW Gtrans = GraphTools::transpose(G);
         // check summation statistics
         EXPECT_EQ(G.numberOfNodes(), Gtrans.numberOfNodes());
         EXPECT_EQ(G.upperNodeIdBound(), Gtrans.upperNodeIdBound());
@@ -1046,7 +1046,7 @@ TEST_P(GraphToolsGTest, testParallelSumEdgesIndexed) {
     NetworKit::count n = 20;
     int maxWeight = n * n;
 
-    Graph G_tmp = ErdosRenyiGenerator{n, 0.01, directed()}.generate();
+    GraphW G_tmp = ErdosRenyiGenerator{n, 0.01, directed()}.generate();
     GraphW G(G_tmp);
     G.indexEdges(true);
     auto sum = G.parallelSumForEdges([&](node, node, edgeweight ew) { return ew; });
@@ -1057,7 +1057,7 @@ TEST_P(GraphToolsGTest, testEdgesRandomizer) {
     if (!weighted())
         return;
     Aux::Random::setSeed(1, true);
-    Graph G1 = ErdosRenyiGenerator{2000, 0.3, directed()}.generate();
+    GraphW G1 = ErdosRenyiGenerator{2000, 0.3, directed()}.generate();
     Graph G(G1, true, directed());
     GraphTools::randomizeWeights(G);
     edgeweight sum = G.parallelSumForEdges([&](node, node, edgeweight ew) { return ew; });
@@ -1080,7 +1080,7 @@ TEST_P(GraphToolsGTest, testEdgesRandomizerDeterminism) {
     if (!weighted())
         return;
     Aux::Random::setSeed(1, true);
-    Graph G1 = ErdosRenyiGenerator{2000, 0.3, directed()}.generate();
+    GraphW G1 = ErdosRenyiGenerator{2000, 0.3, directed()}.generate();
     Graph Ga(G1, true, directed());
     Graph Gb(G1, true, directed());
     Aux::Random::setSeed(1, true);
@@ -1156,19 +1156,19 @@ TEST_F(GraphToolsGTest, testIsBipartiteCompleteGraphs) {
 
 TEST_F(GraphToolsGTest, testIsBipartiteGrid5x5DistArchGraph) {
     METISGraphReader reader;
-    Graph graph = reader.read("input/grid-5x5-dist-arch.graph");
+    GraphW graph = reader.read("input/grid-5x5-dist-arch.graph");
     EXPECT_TRUE(GraphTools::isBipartite(graph));
 }
 
 TEST_F(GraphToolsGTest, testIsBipartiteAirfoil1Graph) {
     METISGraphReader reader;
-    Graph graph = reader.read("input/airfoil1.graph");
+    GraphW graph = reader.read("input/airfoil1.graph");
     EXPECT_FALSE(GraphTools::isBipartite(graph));
 }
 
 TEST_F(GraphToolsGTest, testIsBipartiteHepThGraph) {
     METISGraphReader reader;
-    Graph graph = reader.read("input/hep-th.graph");
+    GraphW graph = reader.read("input/hep-th.graph");
     EXPECT_FALSE(GraphTools::isBipartite(graph));
 }
 

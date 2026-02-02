@@ -103,7 +103,7 @@ TEST_P(GraphBuilderAutoCompleteGTest, testEmptyGraph) {
     auto b = createGraphBuilder();
     ASSERT_EQ(0u, b.numberOfNodes());
 
-    Graph G = toGraph(b);
+    GraphW G = toGraph(b);
 
     ASSERT_EQ(0u, G.numberOfNodes());
     ASSERT_EQ(0u, G.numberOfEdges());
@@ -120,7 +120,7 @@ TEST_P(GraphBuilderAutoCompleteGTest, testAddNode) {
     b.addNode();
     ASSERT_EQ(3u, b.numberOfNodes());
 
-    Graph G = toGraph(b);
+    GraphW G = toGraph(b);
 
     ASSERT_TRUE(G.hasNode(0));
     ASSERT_TRUE(G.hasNode(1));
@@ -134,7 +134,7 @@ TEST_P(GraphBuilderAutoCompleteGTest, testAddNode) {
 /** NODE PROPERTIES **/
 
 TEST_P(GraphBuilderAutoCompleteGTest, testDegree) {
-    Graph Ghouse = toGraph(this->bHouse);
+    GraphW Ghouse = toGraph(this->bHouse);
     if (isDirected()) {
         ASSERT_EQ(1u, Ghouse.degree(0));
         ASSERT_EQ(2u, Ghouse.degree(1));
@@ -151,7 +151,7 @@ TEST_P(GraphBuilderAutoCompleteGTest, testDegree) {
 }
 
 TEST_P(GraphBuilderAutoCompleteGTest, testDegreeIn) {
-    Graph Ghouse = toGraph(this->bHouse);
+    GraphW Ghouse = toGraph(this->bHouse);
     if (isDirected()) {
         ASSERT_EQ(1u, Ghouse.degreeIn(0));
         ASSERT_EQ(2u, Ghouse.degreeIn(1));
@@ -168,7 +168,7 @@ TEST_P(GraphBuilderAutoCompleteGTest, testDegreeIn) {
 }
 
 TEST_P(GraphBuilderAutoCompleteGTest, testDegreeOut) {
-    Graph Ghouse = toGraph(this->bHouse);
+    GraphW Ghouse = toGraph(this->bHouse);
     if (isDirected()) {
         ASSERT_EQ(1u, Ghouse.degreeOut(0));
         ASSERT_EQ(2u, Ghouse.degreeOut(1));
@@ -241,13 +241,13 @@ TEST_P(GraphBuilderAutoCompleteGTest, testAddHalfEdge) {
 
 TEST_P(GraphBuilderAutoCompleteGTest, testIsWeighted) {
     ASSERT_EQ(isWeighted(), this->bHouse.isWeighted());
-    Graph Ghouse = toGraph(this->bHouse);
+    GraphW Ghouse = toGraph(this->bHouse);
     ASSERT_EQ(isWeighted(), Ghouse.isWeighted());
 }
 
 TEST_P(GraphBuilderAutoCompleteGTest, testIsDirected) {
     ASSERT_EQ(isDirected(), this->bHouse.isDirected());
-    Graph Ghouse = toGraph(this->bHouse);
+    GraphW Ghouse = toGraph(this->bHouse);
     ASSERT_EQ(isDirected(), Ghouse.isDirected());
 }
 
@@ -255,13 +255,13 @@ TEST_P(GraphBuilderAutoCompleteGTest, testNumberOfSelfLoops) {
     auto b = createGraphBuilder(3);
     b.addHalfEdge(0, 1);
     b.addHalfEdge(0, 0);
-    Graph G = toGraph(b);
+    GraphW G = toGraph(b);
     ASSERT_EQ(1u, G.numberOfSelfLoops());
 }
 
 TEST_P(GraphBuilderAutoCompleteGTest, testUpperNodeIdBound) {
     ASSERT_EQ(5u, this->bHouse.upperNodeIdBound());
-    Graph Ghouse = toGraph(this->bHouse);
+    GraphW Ghouse = toGraph(this->bHouse);
     ASSERT_EQ(5u, Ghouse.upperNodeIdBound());
 }
 
@@ -288,7 +288,7 @@ TEST_P(GraphBuilderAutoCompleteGTest, testSetWeight) {
         b.addHalfEdge(8, 8, 2.5);
         b.setWeight(8, 8, 3.14);
 
-        Graph G = toGraph(b);
+        GraphW G = toGraph(b);
         ASSERT_TRUE(G.checkConsistency());
         // edges should get weight defaultWeight on creation and setWeight should overwrite this
         ASSERT_EQ(defaultEdgeWeight, G.weight(0, 1));
@@ -369,7 +369,7 @@ TEST_P(GraphBuilderAutoCompleteGTest, testSameAsGraph) {
             }
         });
 
-        Graph G_actual = toGraph(b);
+        GraphW G_actual = toGraph(b);
 
         // check for correct graph properties
         ASSERT_EQ(G_expected.numberOfNodes(), G_actual.numberOfNodes());
@@ -399,7 +399,7 @@ TEST_P(GraphBuilderAutoCompleteGTest, testSameAsGraph) {
 }
 
 TEST_P(GraphBuilderAutoCompleteGTest, testForValidStateAfterToGraph) {
-    Graph Ghouse = toGraph(this->bHouse);
+    GraphW Ghouse = toGraph(this->bHouse);
 
     ASSERT_TRUE(this->bHouse.isEmpty());
     ASSERT_EQ(0u, this->bHouse.numberOfNodes());
@@ -408,7 +408,7 @@ TEST_P(GraphBuilderAutoCompleteGTest, testForValidStateAfterToGraph) {
     ASSERT_EQ(isDirected(), this->bHouse.isDirected());
     this->bHouse.forNodes([&](node) { FAIL(); });
 
-    Graph G1 = toGraph(this->bHouse);
+    GraphW G1 = toGraph(this->bHouse);
     ASSERT_TRUE(G1.isEmpty());
     ASSERT_EQ(0u, G1.numberOfNodes());
     ASSERT_EQ(0u, G1.upperNodeIdBound());
@@ -419,7 +419,7 @@ TEST_P(GraphBuilderAutoCompleteGTest, testForValidStateAfterToGraph) {
     node u = this->bHouse.addNode();
     this->bHouse.addHalfEdge(v, u, 0.25);
 
-    Graph G2 = toGraph(this->bHouse);
+    GraphW G2 = toGraph(this->bHouse);
     ASSERT_FALSE(G2.isEmpty());
     ASSERT_EQ(2u, G2.numberOfNodes());
     ASSERT_EQ(1u, G2.numberOfEdges());
@@ -451,7 +451,7 @@ TEST_P(GraphBuilderAutoCompleteGTest, testSwapNeighbours) {
         new_weights = {1., 1., 1.};
     }
     GB1.swapNeighborhood(0, new_neighbours, new_weights, true);
-    Graph G = GB1.completeGraph();
+    GraphW G = GB1.completeGraph();
 
     EXPECT_TRUE(G.hasEdge(0, 0));
     EXPECT_TRUE(G.hasEdge(0, 2));

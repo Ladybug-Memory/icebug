@@ -177,7 +177,7 @@ TEST_F(CommuteTimeDistanceGTest, runECTDSingleSource) {
     std::string graphFiles[2] = {"input/karate.graph", "input/tiny_01.graph"};
 
     for (auto graphFile : graphFiles) {
-        Graph G = reader.read(graphFile);
+        GraphW G = reader.read(graphFile);
         CommuteTimeDistance ectd(G);
         node u = GraphTools::randomNode(G);
         double sum1 = ectd.runSingleSource(u);

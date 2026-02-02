@@ -21,7 +21,7 @@ TEST_F(MaximalCliquesGTest, testGetCliquesThrowsWithCallback) {
 TEST_F(MaximalCliquesGTest, testMaximalCliques) {
 
     METISGraphReader reader;
-    Graph G = reader.read("input/hep-th.graph");
+    GraphW G = reader.read("input/hep-th.graph");
 
     node seed = 2;
     std::vector<node> sn(G.neighborRange(seed).begin(), G.neighborRange(seed).end());
@@ -52,7 +52,7 @@ TEST_F(MaximalCliquesGTest, testMaximalCliques) {
 TEST_F(MaximalCliquesGTest, testMaximalCliquesOnWholeGraph) {
 
     METISGraphReader reader;
-    Graph G = reader.read("input/hep-th.graph");
+    GraphW G = reader.read("input/hep-th.graph");
 
     MaximalCliques clique(G);
 
@@ -88,7 +88,7 @@ TEST_F(MaximalCliquesGTest, testMaximalCliquesOnWholeGraph) {
 TEST_F(MaximalCliquesGTest, testMaximalCliquesWithCallback) {
 
     METISGraphReader reader;
-    Graph G = reader.read("input/hep-th.graph");
+    GraphW G = reader.read("input/hep-th.graph");
 
     std::vector<bool> inClique(G.upperNodeIdBound());
 

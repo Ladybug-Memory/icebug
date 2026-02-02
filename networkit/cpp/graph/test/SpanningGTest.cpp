@@ -30,10 +30,10 @@ TEST_F(SpanningGTest, testSpanningForest) {
 
     for (const auto &graphname : graphs) {
         std::string filename = "input/" + graphname + ".graph";
-        Graph G = reader.read(filename);
+        GraphW G = reader.read(filename);
         SpanningForest msf(G);
         msf.run();
-        Graph T = msf.getForest();
+        GraphW T = msf.getForest();
 
         INFO("tree / graph edges: ", T.numberOfEdges(), " / ", G.numberOfEdges());
 
@@ -47,11 +47,11 @@ TEST_F(SpanningGTest, testRandomMaximumSpanningForest) {
 
     for (const auto &graphname : graphs) {
         std::string filename = "input/" + graphname + ".graph";
-        Graph G = reader.read(filename);
+        GraphW G = reader.read(filename);
 
         RandomMaximumSpanningForest rmsf(G);
         rmsf.run();
-        Graph T = rmsf.getMSF();
+        GraphW T = rmsf.getMSF();
 
         INFO("tree / graph edges: ", T.numberOfEdges(), " / ", G.numberOfEdges());
 
@@ -67,11 +67,11 @@ TEST_F(SpanningGTest, testUnionMaximumSpanningForest) {
 
     for (const auto &graphname : graphs) {
         std::string filename = "input/" + graphname + ".graph";
-        Graph G = reader.read(filename);
+        GraphW G = reader.read(filename);
 
         UnionMaximumSpanningForest umsf(G);
         umsf.run();
-        Graph T = umsf.getUMSF();
+        GraphW T = umsf.getUMSF();
 
         INFO("tree / graph edges: ", T.numberOfEdges(), " / ", G.numberOfEdges());
 
@@ -87,10 +87,10 @@ TEST_F(SpanningGTest, testKruskalMinSpanningForest) {
 
     for (const auto &graphname : graphs) {
         std::string filename = "input/" + graphname + ".graph";
-        Graph G = reader.read(filename);
+        GraphW G = reader.read(filename);
         KruskalMSF msf(G);
         msf.run();
-        Graph T = msf.getForest();
+        GraphW T = msf.getForest();
 
         isValidForest(G, T);
     }
@@ -107,7 +107,7 @@ TEST_F(SpanningGTest, testKruskalMinimumSpanningForestIsMSTUnitWeights) {
 
     KruskalMSF msf(g);
     msf.run();
-    Graph T = msf.getForest();
+    GraphW T = msf.getForest();
 
     isValidForest(g, T);
     EXPECT_EQ(msf.getTotalWeight(), 4);
@@ -125,7 +125,7 @@ TEST_F(SpanningGTest, testKruskalMinimumSpanningForestIsMSFUnitWeights) {
 
     KruskalMSF msf(g);
     msf.run();
-    Graph T = msf.getForest();
+    GraphW T = msf.getForest();
 
     isValidForest(g, T);
     EXPECT_EQ(msf.getTotalWeight(), 4);
@@ -142,7 +142,7 @@ TEST_F(SpanningGTest, testKruskalMinimumSpanningForestIsMSTNonUnitWeights) {
 
     KruskalMSF msf(g);
     msf.run();
-    Graph T = msf.getForest();
+    GraphW T = msf.getForest();
 
     isValidForest(g, T);
     EXPECT_EQ(msf.getTotalWeight(), 3);
@@ -160,7 +160,7 @@ TEST_F(SpanningGTest, testKruskalMinimumSpanningForestIsMSFNonUnitWeights) {
 
     KruskalMSF msf(g);
     msf.run();
-    Graph T = msf.getForest();
+    GraphW T = msf.getForest();
 
     isValidForest(g, T);
     EXPECT_EQ(msf.getTotalWeight(), 6);
@@ -184,10 +184,10 @@ TEST_F(SpanningGTest, testPrimMinSpanningForest) {
 
     for (const auto &graphname : graphs) {
         std::string filename = "input/" + graphname + ".graph";
-        Graph G = reader.read(filename);
+        GraphW G = reader.read(filename);
         PrimMSF msf(G);
         msf.run();
-        Graph T = msf.getForest();
+        GraphW T = msf.getForest();
 
         isValidForest(G, T);
     }
@@ -204,7 +204,7 @@ TEST_F(SpanningGTest, testPrimMinimumSpanningForestIsMSTUnitWeights) {
 
     PrimMSF msf(g);
     msf.run();
-    Graph T = msf.getForest();
+    GraphW T = msf.getForest();
 
     isValidForest(g, T);
     EXPECT_EQ(msf.getTotalWeight(), 4);
@@ -222,7 +222,7 @@ TEST_F(SpanningGTest, testPrimMinimumSpanningForestIsMSFUnitWeights) {
 
     PrimMSF msf(g);
     msf.run();
-    Graph T = msf.getForest();
+    GraphW T = msf.getForest();
 
     isValidForest(g, T);
     EXPECT_EQ(msf.getTotalWeight(), 4);
@@ -239,7 +239,7 @@ TEST_F(SpanningGTest, testPrimMinimumSpanningForestIsMSTNonUnitWeights) {
 
     PrimMSF msf(g);
     msf.run();
-    Graph T = msf.getForest();
+    GraphW T = msf.getForest();
 
     isValidForest(g, T);
     EXPECT_EQ(msf.getTotalWeight(), 3);
@@ -257,7 +257,7 @@ TEST_F(SpanningGTest, testPrimMinimumSpanningForestIsMSFNonUnitWeights) {
 
     PrimMSF msf(g);
     msf.run();
-    Graph T = msf.getForest();
+    GraphW T = msf.getForest();
 
     isValidForest(g, T);
     EXPECT_EQ(msf.getTotalWeight(), 6);
@@ -275,7 +275,7 @@ TEST_F(SpanningGTest, testPrimMinimumSpanningForestIsMSFUnweighted) {
 
     PrimMSF msf(g);
     msf.run();
-    Graph T = msf.getForest();
+    GraphW T = msf.getForest();
 
     isValidForest(g, T);
     EXPECT_EQ(msf.getTotalWeight(), 4);

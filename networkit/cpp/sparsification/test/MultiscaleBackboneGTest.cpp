@@ -45,7 +45,7 @@ TEST_F(MultiscaleBackboneGTest, testSimpleMultiscaleBackbone) {
 
     MultiscaleSparsifier sparsifier(g, 0.5);
     sparsifier.run();
-    Graph b = sparsifier.getGraph();
+    GraphW b = sparsifier.getGraph();
 
     EXPECT_EQ(3, b.numberOfEdges());
     EXPECT_TRUE(b.hasEdge(0, 4));
