@@ -797,4 +797,54 @@ void GraphW::setWeightAtIthInNeighbor(Unsafe, node u, index i, edgeweight ew) {
     inEdgeWeights[u][i] = ew;
 }
 
+void GraphW::forEdgesVirtualImpl(bool directed, bool weighted, bool hasEdgeIds,
+                                 std::function<void(node, node, edgeweight, edgeid)> handle) const {
+    // Vector-based implementation using GraphW's outEdges
+    for (node u = 0; u < outEdges.size(); ++u) {
+        if (directed) {
+            for (index i = 0; i < outEdges[u].size(); ++i) {
+                node v = outEdges[u][i];
+                edgeweight w = weighted ? outEdgeWeights[u][i] : defaultEdgeWeight;
+                edgeid eid = hasEdgeIds ? outEdgeIds[u][i] : none;
+                handle(u, v, w, eid);
+            }
+        } else {
+            for (index i = 0; i < outEdges[u].size(); ++i) {
+                node v = outEdges[u][i];
+                // For undirected graphs, only process edge if u <= v to avoid duplicates
+                if (static_cast<node>(v) < u)
+                    continue;
+                edgeweight w = weighted ? outEdgeWeights[u][i] : defaultEdgeWeight;
+                edgeid eid = hasEdgeIds ? outEdgeIds[u][i] : none;
+                handle(u, v, w, eid);
+            }
+        }
+    }
+}
+
+void GraphW::forEdgesOfVirtualImpl(
+    node u, bool directed, bool weighted, bool hasEdgeIds,
+    std::function<void(node, node, edgeweight, edgeid)> handle) const {
+    // Vector-based implementation for a single node
+    for (index i = 0; i < outEdges[u].size(); ++i) {
+        node v = outEdges[u][i];
+        edgeweight w = weighted ? outEdgeWeights[u][i] : defaultEdgeWeight;
+        edgeid eid = hasEdgeIds ? outEdgeIds[u][i] : none;
+        handle(u, v, w, eid);
+    }
+}
+
+bool GraphW::hasEdgeImpl(node u, node v) const {
+    // Vector-based implementation
+    if (u >= outEdges.size() || v >= outEdges.size()) {
+        return false;
+    }
+    for (index i = 0; i < outEdges[u].size(); ++i) {
+        if (outEdges[u][i] == v) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } /* namespace NetworKit */

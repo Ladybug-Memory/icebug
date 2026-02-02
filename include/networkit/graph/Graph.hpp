@@ -409,6 +409,20 @@ private:
     template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
     inline double parallelSumForEdgesImpl(L handle) const;
 
+    /**
+     * @brief Virtual method for edge iteration - overridden by GraphW for vector-based iteration
+     */
+    virtual void
+    forEdgesVirtualImpl(bool directed, bool weighted, bool hasEdgeIds,
+                        std::function<void(node, node, edgeweight, edgeid)> handle) const;
+
+    /**
+     * @brief Virtual method for forEdgesOf - overridden by GraphW for vector-based iteration
+     */
+    virtual void
+    forEdgesOfVirtualImpl(node u, bool directed, bool weighted, bool hasEdgeIds,
+                          std::function<void(node, node, edgeweight, edgeid)> handle) const;
+
     /*
      * In the following definition, Aux::FunctionTraits is used in order to only
      * execute lambda functions with the appropriate parameters. The
@@ -926,6 +940,11 @@ public:
      * @return @c true if edge exists, @c false otherwise.
      */
     bool hasEdge(node u, node v) const;
+
+    /**
+     * @brief Virtual method for hasEdge - overridden by GraphW for vector-based graphs
+     */
+    virtual bool hasEdgeImpl(node u, node v) const;
 
     /**
      * Remove adjacent edges satisfying a condition.
@@ -1744,16 +1763,30 @@ inline void Graph::forInEdgesOfImpl(node u, L handle) const {
 
 template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
 inline void Graph::forEdgeImpl(L handle) const {
-    for (node u = 0; u < z; ++u) {
-        forOutEdgesOfImpl<graphIsDirected, hasWeights, graphHasEdgeIds, L>(u, handle);
+    if (usingCSR) {
+        for (node u = 0; u < z; ++u) {
+            forOutEdgesOfImpl<graphIsDirected, hasWeights, graphHasEdgeIds, L>(u, handle);
+        }
+    } else {
+        // For vector-based graphs (GraphW), use the virtual dispatch
+        forEdgesVirtualImpl(
+            graphIsDirected, hasWeights, graphHasEdgeIds,
+            [&](node u, node v, edgeweight w, edgeid e) { edgeLambda(handle, u, v, w, e); });
     }
 }
 
 template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
 inline void Graph::parallelForEdgesImpl(L handle) const {
+    if (usingCSR) {
 #pragma omp parallel for schedule(guided)
-    for (omp_index u = 0; u < static_cast<omp_index>(z); ++u) {
-        forOutEdgesOfImpl<graphIsDirected, hasWeights, graphHasEdgeIds, L>(u, handle);
+        for (omp_index u = 0; u < static_cast<omp_index>(z); ++u) {
+            forOutEdgesOfImpl<graphIsDirected, hasWeights, graphHasEdgeIds, L>(u, handle);
+        }
+    } else {
+        // For vector-based graphs, use the virtual dispatch
+        forEdgesVirtualImpl(
+            graphIsDirected, hasWeights, graphHasEdgeIds,
+            [&](node u, node v, edgeweight w, edgeid e) { edgeLambda(handle, u, v, w, e); });
     }
 }
 
@@ -1885,42 +1918,50 @@ void Graph::forNeighborsOf(node u, L handle) const {
 
 template <typename L>
 void Graph::forEdgesOf(node u, L handle) const {
-    if (directed) {
-        switch (weighted + 2 * edgesIndexed) {
-        case 0: // not weighted, no edge ids
-            forOutEdgesOfImpl<true, false, false, L>(u, handle);
-            break;
+    if (usingCSR) {
+        if (directed) {
+            switch (weighted + 2 * edgesIndexed) {
+            case 0: // not weighted, no edge ids
+                forOutEdgesOfImpl<true, false, false, L>(u, handle);
+                break;
 
-        case 1: // weighted, no edge ids
-            forOutEdgesOfImpl<true, true, false, L>(u, handle);
-            break;
+            case 1: // weighted, no edge ids
+                forOutEdgesOfImpl<true, true, false, L>(u, handle);
+                break;
 
-        case 2: // not weighted, with edge ids
-            forOutEdgesOfImpl<true, false, true, L>(u, handle);
-            break;
+            case 2: // not weighted, with edge ids
+                forOutEdgesOfImpl<true, false, true, L>(u, handle);
+                break;
 
-        case 3: // weighted, with edge ids
-            forOutEdgesOfImpl<true, true, true, L>(u, handle);
-            break;
+            case 3: // weighted, with edge ids
+                forOutEdgesOfImpl<true, true, true, L>(u, handle);
+                break;
+            }
+        } else {
+            switch (weighted + 2 * edgesIndexed) {
+            case 0: // not weighted, no edge ids
+                forOutEdgesOfImpl<false, false, false, L>(u, handle);
+                break;
+
+            case 1: // weighted, no edge ids
+                forOutEdgesOfImpl<false, true, false, L>(u, handle);
+                break;
+
+            case 2: // not weighted, with edge ids
+                forOutEdgesOfImpl<false, false, true, L>(u, handle);
+                break;
+
+            case 3: // weighted, with edge ids
+                forOutEdgesOfImpl<false, true, true, L>(u, handle);
+                break;
+            }
         }
     } else {
-        switch (weighted + 2 * edgesIndexed) {
-        case 0: // not weighted, no edge ids
-            forOutEdgesOfImpl<false, false, false, L>(u, handle);
-            break;
-
-        case 1: // weighted, no edge ids
-            forOutEdgesOfImpl<false, true, false, L>(u, handle);
-            break;
-
-        case 2: // not weighted, with edge ids
-            forOutEdgesOfImpl<false, false, true, L>(u, handle);
-            break;
-
-        case 3: // weighted, with edge ids
-            forOutEdgesOfImpl<false, true, true, L>(u, handle);
-            break;
-        }
+        // For vector-based graphs, use virtual dispatch
+        forEdgesOfVirtualImpl(u, directed, weighted, edgesIndexed,
+                              [&](node uu, node vv, edgeweight ww, edgeid ee) {
+                                  edgeLambda(handle, uu, vv, ww, ee);
+                              });
     }
 }
 

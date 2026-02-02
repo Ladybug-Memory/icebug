@@ -301,9 +301,17 @@ bool Graph::hasEdge(node u, node v) const {
         return hasEdgeCSR(u, v);
     }
 
-    // Base Graph class only supports CSR format
-    throw std::runtime_error(
-        "hasEdge method requires CSR format - non-CSR graphs should use GraphW");
+    // For vector-based graphs, use virtual dispatch
+    return hasEdgeImpl(u, v);
+}
+
+bool Graph::hasEdgeImpl(node u, node v) const {
+    // CSR-based implementation
+    if (usingCSR) {
+        return hasEdgeCSR(u, v);
+    }
+    // Base class doesn't have vector-based implementation
+    throw std::runtime_error("hasEdgeImpl not implemented for base Graph class");
 }
 
 bool Graph::checkConsistency() const {
@@ -413,6 +421,43 @@ std::pair<const node *, count> Graph::getCSRInNeighbors(node u) const {
     const node *neighbors =
         reinterpret_cast<const node *>(inEdgesCSRIndices->raw_values()) + start_idx;
     return {neighbors, degree};
+}
+
+void Graph::forEdgesVirtualImpl(bool directed, bool weighted, bool hasEdgeIds,
+                                std::function<void(node, node, edgeweight, edgeid)> handle) const {
+    // CSR-based implementation
+    for (node u = 0; u < z; ++u) {
+        auto [neighbors, degree] = getCSROutNeighbors(u);
+        for (count i = 0; i < degree; ++i) {
+            node v = neighbors[i];
+            if (!exists[v])
+                continue;
+
+            // For undirected graphs, only process edge if u >= v to avoid duplicates
+            if (!directed && !useEdgeInIteration<false>(u, v))
+                continue;
+
+            edgeweight w = weighted ? defaultEdgeWeight : defaultEdgeWeight;
+            edgeid eid = hasEdgeIds ? none : none;
+            handle(u, v, w, eid);
+        }
+    }
+}
+
+void Graph::forEdgesOfVirtualImpl(
+    node u, bool directed, bool weighted, bool hasEdgeIds,
+    std::function<void(node, node, edgeweight, edgeid)> handle) const {
+    // CSR-based implementation for a single node
+    auto [neighbors, degree] = getCSROutNeighbors(u);
+    for (count i = 0; i < degree; ++i) {
+        node v = neighbors[i];
+        if (!exists[v])
+            continue;
+
+        edgeweight w = weighted ? defaultEdgeWeight : defaultEdgeWeight;
+        edgeid eid = hasEdgeIds ? none : none;
+        handle(u, v, w, eid);
+    }
 }
 
 } /* namespace NetworKit */

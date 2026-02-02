@@ -837,6 +837,25 @@ private:
     template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
     inline double parallelSumForEdgesImpl(L handle) const;
 
+    /**
+     * @brief Override for vector-based edge iteration
+     */
+    void
+    forEdgesVirtualImpl(bool directed, bool weighted, bool hasEdgeIds,
+                        std::function<void(node, node, edgeweight, edgeid)> handle) const override;
+
+    /**
+     * @brief Override for vector-based forEdgesOf
+     */
+    void forEdgesOfVirtualImpl(
+        node u, bool directed, bool weighted, bool hasEdgeIds,
+        std::function<void(node, node, edgeweight, edgeid)> handle) const override;
+
+    /**
+     * @brief Override for hasEdge - vector-based implementation
+     */
+    bool hasEdgeImpl(node u, node v) const override;
+
 public:
     /**
      * Wrapper class to iterate over a range of the neighbors of a node within
