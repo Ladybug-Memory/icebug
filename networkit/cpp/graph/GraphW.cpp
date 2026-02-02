@@ -823,7 +823,8 @@ void GraphW::forEdgesVirtualImpl(bool directed, bool weighted, bool hasEdgeIds,
 }
 
 void GraphW::forEdgesOfVirtualImpl(
-    node u, bool directed, bool weighted, bool hasEdgeIds,
+    node u, [[maybe_unused]] bool directed, [[maybe_unused]] bool weighted,
+    [[maybe_unused]] bool hasEdgeIds,
     std::function<void(node, node, edgeweight, edgeid)> handle) const {
     // Vector-based implementation for a single node
     for (index i = 0; i < outEdges[u].size(); ++i) {
@@ -835,7 +836,8 @@ void GraphW::forEdgesOfVirtualImpl(
 }
 
 void GraphW::forInEdgesVirtualImpl(
-    node u, bool directed, bool weighted, bool hasEdgeIds,
+    node u, [[maybe_unused]] bool directed, [[maybe_unused]] bool weighted,
+    [[maybe_unused]] bool hasEdgeIds,
     std::function<void(node, node, edgeweight, edgeid)> handle) const {
     // Vector-based implementation for in-edges
     if (directed) {

@@ -423,7 +423,8 @@ std::pair<const node *, count> Graph::getCSRInNeighbors(node u) const {
     return {neighbors, degree};
 }
 
-void Graph::forEdgesVirtualImpl(bool directed, bool weighted, bool hasEdgeIds,
+void Graph::forEdgesVirtualImpl([[maybe_unused]] bool directed, [[maybe_unused]] bool weighted,
+                                [[maybe_unused]] bool hasEdgeIds,
                                 std::function<void(node, node, edgeweight, edgeid)> handle) const {
     // CSR-based implementation
     for (node u = 0; u < z; ++u) {
@@ -446,7 +447,8 @@ void Graph::forEdgesVirtualImpl(bool directed, bool weighted, bool hasEdgeIds,
 }
 
 void Graph::forEdgesOfVirtualImpl(
-    node u, bool directed, bool weighted, bool hasEdgeIds,
+    node u, [[maybe_unused]] bool directed, [[maybe_unused]] bool weighted,
+    [[maybe_unused]] bool hasEdgeIds,
     std::function<void(node, node, edgeweight, edgeid)> handle) const {
     // CSR-based implementation for a single node
     auto [neighbors, degree] = getCSROutNeighbors(u);
@@ -463,7 +465,8 @@ void Graph::forEdgesOfVirtualImpl(
 }
 
 void Graph::forInEdgesVirtualImpl(
-    node u, bool directed, bool weighted, bool hasEdgeIds,
+    node u, [[maybe_unused]] bool directed, [[maybe_unused]] bool weighted,
+    [[maybe_unused]] bool hasEdgeIds,
     std::function<void(node, node, edgeweight, edgeid)> handle) const {
     // CSR-based implementation for in-edges
     auto [neighbors, degree] = getCSRInNeighbors(u);
@@ -480,7 +483,8 @@ void Graph::forInEdgesVirtualImpl(
 }
 
 double Graph::parallelSumForEdgesVirtualImpl(
-    bool directed, bool weighted, bool hasEdgeIds,
+    [[maybe_unused]] bool directed, [[maybe_unused]] bool weighted,
+    [[maybe_unused]] bool hasEdgeIds,
     std::function<double(node, node, edgeweight, edgeid)> handle) const {
     double sum = 0.0;
 
