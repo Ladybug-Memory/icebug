@@ -29,13 +29,23 @@ def isSupported(cmd):
 	if shutil.which(cmd) is None:
 		return False
 	# Read major revision number from "clang-format version XX.XX.XX ... "
-	version = str(subprocess.check_output([cmd, "--version"],
-		universal_newlines=True, env=getEnv())).strip().split()[-1].split('.')[0]
+	# Handle different formats:
+	# - Standard: "clang-format version 17.0.6"
+	# - Ubuntu: "Ubuntu clang-format version 17.0.6 (9ubuntu1)"
+	version_output = str(subprocess.check_output([cmd, "--version"],
+		universal_newlines=True, env=getEnv())).strip()
+
+	# Find the word "version" and extract the next token which should be the version number
+	tokens = version_output.split()
 	try:
-		found_version = int(version)
-		return found_version == nkt.CLANG_FORMAT_VERSION
-	except ValueError as val_error:
-		return False
+		version_idx = tokens.index("version")
+		if version_idx + 1 < len(tokens):
+			version = tokens[version_idx + 1].split('.')[0]
+			found_version = int(version)
+			return found_version == nkt.CLANG_FORMAT_VERSION
+	except (ValueError, IndexError):
+		pass
+	return False
 
 def findClangFormat():
 	"""Tries to find clang-format-XXX variants within the path"""
