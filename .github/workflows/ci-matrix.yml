@@ -1,0 +1,167 @@
+name: matrix build
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+env:
+  OMP_NUM_THREADS: 2
+  CXX_STANDARD: 20
+  MONOLITH: ON
+  TLX_PATH: /home/runner/work/networkit/networkit/tlx
+  TLX_PATH_WIN: /d/a/networkit/networkit/tlx
+  NATIVE: OFF
+
+jobs:
+  build:
+    name: "${{ matrix.os }} (${{ matrix.compiler }})"
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            compiler: gcc-14
+            runner: ubuntu-24.04
+            cc: gcc-14
+            cxx: g++-14
+          - os: linux
+            compiler: llvm-20
+            runner: ubuntu-24.04
+            cc: clang-20
+            cxx: clang++-20
+          - os: macos
+            compiler: gcc-14
+            runner: macos-14
+            cc: gcc-14
+            cxx: g++-14
+          - os: macos
+            compiler: llvm-20
+            runner: macos-14
+            cc: /opt/homebrew/opt/llvm/bin/clang
+            cxx: /opt/homebrew/opt/llvm/bin/clang++
+          - os: windows
+            compiler: msvc
+            runner: windows-2022
+            cc: cl
+            cxx: cl
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - name: Checkout networkit
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Checkout tlx
+        if: matrix.os != 'windows'
+        uses: actions/checkout@v4
+        with:
+          repository: tlx/tlx
+          path: tlx
+
+      - name: Setup ccache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.ccache
+            /Users/runner/Library/Caches/ccache
+            C:\Users\runner\AppData\Local\ccache
+          key: ccache-${{ matrix.os }}-${{ matrix.compiler }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ matrix.os }}-${{ matrix.compiler }}-
+            ccache-${{ matrix.os }}-
+
+      - name: Install ccache (Linux)
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache
+
+      - name: Install ccache (macOS)
+        if: matrix.os == 'macos'
+        run: brew install ccache
+
+      - name: Install prerequisites (Linux)
+        if: matrix.os == 'linux' && matrix.compiler == 'llvm-20'
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm-snapshot.asc
+          echo "deb http://apt.llvm.org/noble llvm-toolchain-noble-20 main" | sudo tee /etc/apt/sources.list.d/llvm20.list
+          wget https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-noble.deb
+          sudo apt-get update
+          sudo apt-get install -y ./apache-arrow-apt-source-latest-noble.deb
+          sudo apt-get install -y clang-20 libomp-20-dev ninja-build libarrow-dev
+
+      - name: Install prerequisites (Linux)
+        if: matrix.os == 'linux' && matrix.compiler == 'gcc-14'
+        run: |
+          wget https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-noble.deb
+          sudo apt-get update
+          sudo apt-get install -y ./apache-arrow-apt-source-latest-noble.deb
+          sudo apt-get install -y g++-14 ninja-build libarrow-dev
+
+      - name: Install prerequisites (macOS)
+        if: matrix.os == 'macos'
+        run: |
+          brew install ninja apache-arrow ccache
+          if [[ "${{ matrix.compiler }}" == "llvm-20" ]]; then
+            brew install libomp
+            brew reinstall llvm
+            brew link --overwrite llvm
+          fi
+
+      - name: Create vcpkg manifest (Windows)
+        if: matrix.os == 'windows'
+        shell: bash
+        run: |
+          cat > vcpkg.json << 'EOF'
+          {
+            "name": "networkit-deps",
+            "version": "1.0.0",
+            "dependencies": [
+              "arrow"
+            ]
+          }
+          EOF
+
+      - name: Cache vcpkg (Windows)
+        if: matrix.os == 'windows'
+        uses: actions/cache@v4
+        with:
+          path: C:\Users\runner\AppData\Local\vcpkg
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+
+      - name: Setup vcpkg (Windows)
+        if: matrix.os == 'windows'
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: 'b322364f06308bdd24823f9d8f03fe0cc86fd46f'
+          runVcpkgInstall: true
+        env:
+          VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
+
+      - name: Setup devCmd (vstools)
+        if: matrix.os == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build and test (Windows)
+        if: matrix.os == 'windows'
+        shell: bash
+        run: |
+          mkdir build && cd build
+          cmake -GNinja -DNETWORKIT_STATIC=ON -DNETWORKIT_BUILD_TESTS=ON -DNETWORKIT_MONOLITH=ON -DNETWORKIT_CXX_STANDARD=${{ env.CXX_STANDARD }} -DCMAKE_BUILD_TYPE=Debug ..
+          ninja
+          ctest -V -C Debug
+
+      - name: Prepare environment and run checks (Linux/macOS)
+        if: matrix.os != 'windows'
+        run: ${{ github.workspace }}/.github/workflows/scripts/cpp_only.sh
+        shell: bash
