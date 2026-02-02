@@ -423,6 +423,21 @@ private:
     forEdgesOfVirtualImpl(node u, bool directed, bool weighted, bool hasEdgeIds,
                           std::function<void(node, node, edgeweight, edgeid)> handle) const;
 
+    /**
+     * @brief Virtual method for forInEdgesOf - overridden by GraphW for vector-based iteration
+     */
+    virtual void
+    forInEdgesVirtualImpl(node u, bool directed, bool weighted, bool hasEdgeIds,
+                          std::function<void(node, node, edgeweight, edgeid)> handle) const;
+
+    /**
+     * @brief Virtual method for parallelSumForEdges - overridden by GraphW for vector-based
+     * iteration
+     */
+    virtual double parallelSumForEdgesVirtualImpl(
+        bool directed, bool weighted, bool hasEdgeIds,
+        std::function<double(node, node, edgeweight, edgeid)> handle) const;
+
     /*
      * In the following definition, Aux::FunctionTraits is used in order to only
      * execute lambda functions with the appropriate parameters. The
@@ -1755,9 +1770,17 @@ inline void Graph::forInEdgesOfImpl(node u, L handle) const {
             }
         }
     } else {
-        // Vector-based graphs should use GraphW
-        throw std::runtime_error("forInEdgesOfImpl not supported for vector-based graphs in base "
-                                 "Graph class - use GraphW");
+        // For vector-based graphs (GraphW), use the virtual dispatch
+        // Create a wrapper function that swaps the first two arguments
+        // The handle expects (source, target, ...) but virtual method provides (target, source,
+        // ...)
+        auto wrapper = std::function<void(node, node, edgeweight, edgeid)>(
+            [&](node target, node source, edgeweight w, edgeid e) {
+                // Swap arguments: call handle with (source, target, ...) instead of (target,
+                // source, ...)
+                edgeLambda(handle, source, target, w, e);
+            });
+        forInEdgesVirtualImpl(u, graphIsDirected, hasWeights, graphHasEdgeIds, wrapper);
     }
 }
 
@@ -1827,9 +1850,12 @@ inline double Graph::parallelSumForEdgesImpl(L handle) const {
             }
         }
     } else {
-        // Vector-based graphs should use GraphW
-        throw std::runtime_error("parallelSumForEdgesImpl not supported for vector-based graphs in "
-                                 "base Graph class - use GraphW");
+        // For vector-based graphs (GraphW), use the virtual dispatch
+        auto wrapper = [&](node u, node v, edgeweight w, edgeid e) -> double {
+            return edgeLambda(handle, u, v, w, e);
+        };
+        return parallelSumForEdgesVirtualImpl(graphIsDirected, hasWeights, graphHasEdgeIds,
+                                              wrapper);
     }
 
     return sum;

@@ -834,6 +834,54 @@ void GraphW::forEdgesOfVirtualImpl(
     }
 }
 
+
+void GraphW::forInEdgesVirtualImpl(
+    node u, bool directed, bool weighted, bool hasEdgeIds,
+    std::function<void(node, node, edgeweight, edgeid)> handle) const {
+    // Vector-based implementation for in-edges
+    if (directed) {
+        for (index i = 0; i < inEdges[u].size(); ++i) {
+            node v = inEdges[u][i];
+            edgeweight w = weighted ? inEdgeWeights[u][i] : defaultEdgeWeight;
+            edgeid eid = hasEdgeIds ? inEdgeIds[u][i] : none;
+            // For in-edges, call with (neighbor, thisNode) which is (v, u)
+            handle(v, u, w, eid);
+        }
+    } else {
+        // For undirected graphs, incoming edges are the same as outgoing edges
+        for (index i = 0; i < outEdges[u].size(); ++i) {
+            node v = outEdges[u][i];
+            edgeweight w = weighted ? outEdgeWeights[u][i] : defaultEdgeWeight;
+            edgeid eid = hasEdgeIds ? outEdgeIds[u][i] : none;
+            handle(v, u, w, eid);
+        }
+    }
+}
+
+double GraphW::parallelSumForEdgesVirtualImpl(
+    bool directed, bool weighted, bool hasEdgeIds,
+    std::function<double(node, node, edgeweight, edgeid)> handle) const {
+    double sum = 0.0;
+
+#pragma omp parallel for reduction(+ : sum)
+    for (omp_index u = 0; u < static_cast<omp_index>(outEdges.size()); ++u) {
+        for (index i = 0; i < outEdges[u].size(); ++i) {
+            node v = outEdges[u][i];
+
+            // For undirected graphs, only process edge if u <= v to avoid duplicates
+            if (!directed && static_cast<node>(v) < u)
+                continue;
+
+            edgeweight w = weighted ? outEdgeWeights[u][i] : defaultEdgeWeight;
+            edgeid eid = hasEdgeIds ? outEdgeIds[u][i] : none;
+
+            sum += handle(u, v, w, eid);
+        }
+    }
+
+    return sum;
+}
+
 bool GraphW::hasEdgeImpl(node u, node v) const {
     // Vector-based implementation
     if (u >= outEdges.size() || v >= outEdges.size()) {

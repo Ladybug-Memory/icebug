@@ -460,4 +460,54 @@ void Graph::forEdgesOfVirtualImpl(
     }
 }
 
+void Graph::forInEdgesVirtualImpl(
+    node u, bool directed, bool weighted, bool hasEdgeIds,
+    std::function<void(node, node, edgeweight, edgeid)> handle) const {
+    // CSR-based implementation for in-edges
+    auto [neighbors, degree] = getCSRInNeighbors(u);
+    for (count i = 0; i < degree; ++i) {
+        node v = neighbors[i];
+        if (!exists[v])
+            continue;
+
+        edgeweight w = weighted ? defaultEdgeWeight : defaultEdgeWeight;
+        edgeid eid = hasEdgeIds ? none : none;
+        handle(u, v, w, eid);
+    }
+}
+
+double Graph::parallelSumForEdgesVirtualImpl(
+    bool directed, bool weighted, bool hasEdgeIds,
+    std::function<double(node, node, edgeweight, edgeid)> handle) const {
+    double sum = 0.0;
+
+    // CSR-based parallel implementation
+#pragma omp parallel for schedule(guided) reduction(+ : sum)
+    for (omp_index u = 0; u < static_cast<omp_index>(z); ++u) {
+        if (!exists[u])
+            continue;
+
+        auto [neighbors, degree] = getCSROutNeighbors(u);
+        if (neighbors == nullptr || degree == 0)
+            continue;
+
+        for (count i = 0; i < degree; ++i) {
+            node v = neighbors[i];
+            if (!exists[v])
+                continue;
+
+            // For undirected graphs, only process edge if u >= v to avoid duplicates
+            if (!directed && !useEdgeInIteration<false>(u, v))
+                continue;
+
+            edgeweight w = weighted ? defaultEdgeWeight : defaultEdgeWeight;
+            edgeid eid = hasEdgeIds ? none : none;
+
+            sum += handle(u, v, w, eid);
+        }
+    }
+
+    return sum;
+}
+
 } /* namespace NetworKit */

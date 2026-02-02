@@ -852,6 +852,20 @@ private:
         std::function<void(node, node, edgeweight, edgeid)> handle) const override;
 
     /**
+     * @brief Override for vector-based forInEdgesOf
+     */
+    void forInEdgesVirtualImpl(
+        node u, bool directed, bool weighted, bool hasEdgeIds,
+        std::function<void(node, node, edgeweight, edgeid)> handle) const override;
+
+    /**
+     * @brief Override for vector-based parallelSumForEdges
+     */
+    double parallelSumForEdgesVirtualImpl(
+        bool directed, bool weighted, bool hasEdgeIds,
+        std::function<double(node, node, edgeweight, edgeid)> handle) const override;
+
+    /**
      * @brief Override for hasEdge - vector-based implementation
      */
     bool hasEdgeImpl(node u, node v) const override;
