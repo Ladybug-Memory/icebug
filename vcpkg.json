@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/scripts/vcpkg.schema.json",
+  "name": "icebug",
+  "version": "0.0.1",
+  "description": "Icebug - High-performance graph analysis library",
+  "homepage": "https://github.com/Ladybug-Memory/icebug",
+  "license": "MIT",
+  "supports": "(x64 & !uwp)",
+  "features": {
+    "tests": {
+      "description": "Build C++ tests",
+      "dependencies": [
+        "googletest"
+      ]
+    }
+  },
+  "default-features": [],
+  "dependencies": [
+    "arrow",
+    "openmp"
+  ]
+}

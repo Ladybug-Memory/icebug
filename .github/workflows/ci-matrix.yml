@@ -9,6 +9,10 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  packages: write
+  contents: read
+
 env:
   OMP_NUM_THREADS: 2
   CXX_STANDARD: 20
@@ -117,13 +121,10 @@ jobs:
           }
           EOF
 
-      - name: Export GitHub Actions cache environment variables
+      - name: Authenticate NuGet for GitHub Packages
         if: matrix.os == 'windows'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+        run: |
+          dotnet nuget add source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" --name "GitHub" --username "${{ github.repository_owner }}" --password "${{ secrets.GITHUB_TOKEN }}" --store-password-in-clear-text
 
       - name: Setup vcpkg (Windows)
         if: matrix.os == 'windows'
@@ -132,7 +133,8 @@ jobs:
           vcpkgGitCommitId: 'b322364f06308bdd24823f9d8f03fe0cc86fd46f'
           runVcpkgInstall: true
         env:
-          VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
+          VCPKG_BINARY_SOURCES: 'clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite'
+          VCPKG_NUGET_REPOSITORY: 'https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json'
 
       - name: Setup devCmd (vstools)
         if: matrix.os == 'windows'
