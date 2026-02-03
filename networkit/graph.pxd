@@ -340,6 +340,7 @@ cdef extern from "<networkit/graph/Graph.hpp>":
 
 cdef class Graph:
 	cdef _Graph _this
+	cdef dict _arrow_arrays
 	cdef setThis(self, _Graph& other)
 	cdef setThisFromGraphW(self, _GraphW& other)
 
