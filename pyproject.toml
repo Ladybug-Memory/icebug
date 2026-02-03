@@ -1,14 +1,15 @@
 [project]
-name = "networkit"
+name = "icebug"
 version = "11.1.post1"
-description = "NetworKit is a toolbox for high-performance network analysis"
+description = "High performance graph analytics backed by read-only memory"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {file = "License.txt"}
-keywords =["graph algorithm", "network analysis", "social network"]
+keywords =["graph algorithm", "network analysis", "social network", "apache arrow", "columnar"]
 authors = [
   {name = "Christian L. Staudt"},
-  {name = "Henning Meyerhenke"}
+  {name = "Henning Meyerhenke"},
+  {name = "Arun Sharma"}
 ]
 
 classifiers = [
@@ -41,8 +42,8 @@ dependencies = [
 [project.urls]
 homepage = "https://networkit.github.io/"
 documentation = "https://networkit.github.io/dev-docs/index.html"
-repository = "https://github.com/networkit/networkit"
-changelog = "https://github.com/networkit/networkit/blob/master/CHANGES.md"
+repository = "https://github.com/Ladybug-Memory/icebug"
+changelog = "https://github.com/Ladybug-Memory/icebug/blob/master/CHANGES.md"
 
 
 [build-system]
