@@ -55,16 +55,9 @@ edgeweight CoarsenedGraphView::weightedDegree(node supernode, bool countSelfLoop
     if (!hasNode(supernode))
         return 0.0;
 
-    // Check cache first
-    auto cacheKey = supernode + (countSelfLoops ? numberOfNodes() : 0);
-    auto it = weightedDegreeCache.find(cacheKey);
-    if (it != weightedDegreeCache.end()) {
-        return it->second;
-    }
-
-    edgeweight totalWeight = 0.0;
     const auto &neighbors = getNeighbors(supernode);
 
+    edgeweight totalWeight = 0.0;
     for (const auto &entry : neighbors) {
         if (entry.first == supernode) {
             if (countSelfLoops) {
@@ -74,9 +67,6 @@ edgeweight CoarsenedGraphView::weightedDegree(node supernode, bool countSelfLoop
             totalWeight += entry.second;
         }
     }
-
-    // Cache the result
-    weightedDegreeCache[cacheKey] = totalWeight;
     return totalWeight;
 }
 
@@ -118,12 +108,12 @@ std::vector<std::pair<node, edgeweight>>
 CoarsenedGraphView::computeNeighbors(node supernode) const {
     std::unordered_map<node, edgeweight> aggregatedWeights;
 
+    // No locks needed here - supernodeToOriginal and nodeMapping are read-only after construction
     // Iterate through all original nodes in this supernode
     for (node originalNode : supernodeToOriginal[supernode]) {
         // Iterate through neighbors of each original node
         originalGraph.forNeighborsOf(originalNode, [&](node originalNeighbor, edgeweight weight) {
             node neighborSupernode = nodeMapping[originalNeighbor];
-
             // Aggregate weights to the same supernode
             aggregatedWeights[neighborSupernode] += weight;
         });
@@ -144,13 +134,31 @@ CoarsenedGraphView::computeNeighbors(node supernode) const {
 
 const std::vector<std::pair<node, edgeweight>> &
 CoarsenedGraphView::getNeighbors(node supernode) const {
-    auto it = neighborCache.find(supernode);
-    if (it == neighborCache.end()) {
-        // Compute and cache neighbors
-        neighborCache[supernode] = computeNeighbors(supernode);
-        return neighborCache[supernode];
+    // Double-checked locking pattern to minimize lock contention
+    // First check without lock (fast path for cached entries)
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex);
+        auto it = neighborCache.find(supernode);
+        if (it != neighborCache.end()) {
+            return it->second;
+        }
     }
-    return it->second;
+
+    // Compute neighbors WITHOUT holding the lock (slow path)
+    // This is safe because computeNeighbors() only reads immutable data
+    auto result = computeNeighbors(supernode);
+
+    // Now acquire lock and insert the result
+    std::lock_guard<std::mutex> lock(cacheMutex);
+    // Check again in case another thread computed it while we were computing
+    auto it = neighborCache.find(supernode);
+    if (it != neighborCache.end()) {
+        // Another thread beat us to it, use their result
+        return it->second;
+    }
+    // We're the first to compute it, insert our result
+    auto [insertIt, inserted] = neighborCache.emplace(supernode, std::move(result));
+    return insertIt->second;
 }
 
 } /* namespace NetworKit */

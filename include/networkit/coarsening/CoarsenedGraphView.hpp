@@ -7,6 +7,7 @@
 #ifndef NETWORKIT_COARSENING_COARSENED_GRAPH_VIEW_HPP_
 #define NETWORKIT_COARSENING_COARSENED_GRAPH_VIEW_HPP_
 
+#include <mutex>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -141,7 +142,7 @@ private:
 
     // Cache for computed neighborhoods to avoid recomputation
     mutable std::unordered_map<node, std::vector<std::pair<node, edgeweight>>> neighborCache;
-    mutable std::unordered_map<node, edgeweight> weightedDegreeCache;
+    mutable std::mutex cacheMutex; // Mutex to protect neighborCache access
 
     /**
      * Compute neighbors of a supernode on-demand
