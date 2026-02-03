@@ -97,21 +97,23 @@ void ParallelLeidenView::run() {
                 ppcView.run();
                 auto newCoarsenedView = ppcView.getCoarsenedGraphView();
                 auto map = ppcView.getFineToCoarseNodeMapping();
-
-                // Update mappings for original nodes
-                mappings.emplace_back(std::move(map));
+                const auto &oldNodeMapping = currentCoarsenedView->getNodeMapping();
 
                 // Create new partition for the new coarsened view
                 Partition p(newCoarsenedView->numberOfNodes());
                 p.setUpperBound(result.upperBound());
 
-                // Map communities through the chain of coarsenings
-                G->parallelForNodes([&](node originalNode) {
+                // Map communities through the chain of coarsenings BEFORE moving map
+                // Capture map by value and other refs explicitly
+                G->parallelForNodes([map = map, &p, this, &oldNodeMapping](node originalNode) {
                     node newCoarseNode = map[originalNode];
                     // Find what community this original node belonged to
-                    node oldCoarseNode = currentCoarsenedView->getNodeMapping()[originalNode];
+                    node oldCoarseNode = oldNodeMapping[originalNode];
                     p[newCoarseNode] = result[oldCoarseNode];
                 });
+
+                // Update mappings after using map
+                mappings.emplace_back(std::move(map));
 
                 result = std::move(p);
                 coarsenedGraphs.push_back(newCoarsenedView);
@@ -127,7 +129,9 @@ void ParallelLeidenView::run() {
                 // Maintain Partition, add every coarse Node to the community its fine Nodes were in
                 Partition p(newCoarsenedView->numberOfNodes());
                 p.setUpperBound(result.upperBound());
-                currentGraph->parallelForNodes([&](node u) { p[map[u]] = result[u]; });
+                // Capture map by value and other refs explicitly
+                currentGraph->parallelForNodes(
+                    [map = map, &p, this](node u) { p[map[u]] = result[u]; });
 
                 mappings.emplace_back(std::move(map));
                 result = std::move(p);
