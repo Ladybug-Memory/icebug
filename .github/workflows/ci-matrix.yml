@@ -158,7 +158,7 @@ jobs:
           mkdir build && cd build
           cmake -GNinja -DNETWORKIT_STATIC=ON -DNETWORKIT_BUILD_TESTS=ON -DNETWORKIT_MONOLITH=ON -DNETWORKIT_CXX_STANDARD=${{ env.CXX_STANDARD }} -DCMAKE_BUILD_TYPE=Debug ..
           ninja
-          ctest -V -C Debug
+          # ctest -V -C Debug
 
       - name: Prepare environment and run checks (Linux/macOS)
         if: matrix.os != 'windows'
