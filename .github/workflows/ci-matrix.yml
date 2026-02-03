@@ -67,26 +67,13 @@ jobs:
           path: tlx
 
       - name: Setup ccache
-        uses: actions/cache@v4
+        uses: hendrikmuhs/ccache-action@v1.2
         with:
-          path: |
-            ~/.ccache
-            /Users/runner/Library/Caches/ccache
-            C:\Users\runner\AppData\Local\ccache
           key: ccache-${{ matrix.os }}-${{ matrix.compiler }}-${{ github.sha }}
+          max-size: 2G
           restore-keys: |
             ccache-${{ matrix.os }}-${{ matrix.compiler }}-
             ccache-${{ matrix.os }}-
-
-      - name: Install ccache (Linux)
-        if: matrix.os == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ccache
-
-      - name: Install ccache (macOS)
-        if: matrix.os == 'macos'
-        run: brew install ccache
 
       - name: Install prerequisites (Linux)
         if: matrix.os == 'linux' && matrix.compiler == 'llvm-20'
@@ -109,7 +96,7 @@ jobs:
       - name: Install prerequisites (macOS)
         if: matrix.os == 'macos'
         run: |
-          brew install ninja apache-arrow ccache
+          brew install ninja apache-arrow
           if [[ "${{ matrix.compiler }}" == "llvm-20" ]]; then
             brew install libomp
             brew reinstall llvm
