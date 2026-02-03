@@ -145,11 +145,8 @@ jobs:
         shell: bash
         run: |
           mkdir build && cd build
-          cmake -GNinja -DNETWORKIT_STATIC=ON -DNETWORKIT_BUILD_TESTS=ON -DNETWORKIT_MONOLITH=ON -DNETWORKIT_CXX_STANDARD=${{ env.CXX_STANDARD }} -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache ..
+          cmake -GNinja -DNETWORKIT_STATIC=ON -DNETWORKIT_BUILD_TESTS=ON -DNETWORKIT_MONOLITH=ON -DNETWORKIT_CXX_STANDARD=${{ env.CXX_STANDARD }} -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" ..
           ninja
-          # ctest -V -C Debug
-        env:
-          CMAKE_TOOLCHAIN_FILE: ${{ env.VCPKG_INSTALLATION_ROOT }}/scripts/buildsystems/vcpkg.cmake
 
       - name: Prepare environment and run checks (Linux/macOS)
         if: matrix.os != 'windows'
