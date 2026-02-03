@@ -398,6 +398,7 @@ jobs:
           pip install ipycytoscape plotly seaborn
           python notebooks/test_notebooks.py "notebooks"
         env:
+          CMAKE_TOOLCHAIN_FILE: ${{ env.VCPKG_INSTALLATION_ROOT }}/scripts/buildsystems/vcpkg.cmake
           NATIVE: ${{ matrix.os == 'full (native)' }}
 
   documentation-build:
