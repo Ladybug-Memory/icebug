@@ -179,7 +179,6 @@ cdef class Graph:
 
 		# Create Graph using Arrow CSR constructor
 		result = Graph.__new__(Graph)
-		print(f"Creating Graph with CSR constructor: n={n}, directed={directed}")
 
 		# Store Arrow arrays in the graph to keep them alive
 		result._arrow_arrays = {
