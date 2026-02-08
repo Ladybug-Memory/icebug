@@ -1000,7 +1000,7 @@ public:
      * @note The existence of the node is not checked. Calling this function with a non-existing
      * node results in a segmentation fault. Node existence can be checked by calling hasNode(u).
      */
-    count degreeIn(node v) const {
+    virtual count degreeIn(node v) const {
         assert(hasNode(v));
         if (usingCSR) {
             return directed ? degreeCSR(v, true) : degreeCSR(v, false);
@@ -1024,7 +1024,7 @@ public:
      * @param v Node.
      * @return @c true if the node is isolated (= degree is 0)
      */
-    bool isIsolated(node v) const {
+    virtual bool isIsolated(node v) const {
         if (!exists[v])
             throw std::runtime_error("Error, the node does not exist!");
         if (usingCSR) {
