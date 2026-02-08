@@ -1540,10 +1540,19 @@ void Graph::forNodes(L handle) const {
 
 template <typename L>
 void Graph::parallelForNodes(L handle) const {
+    if (usingCSR) {
+        // For immutable CSR graphs, all nodes exist - skip exists check for thread safety
 #pragma omp parallel for
-    for (omp_index v = 0; v < static_cast<omp_index>(z); ++v) {
-        if (exists[v]) {
+        for (omp_index v = 0; v < static_cast<omp_index>(z); ++v) {
             handle(v);
+        }
+    } else {
+        // For mutable graphs, check exists
+#pragma omp parallel for
+        for (omp_index v = 0; v < static_cast<omp_index>(z); ++v) {
+            if (exists[v]) {
+                handle(v);
+            }
         }
     }
 }
@@ -1573,11 +1582,20 @@ void Graph::forNodesInRandomOrder(L handle) const {
 
 template <typename L>
 void Graph::balancedParallelForNodes(L handle) const {
-// TODO: define min block size (and test it!)
+    // TODO: define min block size (and test it!)
+    if (usingCSR) {
+        // For immutable CSR graphs, all nodes exist - skip exists check for thread safety
 #pragma omp parallel for schedule(guided)
-    for (omp_index v = 0; v < static_cast<omp_index>(z); ++v) {
-        if (exists[v]) {
+        for (omp_index v = 0; v < static_cast<omp_index>(z); ++v) {
             handle(v);
+        }
+    } else {
+        // For mutable graphs, check exists
+#pragma omp parallel for schedule(guided)
+        for (omp_index v = 0; v < static_cast<omp_index>(z); ++v) {
+            if (exists[v]) {
+                handle(v);
+            }
         }
     }
 }
@@ -1597,12 +1615,23 @@ void Graph::forNodePairs(L handle) const {
 
 template <typename L>
 void Graph::parallelForNodePairs(L handle) const {
+    if (usingCSR) {
+        // For immutable CSR graphs, all nodes exist - skip exists check for thread safety
 #pragma omp parallel for schedule(guided)
-    for (omp_index u = 0; u < static_cast<omp_index>(z); ++u) {
-        if (exists[u]) {
+        for (omp_index u = 0; u < static_cast<omp_index>(z); ++u) {
             for (node v = u + 1; v < z; ++v) {
-                if (exists[v]) {
-                    handle(u, v);
+                handle(u, v);
+            }
+        }
+    } else {
+        // For mutable graphs, check exists
+#pragma omp parallel for schedule(guided)
+        for (omp_index u = 0; u < static_cast<omp_index>(z); ++u) {
+            if (exists[u]) {
+                for (node v = u + 1; v < z; ++v) {
+                    if (exists[v]) {
+                        handle(u, v);
+                    }
                 }
             }
         }
@@ -1685,19 +1714,17 @@ inline bool Graph::useEdgeInIteration<false>(node u, node v) const {
 
 template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
 inline void Graph::forOutEdgesOfImpl(node u, L handle) const {
-    if (!exists[u])
-        return;
-
     if (usingCSR) {
         // CSR-based implementation
+        // Note: For immutable CSR graphs, all nodes exist so we skip exists check to avoid
+        // thread-safety issues with std::vector<bool> in parallel contexts
         auto [neighbors, degree] = getCSROutNeighbors(u);
         if (neighbors == nullptr || degree == 0)
             return;
 
         for (count i = 0; i < degree; ++i) {
             node v = neighbors[i];
-            if (!exists[v])
-                continue;
+            // Skip exists[v] check for CSR graphs - all nodes always exist in immutable graphs
 
             // For undirected graphs, only process edge if u >= v to avoid duplicates
             if constexpr (!graphIsDirected) {
@@ -1716,6 +1743,9 @@ inline void Graph::forOutEdgesOfImpl(node u, L handle) const {
         }
     } else {
         // Vector-based graphs should use GraphW
+        // Check exists for mutable graphs
+        if (!exists[u])
+            return;
         throw std::runtime_error("forOutEdgesOfImpl not supported for vector-based graphs in base "
                                  "Graph class - use GraphW");
     }
@@ -1723,10 +1753,9 @@ inline void Graph::forOutEdgesOfImpl(node u, L handle) const {
 
 template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
 inline void Graph::forInEdgesOfImpl(node u, L handle) const {
-    if (!exists[u])
-        return;
-
     if (usingCSR) {
+        // Note: For immutable CSR graphs, all nodes exist so we skip exists check to avoid
+        // thread-safety issues with std::vector<bool> in parallel contexts
         if constexpr (graphIsDirected) {
             // For directed graphs, use incoming edges
             auto [neighbors, degree] = getCSRInNeighbors(u);
@@ -1735,8 +1764,7 @@ inline void Graph::forInEdgesOfImpl(node u, L handle) const {
 
             for (count i = 0; i < degree; ++i) {
                 node v = neighbors[i];
-                if (!exists[v])
-                    continue;
+                // Skip exists[v] check for CSR graphs - all nodes always exist
 
                 // Get edge weight (currently CSR graphs are unweighted)
                 edgeweight weight = hasWeights ? defaultEdgeWeight : defaultEdgeWeight;
@@ -1756,8 +1784,7 @@ inline void Graph::forInEdgesOfImpl(node u, L handle) const {
 
             for (count i = 0; i < degree; ++i) {
                 node v = neighbors[i];
-                if (!exists[v])
-                    continue;
+                // Skip exists[v] check for CSR graphs - all nodes always exist
 
                 // Get edge weight (currently CSR graphs are unweighted)
                 edgeweight weight = hasWeights ? defaultEdgeWeight : defaultEdgeWeight;
@@ -1771,6 +1798,9 @@ inline void Graph::forInEdgesOfImpl(node u, L handle) const {
         }
     } else {
         // For vector-based graphs (GraphW), use the virtual dispatch
+        // Check exists for mutable graphs
+        if (!exists[u])
+            return;
         // Create a wrapper function that swaps the first two arguments
         // The handle expects (source, target, ...) but virtual method provides (target, source,
         // ...)
@@ -1819,19 +1849,17 @@ inline double Graph::parallelSumForEdgesImpl(L handle) const {
 
     if (usingCSR) {
         // CSR-based parallel implementation
+        // Note: For immutable CSR graphs, all nodes exist so we skip exists check to avoid
+        // thread-safety issues with std::vector<bool> in parallel contexts
 #pragma omp parallel for schedule(guided) reduction(+ : sum)
         for (omp_index u = 0; u < static_cast<omp_index>(z); ++u) {
-            if (!exists[u])
-                continue;
-
             auto [neighbors, degree] = getCSROutNeighbors(u);
             if (neighbors == nullptr || degree == 0)
                 continue;
 
             for (count i = 0; i < degree; ++i) {
                 node v = neighbors[i];
-                if (!exists[v])
-                    continue;
+                // Skip exists[v] check for CSR graphs - all nodes always exist
 
                 // For undirected graphs, only process edge if u >= v to avoid duplicates
                 if constexpr (!graphIsDirected) {
@@ -1839,14 +1867,10 @@ inline double Graph::parallelSumForEdgesImpl(L handle) const {
                         continue;
                 }
 
-                // Get edge weight (currently CSR graphs are unweighted)
-                edgeweight weight = hasWeights ? defaultEdgeWeight : defaultEdgeWeight;
-
-                // Get edge ID (CSR graphs don't currently support edge IDs)
+                edgeweight w = hasWeights ? defaultEdgeWeight : defaultEdgeWeight;
                 edgeid eid = graphHasEdgeIds ? none : none;
 
-                // Call the lambda and add result to sum
-                sum += edgeLambda(handle, u, v, weight, eid);
+                sum += edgeLambda(handle, u, v, w, eid);
             }
         }
     } else {
@@ -2039,10 +2063,19 @@ template <typename L>
 double Graph::parallelSumForNodes(L handle) const {
     double sum = 0.0;
 
+    if (usingCSR) {
+        // For immutable CSR graphs, all nodes exist - skip exists check for thread safety
 #pragma omp parallel for reduction(+ : sum)
-    for (omp_index v = 0; v < static_cast<omp_index>(z); ++v) {
-        if (exists[v]) {
+        for (omp_index v = 0; v < static_cast<omp_index>(z); ++v) {
             sum += handle(v);
+        }
+    } else {
+        // For mutable graphs, check exists
+#pragma omp parallel for reduction(+ : sum)
+        for (omp_index v = 0; v < static_cast<omp_index>(z); ++v) {
+            if (exists[v]) {
+                sum += handle(v);
+            }
         }
     }
 
