@@ -649,6 +649,23 @@ public:
         return outEdges[v].size();
     }
 
+    count degreeIn(node v) const override {
+        assert(hasNode(v));
+        if (directed) {
+            return inEdges[v].size();
+        }
+        return outEdges[v].size();
+    }
+
+    bool isIsolated(node v) const override {
+        if (!hasNode(v))
+            throw std::runtime_error("Error, the node does not exist!");
+        if (directed) {
+            return outEdges[v].size() == 0 && inEdges[v].size() == 0;
+        }
+        return outEdges[v].size() == 0;
+    }
+
     /**
      * Return the i-th (outgoing) neighbor of @a u.
      *
