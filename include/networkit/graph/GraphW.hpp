@@ -36,6 +36,13 @@ protected:
     //!< same schema (and same order!) as outEdges
     std::vector<std::vector<edgeid>> outEdgeIds;
 
+public:
+    /**
+     * Check for invalid graph states for vector-based graphs.
+     * @return False if the graph is in invalid state.
+     */
+    bool checkConsistency() const override;
+
 private:
     /**
      * Initialize vector-based data structures based on graph properties
