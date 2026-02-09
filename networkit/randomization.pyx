@@ -1,5 +1,6 @@
 # distutils: language=c++
 
+from cython.operator import dereference, preincrement
 from libcpp cimport bool as bool_t
 from libcpp.vector cimport vector
 from libcpp.utility cimport pair
@@ -12,7 +13,7 @@ cdef extern from "<networkit/randomization/EdgeSwitching.hpp>":
 	cdef cppclass _EdgeSwitching "NetworKit::EdgeSwitching"(_Algorithm):
 		_EdgeSwitching(_Graph, double, bool_t) except +
 		void run(count) except + nogil
-		_Graph getGraph() except +
+		_GraphW getGraph() except +
 		count getNumberOfAffectedEdges()
 		double getNumberOfSwitchesPerEdge()
 		void setNumberOfSwitchesPerEdge(double)
@@ -62,7 +63,7 @@ cdef class EdgeSwitching(Algorithm):
 
 	def __cinit__(self, G, numberOfSwapsPerEdge = 10.0, degreePreservingShufflePreprocessing = True):
 		if isinstance(G, Graph):
-			self._this = new _EdgeSwitching((<Graph>G)._this, numberOfSwapsPerEdge, degreePreservingShufflePreprocessing)
+			self._this = new _EdgeSwitching(dereference((<Graph>G)._this), numberOfSwapsPerEdge, degreePreservingShufflePreprocessing)
 		else:
 			raise RuntimeError("Parameter G has to be a graph")
 
@@ -119,7 +120,7 @@ cdef class EdgeSwitchingInPlace(Algorithm):
 	def __cinit__(self, G, numberOfSwitchesPerEdge = 10.0):
 		cdef _GraphW gw
 		if isinstance(G, Graph):
-			gw = _GraphW((<Graph>G)._this)
+			gw = _GraphW(dereference((<Graph>G)._this))
 			self._this = new _EdgeSwitchingInPlace(gw, numberOfSwitchesPerEdge)
 			(<Graph>G).setThisFromGraphW(gw)
 			self._localReference = G
@@ -173,7 +174,7 @@ cdef extern from "<networkit/randomization/GlobalCurveball.hpp>":
 
 	cdef cppclass _GlobalCurveball "NetworKit::GlobalCurveball"(_Algorithm):
 		_GlobalCurveball(_Graph, count, bool_t, bool_t) except +
-		_Graph getGraph() except +
+		_GraphW getGraph() except +
 
 cdef class GlobalCurveball(Algorithm):
 	"""
@@ -226,7 +227,7 @@ cdef class GlobalCurveball(Algorithm):
 	"""
 	def __cinit__(self, G, number_of_global_rounds = 20, allowSelfLoops = False, degreePreservingShufflePreprocessing = True):
 		if isinstance(G, Graph):
-			self._this = new _GlobalCurveball((<Graph>G)._this, number_of_global_rounds, allowSelfLoops, degreePreservingShufflePreprocessing)
+			self._this = new _GlobalCurveball(dereference((<Graph>G)._this), number_of_global_rounds, allowSelfLoops, degreePreservingShufflePreprocessing)
 		else:
 			raise RuntimeError("Parameter G has to be a graph")
 
@@ -325,7 +326,7 @@ cdef extern from "<networkit/randomization/Curveball.hpp>":
 	cdef cppclass _Curveball "NetworKit::Curveball"(_Algorithm):
 		_Curveball(_Graph) except +
 		void run(vector[pair[node, node]] trades) except + nogil
-		_Graph getGraph() except +
+		_GraphW getGraph() except +
 		vector[pair[node, node]] getEdges() except +
 		count getNumberOfAffectedEdges() except +
 
@@ -362,7 +363,7 @@ cdef class Curveball(Algorithm):
 	"""
 	def __cinit__(self, G):
 		if isinstance(G, Graph):
-			self._this = new _Curveball((<Graph>G)._this)
+			self._this = new _Curveball(dereference((<Graph>G)._this))
 		else:
 			raise RuntimeError("Parameter G has to be a graph")
 
@@ -410,7 +411,7 @@ cdef class Curveball(Algorithm):
 cdef extern from "<networkit/randomization/DegreePreservingShuffle.hpp>":
 	cdef cppclass _DegreePreservingShuffle "NetworKit::DegreePreservingShuffle"(_Algorithm):
 		_DegreePreservingShuffle(_Graph) except +
-		_Graph getGraph() except +
+		_GraphW getGraph() except +
 		vector[node] getPermutation() except +
 
 cdef class DegreePreservingShuffle(Algorithm):
@@ -443,7 +444,7 @@ cdef class DegreePreservingShuffle(Algorithm):
 	"""
 	def __cinit__(self, G):
 		if isinstance(G, Graph):
-			self._this = new _DegreePreservingShuffle((<Graph>G)._this)
+			self._this = new _DegreePreservingShuffle(dereference((<Graph>G)._this))
 		else:
 			raise RuntimeError("Parameter G has to be a graph")
 

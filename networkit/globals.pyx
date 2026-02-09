@@ -1,5 +1,7 @@
 # distutils: language=c++
 
+from cython.operator import dereference, preincrement
+
 from libcpp cimport bool as bool_t
 
 from .graph cimport _Graph, Graph

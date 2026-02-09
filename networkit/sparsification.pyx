@@ -1,10 +1,12 @@
 # distutils: language=c++
 
+from cython.operator import dereference, preincrement
+
 from libcpp cimport bool as bool_t
 from libcpp.vector cimport vector
 
 from .base cimport _Algorithm, Algorithm
-from .graph cimport _Graph, Graph
+from .graph cimport _Graph, _GraphW, Graph
 from .distance import AdamicAdarDistance, JaccardSimilarityAttributizer
 from .structures cimport count, node, index, edgeid, edgeweight
 from . import community
@@ -299,7 +301,7 @@ cdef extern from "<networkit/edgescores/EdgeScoreAsWeight.hpp>":
 
 	cdef cppclass _EdgeScoreAsWeight "NetworKit::EdgeScoreAsWeight":
 		_EdgeScoreAsWeight(const _Graph& G, const vector[double]& score, bool_t squared, edgeweight offset, edgeweight factor) except +
-		_Graph calculate() except +
+		_GraphW calculate() except +
 
 cdef class EdgeScoreAsWeight:
 	"""
@@ -659,7 +661,7 @@ cdef extern from "<networkit/sparsification/GlobalThresholdFilter.hpp>":
 
 	cdef cppclass _GlobalThresholdFilter "NetworKit::GlobalThresholdFilter":
 		_GlobalThresholdFilter(const _Graph& G, const vector[double]& a, double alpha, bool_t above) except +
-		_Graph calculate() except +
+		_GraphW calculate() except +
 
 cdef class GlobalThresholdFilter:
 	"""
@@ -693,7 +695,7 @@ cdef class GlobalThresholdFilter:
 		del self._this
 
 	def calculate(self):
-		return Graph().setThis(self._this.calculate())
+		return Graph().setThisFromGraphW(self._this.calculate())
 
 _ABS_ZERO = 1e-7
 

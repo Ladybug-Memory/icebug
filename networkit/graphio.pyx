@@ -1,5 +1,7 @@
 # distutils: language=c++
 
+from cython.operator import dereference, preincrement
+
 from libc.stdint cimport uint8_t
 
 from libcpp.vector cimport vector
@@ -23,7 +25,7 @@ from warnings import warn
 from xml.dom import minidom
 
 from .dynamics import DGSWriter, DGSStreamParser, GraphEvent, GraphEventType
-from .graph cimport _Graph, Graph
+from .graph cimport _Graph, _GraphW, Graph
 from .graph import Graph as __Graph
 from .structures cimport _Cover, Cover, _Partition, Partition, count, index, node
 from . import algebraic
@@ -31,14 +33,14 @@ from .support import MissingDependencyError
 
 cdef extern from "<algorithm>" namespace "std":
 	void swap[T](T &a,  T &b)
-	_Graph move( _Graph t ) nogil # specialized declaration as general declaration disables template argument deduction and doesn't work
+	_GraphW move( _GraphW t ) nogil # specialized declaration as general declaration disables template argument deduction and doesn't work
 	_Partition move( _Partition t) nogil
 
 cdef extern from "<networkit/io/GraphReader.hpp>":
 
 	cdef cppclass _GraphReader "NetworKit::GraphReader":
 		_GraphReader() except + nogil
-		_Graph read(string path) except + nogil
+		_GraphW read(string path) except + nogil
 
 cdef class GraphReader:
 	""" Abstract base class for graph readers"""
@@ -74,7 +76,7 @@ cdef class GraphReader:
 			The resulting graph.
 		"""
 		cdef string cpath = stdstring(path)
-		cdef _Graph result
+		cdef _GraphW result
 
 		with nogil:
 			result = move(self._this.read(cpath)) # extra move in order to avoid copying the internal variable that is used by Cython
@@ -157,7 +159,7 @@ cdef class METISGraphReader(GraphReader):
 cdef extern from "<networkit/io/NetworkitBinaryReader.hpp>":
 	cdef cppclass _NetworkitBinaryReader "NetworKit::NetworkitBinaryReader" (_GraphReader):
 		_NetworkitBinaryReader() except +
-		_Graph readFromBuffer(vector[uint8_t] state) except +
+		_GraphW readFromBuffer(vector[uint8_t] state) except +
 
 cdef class NetworkitBinaryReader(GraphReader):
 	"""
@@ -184,7 +186,7 @@ cdef class NetworkitBinaryReader(GraphReader):
 		buffer : list(int)
 			Input data buffer.
 		"""
-		cdef _Graph result
+		cdef _GraphW result
 		result = move((<_NetworkitBinaryReader*>(self._this)).readFromBuffer(state))
 		return Graph(0).setThis(result)
 
@@ -237,7 +239,7 @@ cdef extern from "<networkit/io/ThrillGraphBinaryReader.hpp>":
 
 	cdef cppclass _ThrillGraphBinaryReader "NetworKit::ThrillGraphBinaryReader" (_GraphReader):
 		_ThrillGraphBinaryReader(count n) except +
-		_Graph read(vector[string] paths) except + nogil
+		_GraphW read(vector[string] paths) except + nogil
 
 cdef class ThrillGraphBinaryReader(GraphReader):
 	"""
@@ -282,7 +284,7 @@ cdef class ThrillGraphBinaryReader(GraphReader):
 			for p in paths:
 				c_paths.push_back(stdstring(p))
 
-		cdef _Graph result
+		cdef _GraphW result
 
 		with nogil:
 			result = move((<_ThrillGraphBinaryReader*>(self._this)).read(c_paths)) # extra move in order to avoid copying the internal variable that is used by Cython
@@ -645,7 +647,7 @@ cdef class PartitionWriter:
 		"""
 		cdef string cpath = stdstring(path)
 		with nogil:
-			self._this.write(dereference(zeta._this), cpath)
+			self._this.write(zeta._this, cpath)
 
 cdef extern from "<networkit/io/BinaryPartitionReader.hpp>":
 
@@ -957,7 +959,7 @@ cdef class CoverWriter:
 	def write(self, Cover zeta, path):
 		cdef string cpath = stdstring(path)
 		with nogil:
-			self._this.write(dereference(zeta._this), cpath)
+			self._this.write(zeta._this, cpath)
 
 cdef extern from "<networkit/io/EdgeListCoverReader.hpp>":
 

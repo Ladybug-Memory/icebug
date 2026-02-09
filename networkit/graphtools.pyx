@@ -1,5 +1,7 @@
 # distutils: language=c++
 
+from cython.operator import dereference, preincrement
+
 from libcpp cimport bool as bool_t
 from libcpp.vector cimport vector
 from libcpp.utility cimport pair
@@ -24,25 +26,25 @@ cdef extern from "<networkit/graph/GraphTools.hpp>" namespace "NetworKit::GraphT
 	double density(_Graph G) except + nogil
 	double volume(_Graph G) except + nogil
 	double volume[InputIt](_Graph G, InputIt first, InputIt last) except + nogil
-	double inVolume[InputIt](_Graph G, InputIt first, InputIt last) except + nogil
-	_Graph copyNodes(_Graph G) except + nogil
-	_Graph toUndirected(_Graph G) except + nogil
-	_Graph toUnweighted(_Graph G) except + nogil
-	_Graph toWeighted(_Graph G) except + nogil
-	_Graph subgraphFromNodes[InputIt](_Graph G, InputIt first, InputIt last, bool_t compact) except + nogil
-	_Graph subgraphAndNeighborsFromNodes(_Graph G, unordered_set[node], bool_t, bool_t) except + nogil
-	void append(_GraphW G, _Graph G1) except + nogil
-	void merge(_GraphW G, _Graph G1) except + nogil
+	double inVolume[InputIt](const _Graph& G, InputIt first, InputIt last) except + nogil
+	_GraphW copyNodes(const _Graph& G) except + nogil
+	_GraphW toUndirected(const _Graph& G) except + nogil
+	_GraphW toUnweighted(const _Graph& G) except + nogil
+	_GraphW toWeighted(const _Graph& G) except + nogil
+	_GraphW subgraphFromNodes[InputIt](const _Graph& G, InputIt first, InputIt last, bool_t compact) except + nogil
+	_GraphW subgraphAndNeighborsFromNodes(const _Graph& G, unordered_set[node], bool_t, bool_t) except + nogil
+	void append(_GraphW G, const _Graph& G1) except + nogil
+	void merge(_GraphW G, const _Graph& G1) except + nogil
 	void removeEdgesFromIsolatedSet[InputIt](_GraphW G, InputIt first, InputIt last) except +
-	_Graph getCompactedGraph(_Graph G, unordered_map[node,node]) except + nogil
-	_Graph transpose(_Graph G) except + nogil
-	unordered_map[node,node] getContinuousNodeIds(_Graph G) except + nogil
-	unordered_map[node,node] getRandomContinuousNodeIds(_Graph G) except + nogil
+	_GraphW getCompactedGraph(const _Graph& G, unordered_map[node,node]) except + nogil
+	_GraphW transpose(const _Graph& G) except + nogil
+	unordered_map[node,node] getContinuousNodeIds(const _Graph& G) except + nogil
+	unordered_map[node,node] getRandomContinuousNodeIds(const _Graph& G) except + nogil
 	void sortEdgesByWeight(_GraphW G, bool_t) except + nogil
 	vector[node] topologicalSort(_Graph G) except + nogil
 	vector[node] topologicalSort(_Graph G, unordered_map[node, node], bool_t) except + nogil
 	node augmentGraph(_GraphW G) except + nogil
-	pair[_Graph, node] createAugmentedGraph(_Graph G) except + nogil
+	pair[_GraphW, node] createAugmentedGraph(const _Graph& G) except + nogil
 	void randomizeWeights(_Graph G) except + nogil
 
 cdef class GraphTools:
@@ -246,7 +248,7 @@ cdef class GraphTools:
 			Graph that will be appended to `G`.
 		"""
 		cdef _GraphW gw = _GraphW(dereference(G._this))
-		append(gw, G1._this)
+		append(gw, dereference(G1._this))
 		G.setThisFromGraphW(gw)
 
 	@staticmethod
@@ -265,7 +267,7 @@ cdef class GraphTools:
 			Graph that will be merged with `G`.
 		"""
 		cdef _GraphW gw = _GraphW(dereference(G._this))
-		merge(gw, G1._this)
+		merge(gw, dereference(G1._this))
 		G.setThisFromGraphW(gw)
 
 	@staticmethod
@@ -312,7 +314,7 @@ cdef class GraphTools:
 		graph : networkit.Graph
 			Undirected copy of the input graph.
 		"""
-		return Graph().setThis(toUndirected(dereference(graph._this)))
+		return Graph().setThisFromGraphW(toUndirected(dereference(graph._this)))
 
 	@staticmethod
 	def toUnweighted(Graph graph):
@@ -331,7 +333,7 @@ cdef class GraphTools:
 		graph : networkit.Graph
 			Unweighted copy of the input graph.
 		"""
-		return Graph().setThis(toUnweighted(dereference(graph._this)))
+		return Graph().setThisFromGraphW(toUnweighted(dereference(graph._this)))
 
 	@staticmethod
 	def toWeighted(Graph graph):
@@ -350,7 +352,7 @@ cdef class GraphTools:
 		graph : networkit.Graph
 			Weighted copy of the input graph.
 		"""
-		return Graph().setThis(toWeighted(dereference(graph._this)))
+		return Graph().setThisFromGraphW(toWeighted(dereference(graph._this)))
 
 	@staticmethod
 	def size(graph):
@@ -364,10 +366,12 @@ cdef class GraphTools:
 		tuple(int, int)
 			a pair (n, m) where n is the number of nodes and m is the number of edges.
 		"""
-		if not isinstance(graph, Graph) and not isinstance(graph, GraphW):
+		if isinstance(graph, Graph):
+			return size(dereference((<Graph>graph)._this))
+		elif isinstance(graph, GraphW):
+			return size((<GraphW>graph)._this)
+		else:
 			raise Exception("Graph expected, but got something else")
-		cdef Graph c_graph = <Graph>graph
-		return size(c_dereference(graph._this))
 
 	@staticmethod
 	def density(Graph graph):
@@ -466,7 +470,7 @@ cdef class GraphTools:
 		graph : networkit.Graph
 			Graph with the same nodes as the input graph (and without any edge).
 		"""
-		return Graph().setThis(copyNodes(dereference(graph._this)))
+		return Graph().setThisFromGraphW(copyNodes(dereference(graph._this)))
 
 	@staticmethod
 	def subgraphFromNodes(Graph graph, vector[node] nodes, bool_t compact = False):
@@ -489,7 +493,7 @@ cdef class GraphTools:
 			Induced subgraph of the input graph (including potential edge/weight directions).
 		"""
 
-		return Graph().setThis(subgraphFromNodes(
+		return Graph().setThisFromGraphW(subgraphFromNodes(
 				dereference(graph._this), nodes.begin(), nodes.end(), compact))
 
 	@staticmethod
@@ -524,7 +528,7 @@ cdef class GraphTools:
 		graph : networkit.Graph
 			Induced subgraph.
 		"""
-		return Graph().setThis(subgraphAndNeighborsFromNodes(
+		return Graph().setThisFromGraphW(subgraphAndNeighborsFromNodes(
 			dereference(graph._this), nodes, includeOutNeighbors, includeInNeighbors))
 
 	@staticmethod
@@ -544,7 +548,7 @@ cdef class GraphTools:
 		graph : networkit.Graph
 			Transpose of the input graph.
 		"""
-		return Graph().setThis(transpose(dereference(graph._this)))
+		return Graph().setThisFromGraphW(transpose(dereference(graph._this)))
 
 	@staticmethod
 	def getCompactedGraph(Graph graph, nodeIdMap):
@@ -568,7 +572,7 @@ cdef class GraphTools:
 		cdef unordered_map[node,node] cNodeIdMap
 		for key in nodeIdMap:
 			cNodeIdMap[key] = nodeIdMap[key]
-		return Graph().setThis(getCompactedGraph(dereference(graph._this),cNodeIdMap))
+		return Graph().setThisFromGraphW(getCompactedGraph(dereference(graph._this),cNodeIdMap))
 
 	@staticmethod
 	def getContinuousNodeIds(Graph graph):
@@ -711,7 +715,7 @@ cdef class GraphTools:
 			node.
 		"""
 		result = createAugmentedGraph(dereference(G._this))
-		return Graph().setThis(result.first), result.second
+		return Graph().setThisFromGraphW(result.first), result.second
 
 	@staticmethod
 	def randomizeWeights(GraphW G):
@@ -728,4 +732,4 @@ cdef class GraphTools:
 		G : networkit.Graph
 			The input graph.
 		"""
-		randomizeWeights(dereference(G._this))
+		randomizeWeights(G._this)

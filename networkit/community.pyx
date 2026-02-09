@@ -22,7 +22,7 @@ import tempfile
 import subprocess
 
 from .base cimport _Algorithm, Algorithm
-from .graph cimport _Graph, Graph
+from .graph cimport _Graph, _GraphW, Graph
 from .structures cimport _Partition, Partition, _Cover, Cover, count, index, node, edgeweight
 from .graphio import PartitionReader, PartitionWriter, EdgeListPartitionReader, BinaryPartitionReader, BinaryPartitionWriter, BinaryEdgeListPartitionReader, BinaryEdgeListPartitionWriter
 from .scd cimport _SelectiveCommunityDetector, SelectiveCommunityDetector
@@ -38,7 +38,7 @@ from .support import MissingDependencyError
 from cython.operator import dereference
 
 cdef extern from "<algorithm>" namespace "std":
-	pair[_Graph, vector[node]] move(pair[_Graph, vector[node]]) nogil
+	pair[_GraphW, vector[node]] move(pair[_GraphW, vector[node]]) nogil
 
 cdef extern from "<networkit/Globals.hpp>" namespace "NetworKit":
 
@@ -228,7 +228,7 @@ cdef extern from "<networkit/community/GraphClusteringTools.hpp>" namespace "Net
 
 	float getImbalance(_Partition zeta) except +
 	float getImbalance(_Partition zeta, _Graph graph) except +
-	_Graph communicationGraph(_Graph graph, _Partition zeta) except +
+	_GraphW communicationGraph(_Graph graph, _Partition zeta) except +
 	count weightedDegreeWithCluster(_Graph graph, _Partition zeta, node u, index cid)
 	bool_t isProperClustering(_Graph G, _Partition zeta)
 	bool_t isSingletonClustering(_Graph G, _Partition zeta)
@@ -256,9 +256,9 @@ cdef class GraphClusteringTools:
 			Imbalance of the partition.
 		"""
 		if graph is not None:
-			return getImbalance(dereference(zeta._this), dereference(G._this))
+			return getImbalance(zeta._this, dereference(G._this))
 		else:
-			return getImbalance(dereference(zeta._this))
+			return getImbalance(zeta._this)
 
 	@staticmethod
 	def communicationGraph(Graph graph, Partition zeta):
@@ -285,7 +285,7 @@ cdef class GraphClusteringTools:
 		networkit.Graph
 			Communication graph given by the input graph and its partition.
 		"""
-		return Graph().setThis(communicationGraph(dereference(graph._this), dereference(zeta._this)))
+		return Graph().setThisFromGraphW(communicationGraph(dereference(graph._this), zeta._this))
 	@staticmethod
 	def weightedDegreeWithCluster(Graph graph, Partition zeta, node u, index cid):
 		"""  
@@ -309,7 +309,7 @@ cdef class GraphClusteringTools:
 		float
 			weighted degree of node u for cluster index cid.
 		"""
-		return weightedDegreeWithCluster(dereference(graph._this), dereference(zeta._this), u, cid)
+		return weightedDegreeWithCluster(dereference(graph._this), zeta._this, u, cid)
 	@staticmethod
 	def isProperClustering(Graph G, Partition zeta):
 		"""  
@@ -329,7 +329,7 @@ cdef class GraphClusteringTools:
 		bool
 			True if the partition is a proper clustering, False if not.
 		"""
-		return isProperClustering(dereference(G._this), dereference(zeta._this))
+		return isProperClustering(dereference(G._this), zeta._this)
 	@staticmethod
 	def isSingletonClustering(Graph G, Partition zeta):
 		"""  
@@ -349,7 +349,7 @@ cdef class GraphClusteringTools:
 		bool
 			True if the partition is a singleton clustering, False if not.
 		"""
-		return isSingletonClustering(dereference(G._this), dereference(zeta._this))
+		return isSingletonClustering(dereference(G._this), zeta._this)
 	@staticmethod
 	def isOneClustering(Graph G, Partition zeta):
 		"""  
@@ -369,7 +369,7 @@ cdef class GraphClusteringTools:
 		bool
 			True if the partition is a one clustering, False if not.
 		"""
-		return isOneClustering(dereference(G._this), dereference(zeta._this))
+		return isOneClustering(dereference(G._this), zeta._this)
 	@staticmethod
 	def equalClustering(Partition zeta, Partition eta, Graph G):
 		"""  
@@ -391,7 +391,7 @@ cdef class GraphClusteringTools:
 		bool
 			True if both partitions are the same, False if not.
 		"""
-		return equalClusterings(dereference(zeta._this), eta._this, dereference(G._this))
+		return equalClusterings(zeta._this, eta._this, dereference(G._this))
 
 cdef extern from "<networkit/community/PartitionIntersection.hpp>":
 
@@ -425,7 +425,7 @@ cdef class PartitionIntersection:
 		networkit.Partition
 			The intersection of zeta and eta.
 		"""
-		return Partition().setThis(self._this.calculate(dereference(zeta._this), eta._this))
+		return Partition().setThis(self._this.calculate(zeta._this, eta._this))
 
 cdef extern from "<networkit/community/Coverage.hpp>":
 
@@ -459,7 +459,7 @@ cdef class Coverage:
 		float
 			The coverage in the given Partition.
 		"""
-		return self._this.getQuality(dereference(zeta._this), dereference(G._this))
+		return self._this.getQuality(zeta._this, dereference(G._this))
 
 
 cdef extern from "<networkit/community/EdgeCut.hpp>":
@@ -494,7 +494,7 @@ cdef class EdgeCut:
 		float
 			The edgeCut in the given Partition.
 		"""
-		return self._this.getQuality(dereference(zeta._this), dereference(G._this))
+		return self._this.getQuality(zeta._this, dereference(G._this))
 
 
 cdef extern from "<networkit/community/Modularity.hpp>":
@@ -542,7 +542,7 @@ cdef class Modularity:
 		"""
 		cdef double ret
 		with nogil:
-			ret = self._this.getQuality(dereference(zeta._this), dereference(G._this))
+			ret = self._this.getQuality(zeta._this, dereference(G._this))
 		return ret
 
 cdef extern from "<networkit/community/HubDominance.hpp>":
@@ -590,7 +590,7 @@ cdef class HubDominance:
 		float
 			The average hub dominance in the given Partition or Cover.
 		"""
-		return self._this.getQuality(dereference(zeta._this), dereference(G._this))
+		return self._this.getQuality(zeta._this, dereference(G._this))
 
 cdef extern from "<networkit/community/PLM.hpp>":
 
@@ -601,7 +601,7 @@ cdef extern from "<networkit/community/PLM.hpp>":
 
 cdef extern from "<networkit/community/PLM.hpp>" namespace "NetworKit::PLM":
 
-	pair[_Graph, vector[node]] PLM_coarsen "NetworKit::PLM::coarsen" (const _Graph& G, const _Partition& zeta) except +
+	pair[_GraphW, vector[node]] PLM_coarsen "NetworKit::PLM::coarsen" (const _Graph& G, const _Partition& zeta) except +
 	_Partition PLM_prolong "NetworKit::PLM::prolong"(const _Graph& Gcoarse, const _Partition& zetaCoarse, const _Graph& Gfine, vector[node] nodeToMetaNode) except +
 
 
@@ -670,8 +670,8 @@ cdef class PLM(CommunityDetector):
 		networkit.Graph
 			Pair of coarsened graph and node-mappings from fine to coarse graph.
 		"""
-		cdef pair[_Graph, vector[node]] result = move(PLM_coarsen(dereference(G._this), dereference(zeta._this)))
-		return (Graph().setThis(result.first), result.second)
+		cdef pair[_GraphW, vector[node]] result = move(PLM_coarsen(dereference(G._this), zeta._this))
+		return (Graph().setThisFromGraphW(result.first), result.second)
 
 	@staticmethod
 	def prolong(Graph Gcoarse, Partition zetaCoarse, Graph Gfine, vector[node] nodeToMetaNode):
@@ -697,7 +697,7 @@ cdef class PLM(CommunityDetector):
 		networkit.Partition
 			Output partition.
 		"""
-		return Partition().setThis(PLM_prolong(Gcoarse._this, zetaCoarse._this, Gfine._this, nodeToMetaNode))
+		return Partition().setThis(PLM_prolong(dereference(Gcoarse._this), zetaCoarse._this, dereference(Gfine._this), nodeToMetaNode))
 
 cdef extern from "<networkit/community/ParallelLeiden.hpp>":
 
@@ -1425,7 +1425,7 @@ cdef class IntrapartitionDensity(LocalPartitionEvaluation):
 		The partition that shall be evaluated.
 	"""
 	def __cinit__(self):
-		self._this = new _IntrapartitionDensity(self._dereference(G._this), self._P._this)
+		self._this = new _IntrapartitionDensity(dereference(self._G._this), self._P._this)
 
 	def getGlobal(self):
 		""" 
@@ -1474,7 +1474,7 @@ cdef class IsolatedInterpartitionConductance(LocalPartitionEvaluation):
 		The partition that shall be evaluated.
 	"""
 	def __cinit__(self):
-		self._this = new _IsolatedInterpartitionConductance(self._dereference(G._this), self._P._this)
+		self._this = new _IsolatedInterpartitionConductance(dereference(self._G._this), self._P._this)
 
 cdef extern from "<networkit/community/IsolatedInterpartitionExpansion.hpp>":
 
@@ -1507,7 +1507,7 @@ cdef class IsolatedInterpartitionExpansion(LocalPartitionEvaluation):
 		The partition that shall be evaluated.
 	"""
 	def __cinit__(self):
-		self._this = new _IsolatedInterpartitionExpansion(self._dereference(G._this), self._P._this)
+		self._this = new _IsolatedInterpartitionExpansion(dereference(self._G._this), self._P._this)
 
 cdef extern from "<networkit/community/CoverHubDominance.hpp>":
 
@@ -1538,7 +1538,7 @@ cdef class CoverHubDominance(LocalCoverEvaluation):
 		The cover that shall be evaluated.
 	"""
 	def __cinit__(self):
-		self._this = new _CoverHubDominance(self._dereference(G._this), self._C._this)
+		self._this = new _CoverHubDominance(dereference(self._G._this), self._C._this)
 
 cdef extern from "<networkit/community/PartitionHubDominance.hpp>":
 
@@ -1568,7 +1568,7 @@ cdef class PartitionHubDominance(LocalPartitionEvaluation):
 		The partition that shall be evaluated.
 	"""
 	def __cinit__(self):
-		self._this = new _PartitionHubDominance(self._dereference(G._this), self._P._this)
+		self._this = new _PartitionHubDominance(dereference(self._G._this), self._P._this)
 
 cdef extern from "<networkit/community/PartitionFragmentation.hpp>":
 
@@ -1590,7 +1590,7 @@ cdef class PartitionFragmentation(LocalPartitionEvaluation):
 		The partition that shall be evaluated.
 	"""
 	def __cinit__(self):
-		self._this = new _PartitionFragmentation(self._dereference(G._this), self._P._this)
+		self._this = new _PartitionFragmentation(dereference(self._G._this), self._P._this)
 
 cdef extern from "<networkit/community/StablePartitionNodes.hpp>":
 
@@ -1615,7 +1615,7 @@ cdef class StablePartitionNodes(LocalPartitionEvaluation):
 		The partition that shall be evaluated.
 	"""
 	def __cinit__(self):
-		self._this = new _StablePartitionNodes(self._dereference(G._this), self._P._this)
+		self._this = new _StablePartitionNodes(dereference(self._G._this), self._P._this)
 
 
 	def isStable(self, node u):

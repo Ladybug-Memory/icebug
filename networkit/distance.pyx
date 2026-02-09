@@ -777,8 +777,8 @@ cdef class NeighborhoodFunctionApproximation(Algorithm):
 
 cdef extern from "<networkit/distance/Volume.hpp>" namespace "NetworKit::Volume":
 
-	double volume(const _Graph G, const double r, const count samples) except + nogil
-	vector[double] volume(const _Graph G, const vector[double] r, const count samples) except + nogil
+	double volume(const _Graph& G, const double r, const count samples) except + nogil
+	vector[double] volume(const _Graph& G, const vector[double] r, const count samples) except + nogil
 
 cdef class Volume:
 	"""
@@ -828,12 +828,12 @@ cdef class Volume:
 		if type(r) is float or type(r) is int:
 			_r = r
 			with nogil:
-				_v = volume(<_Graph> dereference(G._this), <double> _r, <count> samples)
+				_v = volume(dereference(G._this), <double> _r, <count> samples)
 			return _v
 		elif type(r) is list and all(is_number(item) for item in r):
 			_rs = r
 			with nogil:
-				_vs = volume(<_Graph> dereference(G._this), <vector[double]> _rs, <count> samples)
+				_vs = volume(dereference(G._this), <vector[double]> _rs, <count> samples)
 			return _vs
 		else:
 			pass

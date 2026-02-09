@@ -1,5 +1,7 @@
 # distutils: language=c++
 
+from cython.operator import dereference, preincrement
+
 from .base cimport _Algorithm
 from .base cimport Algorithm
 from .graph cimport _Graph, Graph, _GraphW, GraphW
@@ -273,7 +275,7 @@ cdef class GraphDifference(Algorithm):
 	cdef Graph _G1, _G2
 
 	def __cinit__(self, Graph G1, Graph G2):
-		self._this = new _GraphDifference(G1._this, G2._this)
+		self._this = new _GraphDifference(dereference(G1._this), dereference(G2._this))
 		self._G1 = G1
 		self._G2 = G2
 

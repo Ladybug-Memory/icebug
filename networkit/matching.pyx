@@ -1,5 +1,7 @@
 # distutils: language=c++
 
+from cython.operator import dereference, preincrement
+
 from libcpp.vector cimport vector
 
 from .dynbase cimport _DynAlgorithm

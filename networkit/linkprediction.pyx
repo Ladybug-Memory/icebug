@@ -1,9 +1,11 @@
 # distutils: language=c++
 
+from cython.operator import dereference, preincrement
+
 from libcpp.vector cimport vector
 from libcpp.utility cimport pair
 
-from .graph cimport _Graph, Graph
+from .graph cimport _Graph, _GraphW, Graph
 from .support import MissingDependencyError
 from .structures cimport count, index, node
 
@@ -62,7 +64,7 @@ cdef class LinkPredictor:
 		newGraph : networkit.Graph
 			The graph to work on.
    		"""
-		self._this.setGraph(newGraph._this)
+		self._this.setGraph(dereference(newGraph._this))
 
 	def run(self, node u, node v):
 		""" 
@@ -516,8 +518,8 @@ cdef class ResourceAllocationIndex(LinkPredictor):
 
 cdef extern from "<networkit/linkprediction/RandomLinkSampler.hpp>" namespace "NetworKit::RandomLinkSampler":
 
-	_Graph byPercentage(_Graph G, double percentage) except +
-	_Graph byCount(_Graph G, count numLinks) except +
+	_GraphW byPercentage(_Graph G, double percentage) except +
+	_GraphW byCount(_Graph G, count numLinks) except +
 
 cdef class RandomLinkSampler:
 	""" Provides methods to randomly sample a number of edges from a given graph. """
@@ -544,7 +546,7 @@ cdef class RandomLinkSampler:
 		networkit.Graph
 			A graph that contains the given percentage of links from G.
 		"""
-		return Graph().setThis(byPercentage(dereference(G._this), percentage))
+		return Graph().setThisFromGraphW(byPercentage(dereference(G._this), percentage))
 
 	@staticmethod
 	def byCount(Graph G, count numLinks):
@@ -567,7 +569,7 @@ cdef class RandomLinkSampler:
 		networkit.Graph
 			A graph that contains the given number of links from G.
 		"""
-		return Graph().setThis(byCount(dereference(G._this), numLinks))
+		return Graph().setThisFromGraphW(byCount(dereference(G._this), numLinks))
 
 cdef extern from "<networkit/linkprediction/EvaluationMetric.hpp>":
 
@@ -618,7 +620,7 @@ cdef class EvaluationMetric:
 		newTestGraph : networkit.Graph
 			New graph to use as ground truth.
 		"""
-		self._this.setTestGraph(newTestGraph._this)
+		self._this.setTestGraph(dereference(newTestGraph._this))
 
 	def getCurve(self, vector[pair[pair[node, node], double]] predictions, count numThresholds = 1000):
 		""" 
@@ -692,7 +694,7 @@ cdef class ROCMetric(EvaluationMetric):
 		if testGraph is None:
 			self._this = new _ROCMetric()
 		else:
-			self._this = new _ROCMetric(testGraph._this)
+			self._this = new _ROCMetric(dereference(testGraph._this))
 
 cdef extern from "<networkit/linkprediction/PrecisionRecallMetric.hpp>":
 
@@ -718,7 +720,7 @@ cdef class PrecisionRecallMetric(EvaluationMetric):
 		if testGraph is None:
 			self._this = new _PrecisionRecallMetric()
 		else:
-			self._this = new _PrecisionRecallMetric(testGraph._this)
+			self._this = new _PrecisionRecallMetric(dereference(testGraph._this))
 
 cdef extern from "<networkit/linkprediction/MissingLinksFinder.hpp>":
 

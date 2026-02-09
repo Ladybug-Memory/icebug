@@ -1,5 +1,7 @@
 # distutils: language=c++
 
+from cython.operator import dereference, preincrement
+
 from libcpp.string cimport string
 from libcpp cimport bool as bool_t
 from libcpp.vector cimport vector

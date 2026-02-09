@@ -399,7 +399,7 @@ cdef extern from "<networkit/graph/SpanningForest.hpp>":
 	cdef cppclass _SpanningForest "NetworKit::SpanningForest":
 		_SpanningForest(_Graph) except +
 		void run() except + nogil
-		_Graph getForest() except +
+		_GraphW& getForest() except +
 
 
 cdef extern from "<networkit/graph/RandomMaximumSpanningForest.hpp>":
@@ -407,7 +407,7 @@ cdef extern from "<networkit/graph/RandomMaximumSpanningForest.hpp>":
 	cdef cppclass _RandomMaximumSpanningForest "NetworKit::RandomMaximumSpanningForest"(_Algorithm):
 		_RandomMaximumSpanningForest(_Graph) except +
 		_RandomMaximumSpanningForest(_Graph, vector[double]) except +
-		_Graph getMSF(bool_t move) except +
+		_GraphW getMSF(bool_t move) except +
 		vector[bool_t] getAttribute(bool_t move) except +
 		bool_t inMSF(edgeid eid) except +
 		bool_t inMSF(node u, node v) except +
@@ -422,7 +422,7 @@ cdef extern from "<networkit/graph/UnionMaximumSpanningForest.hpp>":
 	cdef cppclass _UnionMaximumSpanningForest "NetworKit::UnionMaximumSpanningForest"(_Algorithm):
 		_UnionMaximumSpanningForest(_Graph) except +
 		_UnionMaximumSpanningForest(_Graph, vector[double]) except +
-		_Graph getUMSF(bool_t move) except +
+		_GraphW getUMSF(bool_t move) except +
 		vector[bool_t] getAttribute(bool_t move) except +
 		bool_t inUMSF(edgeid eid) except +
 		bool_t inUMSF(node u, node v) except +
