@@ -43,7 +43,7 @@ TEST_F(ParallelEdgeIterationGTest, testParallelForEdgesCSR) {
 
     // Test parallelForEdges - count edges
     std::atomic<count> edgeCount{0};
-    G.parallelForEdges([&](node u, node v) { edgeCount++; });
+    G.parallelForEdges([&]([[maybe_unused]] node u, [[maybe_unused]] node v) { edgeCount++; });
 
     EXPECT_EQ(edgeCount.load(), 3) << "parallelForEdges should iterate over 3 edges (undirected)";
 
@@ -96,7 +96,7 @@ TEST_F(ParallelEdgeIterationGTest, testParallelForEdgesDirectedCSR) {
 
     // Test parallelForEdges
     std::atomic<count> edgeCount{0};
-    G.parallelForEdges([&](node u, node v) { edgeCount++; });
+    G.parallelForEdges([&]([[maybe_unused]] node u, [[maybe_unused]] node v) { edgeCount++; });
 
     EXPECT_EQ(edgeCount.load(), 3) << "parallelForEdges should iterate over 3 directed edges";
 
@@ -150,12 +150,13 @@ TEST_F(ParallelEdgeIterationGTest, testParallelForEdgesLargeGraph) {
     // Run multiple times to catch race conditions
     for (int run = 0; run < 10; run++) {
         std::atomic<count> edgeCount{0};
-        G.parallelForEdges([&](node u, node v) { edgeCount++; });
+        G.parallelForEdges([&]([[maybe_unused]] node u, [[maybe_unused]] node v) { edgeCount++; });
 
         EXPECT_EQ(edgeCount.load(), 500142) << "Run " << run << " should count correct edges";
 
         // Test parallelSumForEdges
-        double total = G.parallelSumForEdges([&](node u, node v) { return 1.0; });
+        double total = G.parallelSumForEdges(
+            [&]([[maybe_unused]] node u, [[maybe_unused]] node v) { return 1.0; });
 
         EXPECT_EQ(total, 500142.0) << "Run " << run << " should sum correctly";
     }
