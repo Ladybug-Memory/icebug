@@ -917,7 +917,7 @@ cdef class LFRGenerator(Algorithm):
 			The partition to use.
 		"""
 		with nogil:
-			(<_LFRGenerator*>(self._this)).setPartition(zeta._this)
+			(<_LFRGenerator*>(self._this)).setPartition(dereference(zeta._this))
 		return self
 
 	def generatePowerlawCommunitySizeSequence(self, count minCommunitySize, count maxCommunitySize, double communitySizeExp):

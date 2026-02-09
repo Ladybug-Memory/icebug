@@ -88,7 +88,7 @@ cdef class ParallelPartitionCoarsening(GraphCoarsening):
 		If true, algorithm runs in parallel. Default: True
 	"""
 	def __cinit__(self, Graph G not None, Partition zeta not None, parallel = True):
-		self._this = new _ParallelPartitionCoarsening(G._this, zeta._this, parallel)
+		self._this = new _ParallelPartitionCoarsening(dereference(G._this), dereference(zeta._this), parallel)
 
 cdef extern from "<networkit/coarsening/MatchingCoarsening.hpp>":
 
@@ -113,4 +113,4 @@ cdef class MatchingCoarsening(GraphCoarsening):
 	"""
 
 	def __cinit__(self, Graph G not None, Matching M not None, bool_t noSelfLoops=False):
-		self._this = new _MatchingCoarsening(G._this, M._this, noSelfLoops)
+		self._this = new _MatchingCoarsening(dereference(G._this), M._this, noSelfLoops)

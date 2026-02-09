@@ -46,7 +46,7 @@ cdef class IndependentSetFinder:
 		list(bool)
 			A list of bools.
 		"""
-		return self._this.run(G._this)
+		return self._this.run(dereference(G._this))
 
 	def isIndependentSet(self, nodeSet, Graph G):
 		""" 
@@ -66,7 +66,7 @@ cdef class IndependentSetFinder:
 		bool
 
 		"""
-		return self._this.isIndependentSet(nodeSet, G._this)
+		return self._this.isIndependentSet(nodeSet, dereference(G._this))
 
 cdef extern from "<networkit/independentset/Luby.hpp>":
 

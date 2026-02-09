@@ -64,7 +64,7 @@ cdef class GraphTools:
 		int
 			The maximum out-degree of the graph.
 		"""
-		return maxDegree(G._this)
+		return maxDegree(dereference(G._this))
 
 	@staticmethod
 	def maxInDegree(Graph G):
@@ -83,7 +83,7 @@ cdef class GraphTools:
 		int
 			The maximum in-degree of the graph.
 		"""
-		return maxInDegree(G._this)
+		return maxInDegree(dereference(G._this))
 
 	@staticmethod
 	def maxWeightedDegree(Graph G):
@@ -102,7 +102,7 @@ cdef class GraphTools:
 		float
 			The maximum weighted out-degree of the graph.
 		"""
-		return maxWeightedDegree(G._this)
+		return maxWeightedDegree(dereference(G._this))
 
 	@staticmethod
 	def maxWeightedInDegree(Graph G):
@@ -121,7 +121,7 @@ cdef class GraphTools:
 		float
 			The maximum weighted in-degree of the graph.
 		"""
-		return maxWeightedInDegree(G._this)
+		return maxWeightedInDegree(dereference(G._this))
 
 	@staticmethod
 	def randomNode(Graph G):
@@ -140,7 +140,7 @@ cdef class GraphTools:
 		int
 			A random node.
 		"""
-		return randomNode(G._this)
+		return randomNode(dereference(G._this))
 
 	@staticmethod
 	def randomNodes(Graph G, count n):
@@ -161,7 +161,7 @@ cdef class GraphTools:
 		list(int)
 			A list of distinct random nodes.
 		"""
-		return randomNodes(G._this, n)
+		return randomNodes(dereference(G._this), n)
 
 	@staticmethod
 	def randomNeighbor(Graph G, node u):
@@ -182,7 +182,7 @@ cdef class GraphTools:
 		int
 			A random neighbor of `u`.
 		"""
-		return randomNeighbor(G._this, u)
+		return randomNeighbor(dereference(G._this), u)
 
 	@staticmethod
 	def randomEdge(Graph G, uniformDistribution = False):
@@ -208,7 +208,7 @@ cdef class GraphTools:
 		tuple(int, int)
 			Random edge.
 		"""
-		return randomEdge(G._this, uniformDistribution)
+		return randomEdge(dereference(G._this), uniformDistribution)
 
 	@staticmethod
 	def randomEdges(Graph G, numEdges):
@@ -229,7 +229,7 @@ cdef class GraphTools:
 		list(tuple(int, int))
 			List of with `numEdges` random edges.
 		"""
-		return randomEdges(G._this, numEdges)
+		return randomEdges(dereference(G._this), numEdges)
 
 	@staticmethod
 	def append(Graph G, Graph G1):
@@ -245,7 +245,7 @@ cdef class GraphTools:
 		G1 : networkit.Graph
 			Graph that will be appended to `G`.
 		"""
-		cdef _GraphW gw = _GraphW(G._this)
+		cdef _GraphW gw = _GraphW(dereference(G._this))
 		append(gw, G1._this)
 		G.setThisFromGraphW(gw)
 
@@ -264,7 +264,7 @@ cdef class GraphTools:
 		G1 : networkit.Graph
 			Graph that will be merged with `G`.
 		"""
-		cdef _GraphW gw = _GraphW(G._this)
+		cdef _GraphW gw = _GraphW(dereference(G._this))
 		merge(gw, G1._this)
 		G.setThisFromGraphW(gw)
 
@@ -290,7 +290,7 @@ cdef class GraphTools:
 			isolatedSet = <vector[node]?>nodes
 		except TypeError:
 			raise RuntimeError("Error, nodes must be a list of nodes.")
-		cdef _GraphW gw = _GraphW(graph._this)
+		cdef _GraphW gw = _GraphW(dereference(graph._this))
 		removeEdgesFromIsolatedSet[vector[node].iterator](gw,
 				isolatedSet.begin(), isolatedSet.end())
 		graph.setThisFromGraphW(gw)
@@ -312,7 +312,7 @@ cdef class GraphTools:
 		graph : networkit.Graph
 			Undirected copy of the input graph.
 		"""
-		return Graph().setThis(toUndirected(graph._this))
+		return Graph().setThis(toUndirected(dereference(graph._this)))
 
 	@staticmethod
 	def toUnweighted(Graph graph):
@@ -331,7 +331,7 @@ cdef class GraphTools:
 		graph : networkit.Graph
 			Unweighted copy of the input graph.
 		"""
-		return Graph().setThis(toUnweighted(graph._this))
+		return Graph().setThis(toUnweighted(dereference(graph._this)))
 
 	@staticmethod
 	def toWeighted(Graph graph):
@@ -350,7 +350,7 @@ cdef class GraphTools:
 		graph : networkit.Graph
 			Weighted copy of the input graph.
 		"""
-		return Graph().setThis(toWeighted(graph._this))
+		return Graph().setThis(toWeighted(dereference(graph._this)))
 
 	@staticmethod
 	def size(graph):
@@ -367,7 +367,7 @@ cdef class GraphTools:
 		if not isinstance(graph, Graph) and not isinstance(graph, GraphW):
 			raise Exception("Graph expected, but got something else")
 		cdef Graph c_graph = <Graph>graph
-		return size(c_graph._this)
+		return size(c_dereference(graph._this))
 
 	@staticmethod
 	def density(Graph graph):
@@ -386,7 +386,7 @@ cdef class GraphTools:
 		float
 			The density of the input graph.
 		"""
-		return density(graph._this)
+		return density(dereference(graph._this))
 
 	@staticmethod
 	def volume(Graph graph, nodes = None):
@@ -414,11 +414,11 @@ cdef class GraphTools:
 		if nodes is not None:
 			try:
 				cNodes = <vector[node]?>nodes
-				return volume(graph._this, cNodes.begin(), cNodes.end())
+				return volume(dereference(graph._this), cNodes.begin(), cNodes.end())
 			except TypeError:
 				raise RuntimeError("Error, nodes must be a list of nodes.")
 		else:
-			return volume(graph._this)
+			return volume(dereference(graph._this))
 
 	@staticmethod
 	def inVolume(Graph graph, nodes):
@@ -445,7 +445,7 @@ cdef class GraphTools:
 
 		try:
 			cNodes = <vector[node]?>nodes
-			return inVolume[vector[node].iterator](graph._this, cNodes.begin(), cNodes.end())
+			return inVolume[vector[node].iterator](dereference(graph._this), cNodes.begin(), cNodes.end())
 		except TypeError:
 			raise RuntimeError("Error, nodes must be a list of nodes.")
 
@@ -466,7 +466,7 @@ cdef class GraphTools:
 		graph : networkit.Graph
 			Graph with the same nodes as the input graph (and without any edge).
 		"""
-		return Graph().setThis(copyNodes(graph._this))
+		return Graph().setThis(copyNodes(dereference(graph._this)))
 
 	@staticmethod
 	def subgraphFromNodes(Graph graph, vector[node] nodes, bool_t compact = False):
@@ -490,7 +490,7 @@ cdef class GraphTools:
 		"""
 
 		return Graph().setThis(subgraphFromNodes(
-				graph._this, nodes.begin(), nodes.end(), compact))
+				dereference(graph._this), nodes.begin(), nodes.end(), compact))
 
 	@staticmethod
 	def subgraphAndNeighborsFromNodes(Graph graph, nodes, includeOutNeighbors=False, includeInNeighbors=False):
@@ -525,7 +525,7 @@ cdef class GraphTools:
 			Induced subgraph.
 		"""
 		return Graph().setThis(subgraphAndNeighborsFromNodes(
-			graph._this, nodes, includeOutNeighbors, includeInNeighbors))
+			dereference(graph._this), nodes, includeOutNeighbors, includeInNeighbors))
 
 	@staticmethod
 	def transpose(Graph graph):
@@ -544,7 +544,7 @@ cdef class GraphTools:
 		graph : networkit.Graph
 			Transpose of the input graph.
 		"""
-		return Graph().setThis(transpose(graph._this))
+		return Graph().setThis(transpose(dereference(graph._this)))
 
 	@staticmethod
 	def getCompactedGraph(Graph graph, nodeIdMap):
@@ -568,7 +568,7 @@ cdef class GraphTools:
 		cdef unordered_map[node,node] cNodeIdMap
 		for key in nodeIdMap:
 			cNodeIdMap[key] = nodeIdMap[key]
-		return Graph().setThis(getCompactedGraph(graph._this,cNodeIdMap))
+		return Graph().setThis(getCompactedGraph(dereference(graph._this),cNodeIdMap))
 
 	@staticmethod
 	def getContinuousNodeIds(Graph graph):
@@ -589,7 +589,7 @@ cdef class GraphTools:
 		"""
 		cdef unordered_map[node,node] cResult
 		with nogil:
-			cResult = getContinuousNodeIds(graph._this)
+			cResult = getContinuousNodeIds(dereference(graph._this))
 		result = dict()
 		for elem in cResult:
 			result[elem.first] = elem.second
@@ -614,7 +614,7 @@ cdef class GraphTools:
 		"""
 		cdef unordered_map[node,node] cResult
 		with nogil:
-			cResult = getRandomContinuousNodeIds(graph._this)
+			cResult = getRandomContinuousNodeIds(dereference(graph._this))
 		result = dict()
 		for elem in cResult:
 			result[elem.first] = elem.second
@@ -636,7 +636,7 @@ cdef class GraphTools:
 			adjacency arrays are sorted by non-decreasing edge weights. Ties are broken
 			by using node ids. Default: False
 		"""
-		cdef _GraphW gw = _GraphW(G._this)
+		cdef _GraphW gw = _GraphW(dereference(G._this))
 		sortEdgesByWeight(gw, decreasing)
 		G.setThisFromGraphW(gw)
 
@@ -664,8 +664,8 @@ cdef class GraphTools:
 		if nodeIdMap is not None:
 			for node, mapped in nodeIdMap.items():
 				cNodeIdMap[node] = mapped
-			return topologicalSort(G._this, cNodeIdMap, checkMapping)
-		return topologicalSort(G._this)
+			return topologicalSort(dereference(G._this), cNodeIdMap, checkMapping)
+		return topologicalSort(dereference(G._this))
 
 	@staticmethod
 	def augmentGraph(Graph G):
@@ -685,7 +685,7 @@ cdef class GraphTools:
 		int
 			Returns the node id of the new root node.
 		"""
-		cdef _GraphW gw = _GraphW(G._this)
+		cdef _GraphW gw = _GraphW(dereference(G._this))
 		cdef node result = augmentGraph(gw)
 		G.setThisFromGraphW(gw)
 		return result
@@ -710,7 +710,7 @@ cdef class GraphTools:
 			Returns a tuple (G, root) where G is the augmented graph and root is the id of the root
 			node.
 		"""
-		result = createAugmentedGraph(G._this)
+		result = createAugmentedGraph(dereference(G._this))
 		return Graph().setThis(result.first), result.second
 
 	@staticmethod
@@ -728,4 +728,4 @@ cdef class GraphTools:
 		G : networkit.Graph
 			The input graph.
 		"""
-		randomizeWeights(G._this)
+		randomizeWeights(dereference(G._this))

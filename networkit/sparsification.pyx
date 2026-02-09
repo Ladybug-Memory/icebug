@@ -104,7 +104,7 @@ cdef class ChibaNishizekiTriangleEdgeScore(EdgeScore):
 
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _ChibaNishizekiTriangleEdgeScore(G._this)
+		self._this = new _ChibaNishizekiTriangleEdgeScore(dereference(G._this))
 
 	cdef bool_t isDoubleValue(self):
 		return False
@@ -128,7 +128,7 @@ cdef class ChibaNishizekiQuadrangleEdgeScore(EdgeScore):
 
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _ChibaNishizekiQuadrangleEdgeScore(G._this)
+		self._this = new _ChibaNishizekiQuadrangleEdgeScore(dereference(G._this))
 
 	cdef bool_t isDoubleValue(self):
 		return False
@@ -152,7 +152,7 @@ cdef class TriangleEdgeScore(EdgeScore):
 
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _TriangleEdgeScore(G._this)
+		self._this = new _TriangleEdgeScore(dereference(G._this))
 
 	cdef bool_t isDoubleValue(self):
 		return False
@@ -182,7 +182,7 @@ cdef class EdgeScoreLinearizer(EdgeScore):
 	def __cinit__(self, Graph G, vector[double] score, inverse = False):
 		self._G = G
 		self._score = score
-		self._this = new _EdgeScoreLinearizer(G._this, self._score, inverse)
+		self._this = new _EdgeScoreLinearizer(dereference(G._this), self._score, inverse)
 
 	cdef bool_t isDoubleValue(self):
 		return True
@@ -219,11 +219,11 @@ cdef class EdgeScoreNormalizer(EdgeScore):
 		self._G = G
 		try:
 			self._inScoreDouble = <vector[double]?>score
-			self._this = new _EdgeScoreNormalizer[double](G._this, self._inScoreDouble, inverse, lower, upper)
+			self._this = new _EdgeScoreNormalizer[double](dereference(G._this), self._inScoreDouble, inverse, lower, upper)
 		except TypeError:
 			try:
 				self._inScoreCount = <vector[count]?>score
-				self._this = new _EdgeScoreNormalizer[count](G._this, self._inScoreCount, inverse, lower, upper)
+				self._this = new _EdgeScoreNormalizer[count](dereference(G._this), self._inScoreCount, inverse, lower, upper)
 			except TypeError:
 				raise TypeError("score must be either a vector of integer or float")
 
@@ -262,7 +262,7 @@ cdef class EdgeScoreBlender(EdgeScore):
 		self._attribute1 = move(attribute1)
 		self._selection = move(selection)
 
-		self._this = new _EdgeScoreBlender(G._this, self._attribute0, self._attribute1, self._selection)
+		self._this = new _EdgeScoreBlender(dereference(G._this), self._attribute0, self._attribute1, self._selection)
 
 	cdef bool_t isDoubleValue(self):
 		return True
@@ -290,7 +290,7 @@ cdef class GeometricMeanScore(EdgeScore):
 	def __cinit__(self, Graph G, vector[double] attribute):
 		self._G = G
 		self._attribute = attribute
-		self._this = new _GeometricMeanScore(G._this, self._attribute)
+		self._this = new _GeometricMeanScore(dereference(G._this), self._attribute)
 
 	cdef bool_t isDoubleValue(self):
 		return True
@@ -328,7 +328,7 @@ cdef class EdgeScoreAsWeight:
 	def __cinit__(self, Graph G, vector[double] score, bool_t squared, edgeweight offset, edgeweight factor):
 		self._G = G
 		self._score = score
-		self._this = new _EdgeScoreAsWeight(G._this, self._score, squared, offset, factor)
+		self._this = new _EdgeScoreAsWeight(dereference(G._this), self._score, squared, offset, factor)
 
 	def __dealloc__(self):
 		if self._this is not NULL:
@@ -373,7 +373,7 @@ cdef class SimmelianOverlapScore(EdgeScore):
 	def __cinit__(self, Graph G, vector[count] triangles, count maxRank):
 		self._G = G
 		self._triangles = triangles
-		self._this = new _SimmelianOverlapScore(G._this, self._triangles, maxRank)
+		self._this = new _SimmelianOverlapScore(dereference(G._this), self._triangles, maxRank)
 
 	cdef bool_t isDoubleValue(self):
 		return True
@@ -389,7 +389,7 @@ cdef class PrefixJaccardScore(EdgeScore):
 	def __cinit__(self, Graph G, vector[double] attribute):
 		self._G = G
 		self._attribute = attribute
-		self._this = new _PrefixJaccardScore(G._this, self._attribute)
+		self._this = new _PrefixJaccardScore(dereference(G._this), self._attribute)
 
 	cdef bool_t isDoubleValue(self):
 		return True
@@ -419,7 +419,7 @@ cdef class MultiscaleScore(EdgeScore):
 	def __cinit__(self, Graph G, vector[double] attribute):
 		self._G = G
 		self._attribute = attribute
-		self._this = new _MultiscaleScore(G._this, self._attribute)
+		self._this = new _MultiscaleScore(dereference(G._this), self._attribute)
 
 	cdef bool_t isDoubleValue(self):
 		return True
@@ -443,7 +443,7 @@ cdef class RandomEdgeScore(EdgeScore):
 
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _RandomEdgeScore(G._this)
+		self._this = new _RandomEdgeScore(dereference(G._this))
 
 	cdef bool_t isDoubleValue(self):
 		return True
@@ -473,7 +473,7 @@ cdef class LocalSimilarityScore(EdgeScore):
 	def __cinit__(self, Graph G, vector[count] triangles):
 		self._G = G
 		self._triangles = triangles
-		self._this = new _LocalSimilarityScore(G._this, self._triangles)
+		self._this = new _LocalSimilarityScore(dereference(G._this), self._triangles)
 
 	cdef bool_t isDoubleValue(self):
 		return True
@@ -503,7 +503,7 @@ cdef class ForestFireScore(EdgeScore):
 
 	def __cinit__(self, Graph G, double pf, double tebr):
 		self._G = G
-		self._this = new _ForestFireScore(G._this, pf, tebr)
+		self._this = new _ForestFireScore(dereference(G._this), pf, tebr)
 
 	cdef bool_t isDoubleValue(self):
 		return True
@@ -529,7 +529,7 @@ cdef class LocalDegreeScore(EdgeScore):
 
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _LocalDegreeScore(G._this)
+		self._this = new _LocalDegreeScore(dereference(G._this))
 
 	cdef bool_t isDoubleValue(self):
 		return True
@@ -553,7 +553,7 @@ cdef class RandomNodeEdgeScore(EdgeScore):
 	"""
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _RandomNodeEdgeScore(G._this)
+		self._this = new _RandomNodeEdgeScore(dereference(G._this))
 
 	cdef bool_t isDoubleValue(self):
 		return True
@@ -594,7 +594,7 @@ cdef class LocalFilterScore(EdgeScore):
 	def __cinit__(self, Graph G, vector[double] a, bool_t logarithmic = True):
 		self._G = G
 		self._a = a
-		self._this = new _LocalFilterScoreDouble(G._this, self._a, logarithmic)
+		self._this = new _LocalFilterScoreDouble(dereference(G._this), self._a, logarithmic)
 
 	cdef bool_t isDoubleValue(self):
 		return True
@@ -622,7 +622,7 @@ cdef class ChanceCorrectedTriangleScore(EdgeScore):
 	def __cinit__(self, Graph G, vector[count] triangles):
 		self._G = G
 		self._triangles = triangles
-		self._this = new _ChanceCorrectedTriangleScore(G._this, self._triangles)
+		self._this = new _ChanceCorrectedTriangleScore(dereference(G._this), self._triangles)
 
 	cdef bool_t isDoubleValue(self):
 		return True
@@ -650,7 +650,7 @@ cdef class SCANStructuralSimilarityScore(EdgeScore):
 	def __cinit__(self, Graph G, vector[count] triangles):
 		self._G = G
 		self._triangles = triangles
-		self._this = new _SCANStructuralSimilarityScore(G._this, self._triangles)
+		self._this = new _SCANStructuralSimilarityScore(dereference(G._this), self._triangles)
 
 	cdef bool_t isDoubleValue(self):
 		return True
@@ -687,7 +687,7 @@ cdef class GlobalThresholdFilter:
 	def __cinit__(self, Graph G not None, vector[double] attribute, double e, bool_t above):
 		self._G = G
 		self._attribute = attribute
-		self._this = new _GlobalThresholdFilter(G._this, self._attribute, e, above)
+		self._this = new _GlobalThresholdFilter(dereference(G._this), self._attribute, e, above)
 
 	def __dealloc__(self):
 		del self._this

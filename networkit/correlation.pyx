@@ -33,11 +33,11 @@ cdef class Assortativity(Algorithm):
 
 	def __cinit__(self, Graph G, data):
 		if isinstance(data, Partition):
-			self._this = new _Assortativity(G._this, (<Partition>data)._this)
+			self._this = new _Assortativity(dereference(G._this), (<Partition>data)._this)
 			self.partition = <Partition>data
 		else:
 			self.attribute = <vector[double]?>data
-			self._this = new _Assortativity(G._this, self.attribute)
+			self._this = new _Assortativity(dereference(G._this), self.attribute)
 		self.G = G
 
 	def getCoefficient(self):

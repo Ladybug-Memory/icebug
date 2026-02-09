@@ -42,32 +42,32 @@ cdef class Graph:
 
 	def __cinit__(self, n=0, bool_t weighted=False, bool_t directed=False, bool_t edgesIndexed=False):
 		if isinstance(n, Graph):
-			self._this = move(_Graph((<Graph>n)._this, weighted, directed, edgesIndexed))
+			self._this = make_shared[_GraphW](dereference((<Graph>n)._this), weighted, directed, edgesIndexed)
 		else:
-			self._this = move(_Graph(<count>n, weighted, directed, edgesIndexed))
+			self._this = make_shared[_GraphW](<count>n, weighted, directed, edgesIndexed)
 
 		# Keep Arrow arrays alive for CSR graphs
 		self._arrow_arrays = {}
 
 	cdef setThis(self, _Graph& other):
-		swap[_Graph](self._this, other)
+		self._this = make_shared[_GraphW](other)
 		return self
 
 	cdef setThisFromGraphW(self, _GraphW& other):
-		self._this = _Graph(other)
+		self._this = make_shared[_GraphW](other)
 		return self
 
 	def __copy__(self):
 		"""
 		Generates a copy of the graph
 		"""
-		return Graph().setThis(_Graph(self._this))
+		return Graph().setThis(dereference(self._this))
 
 	def __deepcopy__(self, memo):
 		"""
 		Generates a (deep) copy of the graph
 		"""
-		return Graph().setThis(_Graph(self._this))
+		return Graph().setThis(dereference(self._this))
 
 	def __str__(self):
 		return "NetworKit.Graph(n={0}, m={1})".format(self.numberOfNodes(), self.numberOfEdges())
@@ -77,7 +77,7 @@ cdef class Graph:
 
 	def __setstate__(self, state):
 		newG = graphio.NetworkitBinaryReader().readFromBuffer(state)
-		self._this = move(_Graph((<Graph>newG)._this, <bool_t>(newG.isWeighted()), <bool_t>(newG.isDirected()), <bool_t>(newG.hasEdgeIds())))
+		self._this = make_shared[_GraphW](dereference((<Graph>newG)._this), <bool_t>(newG.isWeighted()), <bool_t>(newG.isDirected()), <bool_t>(newG.hasEdgeIds()))
 
 	@classmethod
 	def fromCSR(cls, count n, bool_t directed, out_indices, out_indptr, in_indices=None, in_indptr=None):
@@ -190,7 +190,7 @@ cdef class Graph:
 			result._arrow_arrays['in_indptr'] = in_indptr
 
 		# Force the correct constructor by explicitly casting parameters
-		result._this = _Graph(
+		result._this = make_shared[_GraphR](
 			<count>n,
 			<bool_t>directed,
 			<shared_ptr[UInt64Array]>out_indices_ptr,
@@ -212,7 +212,7 @@ cdef class Graph:
 		bool
 			If edges have been indexed
 		"""
-		return self._this.hasEdgeIds()
+		return dereference(self._this).hasEdgeIds()
 
 	def edgeId(self, node u, node v):
 		"""
@@ -230,7 +230,7 @@ cdef class Graph:
 		int
 			Id of the edge.
 		"""
-		return self._this.edgeId(u, v)
+		return dereference(self._this).edgeId(u, v)
 
 	def numberOfNodes(self):
 		"""
@@ -243,7 +243,7 @@ cdef class Graph:
 		int
 			The number of nodes.
 		"""
-		return self._this.numberOfNodes()
+		return dereference(self._this).numberOfNodes()
 
 	def numberOfEdges(self):
 		"""
@@ -256,7 +256,7 @@ cdef class Graph:
 		int
 			The number of edges.
 		"""
-		return self._this.numberOfEdges()
+		return dereference(self._this).numberOfEdges()
 
 	def upperNodeIdBound(self):
 		"""
@@ -269,7 +269,7 @@ cdef class Graph:
 		int
 			An upper bound for the node ids in the graph.
 		"""
-		return self._this.upperNodeIdBound()
+		return dereference(self._this).upperNodeIdBound()
 
 	def upperEdgeIdBound(self):
 		"""
@@ -282,7 +282,7 @@ cdef class Graph:
 		int
 			An upper bound for the edge ids in the graph.
 		"""
-		return self._this.upperEdgeIdBound()
+		return dereference(self._this).upperEdgeIdBound()
 
 	def degree(self, u):
 		"""
@@ -305,7 +305,7 @@ cdef class Graph:
 		int
 			The number of neighbors.
 		"""
-		return self._this.degree(u)
+		return dereference(self._this).degree(u)
 
 	def degreeIn(self, u):
 		"""
@@ -328,7 +328,7 @@ cdef class Graph:
 		int
 			The number of in-neighbors.
 		"""
-		return self._this.degreeIn(u)
+		return dereference(self._this).degreeIn(u)
 
 	def degreeOut(self, u):
 		"""
@@ -350,7 +350,7 @@ cdef class Graph:
 		int
 			The number of out-neighbors.
 		"""
-		return self._this.degreeOut(u)
+		return dereference(self._this).degreeOut(u)
 
 	def weightedDegree(self, u, countSelfLoopsTwice=False):
 		"""
@@ -372,7 +372,7 @@ cdef class Graph:
 		float
 			The weighted out-degree of u.
 		"""
-		return self._this.weightedDegree(u, countSelfLoopsTwice)
+		return dereference(self._this).weightedDegree(u, countSelfLoopsTwice)
 
 	def weightedDegreeIn(self, u, countSelfLoopsTwice=False):
 		"""
@@ -394,7 +394,7 @@ cdef class Graph:
 		float
 			The weighted in-degree of u.
 		"""
-		return self._this.weightedDegreeIn(u, countSelfLoopsTwice)
+		return dereference(self._this).weightedDegreeIn(u, countSelfLoopsTwice)
 
 	def isIsolated(self, u):
 		"""
@@ -412,7 +412,7 @@ cdef class Graph:
 		bool
 			Indicates whether the node is isolated.
 		"""
-		return self._this.isIsolated(u)
+		return dereference(self._this).isIsolated(u)
 
 	def hasNode(self, u):
 		"""
@@ -430,7 +430,7 @@ cdef class Graph:
 		bool
 			Indicates whether node `u` is part of the graph.
 		"""
-		return self._this.hasNode(u)
+		return dereference(self._this).hasNode(u)
 
 	def hasEdge(self, u, v):
 		"""
@@ -450,7 +450,7 @@ cdef class Graph:
 		bool
 			True if the edge exists, False otherwise.
 		"""
-		return self._this.hasEdge(u, v)
+		return dereference(self._this).hasEdge(u, v)
 
 	def weight(self, u, v):
 		"""
@@ -470,7 +470,7 @@ cdef class Graph:
 		float
 			Edge weight of edge {`u` , `v`} or 0 if edge does not exist.
 		"""
-		return self._this.weight(u, v)
+		return dereference(self._this).weight(u, v)
 
 	def forNodes(self, object callback):
 		"""
@@ -486,7 +486,7 @@ cdef class Graph:
 		cdef NodeCallbackWrapper* wrapper
 		try:
 			wrapper = new NodeCallbackWrapper(callback)
-			self._this.forNodes[NodeCallbackWrapper](dereference(wrapper))
+			dereference(self._this).forNodes[NodeCallbackWrapper](dereference(wrapper))
 		finally:
 			del wrapper
 
@@ -504,7 +504,7 @@ cdef class Graph:
 		cdef NodeCallbackWrapper* wrapper
 		try:
 			wrapper = new NodeCallbackWrapper(callback)
-			self._this.forNodesInRandomOrder[NodeCallbackWrapper](dereference(wrapper))
+			dereference(self._this).forNodesInRandomOrder[NodeCallbackWrapper](dereference(wrapper))
 		finally:
 			del wrapper
 
@@ -523,7 +523,7 @@ cdef class Graph:
 		cdef NodePairCallbackWrapper* wrapper
 		try:
 			wrapper = new NodePairCallbackWrapper(callback)
-			self._this.forNodePairs[NodePairCallbackWrapper](dereference(wrapper))
+			dereference(self._this).forNodePairs[NodePairCallbackWrapper](dereference(wrapper))
 		finally:
 			del wrapper
 
@@ -542,7 +542,7 @@ cdef class Graph:
 		cdef EdgeCallBackWrapper* wrapper
 		try:
 			wrapper = new EdgeCallBackWrapper(callback)
-			self._this.forEdges[EdgeCallBackWrapper](dereference(wrapper))
+			dereference(self._this).forEdges[EdgeCallBackWrapper](dereference(wrapper))
 		finally:
 			del wrapper
 
@@ -563,7 +563,7 @@ cdef class Graph:
 		cdef EdgeCallBackWrapper* wrapper
 		try:
 			wrapper = new EdgeCallBackWrapper(callback)
-			self._this.forEdgesOf[EdgeCallBackWrapper](u, dereference(wrapper))
+			dereference(self._this).forEdgesOf[EdgeCallBackWrapper](u, dereference(wrapper))
 		finally:
 			del wrapper
 
@@ -584,7 +584,7 @@ cdef class Graph:
 		cdef EdgeCallBackWrapper* wrapper
 		try:
 			wrapper = new EdgeCallBackWrapper(callback)
-			self._this.forInEdgesOf[EdgeCallBackWrapper](u, dereference(wrapper))
+			dereference(self._this).forInEdgesOf[EdgeCallBackWrapper](u, dereference(wrapper))
 		finally:
 			del wrapper
 
@@ -599,7 +599,7 @@ cdef class Graph:
 		bool
 			True if this graph supports edge weights other than 1.0.
 		"""
-		return self._this.isWeighted()
+		return dereference(self._this).isWeighted()
 
 	def isDirected(self):
 		"""
@@ -612,7 +612,7 @@ cdef class Graph:
 		bool
 			True if graph is directed.
 		"""
-		return self._this.isDirected()
+		return dereference(self._this).isDirected()
 
 	def totalEdgeWeight(self):
 		"""
@@ -625,7 +625,7 @@ cdef class Graph:
 		float
 			The sum of all edge weights.
 		"""
-		return self._this.totalEdgeWeight()
+		return dereference(self._this).totalEdgeWeight()
 
 	def numberOfSelfLoops(self):
 		"""
@@ -638,7 +638,7 @@ cdef class Graph:
 		int
 			Number of self-loops.
 		"""
-		return self._this.numberOfSelfLoops()
+		return dereference(self._this).numberOfSelfLoops()
 
 	def checkConsistency(self):
 		"""
@@ -651,7 +651,7 @@ cdef class Graph:
 		bool
 			True if graph contains invalid graph states.
 		"""
-		return self._this.checkConsistency()
+		return dereference(self._this).checkConsistency()
 
 	def iterNodes(self):
 		"""
@@ -659,8 +659,8 @@ cdef class Graph:
 
 		Iterates over the nodes of the graph.
 		"""
-		it = self._this.nodeRange().begin()
-		while it != self._this.nodeRange().end():
+		it = dereference(self._this).nodeRange().begin()
+		while it != dereference(self._this).nodeRange().end():
 			yield dereference(it)
 			preincrement(it)
 
@@ -676,8 +676,8 @@ cdef class Graph:
 
 		It does not follow the order of edge ids (if present).
 		"""
-		it = self._this.edgeRange().begin()
-		while it != self._this.edgeRange().end():
+		it = dereference(self._this).edgeRange().begin()
+		while it != dereference(self._this).edgeRange().end():
 			yield dereference(it).u, dereference(it).v
 			preincrement(it)
 
@@ -687,8 +687,8 @@ cdef class Graph:
 
 		Iterates over the edges of the graph and their weights.
 		"""
-		it = self._this.edgeWeightRange().begin()
-		while it != self._this.edgeWeightRange().end():
+		it = dereference(self._this).edgeWeightRange().begin()
+		while it != dereference(self._this).edgeWeightRange().end():
 			yield dereference(it).u, dereference(it).v, dereference(it).weight
 			preincrement(it)
 
@@ -703,8 +703,8 @@ cdef class Graph:
 		u : int
 			The input node.
 		"""
-		it = self._this.neighborRange(u).begin()
-		while it != self._this.neighborRange(u).end():
+		it = dereference(self._this).neighborRange(u).begin()
+		while it != dereference(self._this).neighborRange(u).end():
 			yield dereference(it)
 			preincrement(it)
 
@@ -719,8 +719,8 @@ cdef class Graph:
 		u : int
 			The input node.
 		"""
-		it = self._this.inNeighborRange(u).begin()
-		while it != self._this.inNeighborRange(u).end():
+		it = dereference(self._this).inNeighborRange(u).begin()
+		while it != dereference(self._this).inNeighborRange(u).end():
 			yield dereference(it)
 			preincrement(it)
 
@@ -737,11 +737,11 @@ cdef class Graph:
 		u : int
 			The input node.
 		"""
-		if not self._this.isWeighted():
+		if not dereference(self._this).isWeighted():
 			raise RuntimeError("iterNeighborsWeights: Use this iterator only on weighted graphs.")
 
-		it = self._this.weightNeighborRange(u).begin()
-		while it != self._this.weightNeighborRange(u).end():
+		it = dereference(self._this).weightNeighborRange(u).begin()
+		while it != dereference(self._this).weightNeighborRange(u).end():
 			yield dereference(it)
 			preincrement(it)
 
@@ -758,11 +758,11 @@ cdef class Graph:
 		u : int
 			The input node.
 		"""
-		if not self._this.isWeighted():
+		if not dereference(self._this).isWeighted():
 			raise RuntimeError("iterInNeighborsWeights: Use this iterator only on weighted graphs.")
 
-		it = self._this.weightInNeighborRange(u).begin()
-		while it != self._this.weightInNeighborRange(u).end():
+		it = dereference(self._this).weightInNeighborRange(u).begin()
+		while it != dereference(self._this).weightInNeighborRange(u).end():
 			yield dereference(it)
 			preincrement(it)
 
@@ -807,11 +807,11 @@ cdef class Graph:
 			raise Exception("Attribute name has to be a string")
 
 		if ofType == int:
-			return NodeAttribute(NodeIntAttribute().setThis(self._this.attachNodeIntAttribute(stdstring(name)), &self._this), int)
+			return NodeAttribute(NodeIntAttribute().setThis(dereference(self._this).attachNodeIntAttribute(stdstring(name)), &self._this), int)
 		elif ofType == float:
-			return NodeAttribute(NodeDoubleAttribute().setThis(self._this.attachNodeDoubleAttribute(stdstring(name)), &self._this), float)
+			return NodeAttribute(NodeDoubleAttribute().setThis(dereference(self._this).attachNodeDoubleAttribute(stdstring(name)), &self._this), float)
 		elif ofType == str:
-			return NodeAttribute(NodeStringAttribute().setThis(self._this.attachNodeStringAttribute(stdstring(name)), &self._this), str)
+			return NodeAttribute(NodeStringAttribute().setThis(dereference(self._this).attachNodeStringAttribute(stdstring(name)), &self._this), str)
 
 	def getNodeAttribute(self, name, ofType):
 		"""
@@ -843,11 +843,11 @@ cdef class Graph:
 			raise Exception("Attribute name has to be a string")
 
 		if ofType == int:
-			return NodeAttribute(NodeIntAttribute().setThis(self._this.getNodeIntAttribute(stdstring(name)), &self._this), int)
+			return NodeAttribute(NodeIntAttribute().setThis(dereference(self._this).getNodeIntAttribute(stdstring(name)), &self._this), int)
 		elif ofType == float:
-			return NodeAttribute(NodeDoubleAttribute().setThis(self._this.getNodeDoubleAttribute(stdstring(name)), &self._this), float)
+			return NodeAttribute(NodeDoubleAttribute().setThis(dereference(self._this).getNodeDoubleAttribute(stdstring(name)), &self._this), float)
 		elif ofType == str:
-			return NodeAttribute(NodeStringAttribute().setThis(self._this.getNodeStringAttribute(stdstring(name)), &self._this), str)
+			return NodeAttribute(NodeStringAttribute().setThis(dereference(self._this).getNodeStringAttribute(stdstring(name)), &self._this), str)
 
 	def detachNodeAttribute(self, name):
 		"""
@@ -866,7 +866,7 @@ cdef class Graph:
 		"""
 		if not isinstance(name, str):
 			raise Exception("Attribute name has to be a string")
-		self._this.detachNodeAttribute(stdstring(name))
+		dereference(self._this).detachNodeAttribute(stdstring(name))
 
 	def attachEdgeAttribute(self, name, ofType):
 		"""
@@ -908,11 +908,11 @@ cdef class Graph:
 			raise Exception("Attribute name has to be a string")
 
 		if ofType == int:
-			return EdgeAttribute(EdgeIntAttribute().setThis(self._this.attachEdgeIntAttribute(stdstring(name)), &self._this), int)
+			return EdgeAttribute(EdgeIntAttribute().setThis(dereference(self._this).attachEdgeIntAttribute(stdstring(name)), &self._this), int)
 		elif ofType == float:
-			return EdgeAttribute(EdgeDoubleAttribute().setThis(self._this.attachEdgeDoubleAttribute(stdstring(name)), &self._this), float)
+			return EdgeAttribute(EdgeDoubleAttribute().setThis(dereference(self._this).attachEdgeDoubleAttribute(stdstring(name)), &self._this), float)
 		elif ofType == str:
-			return EdgeAttribute(EdgeStringAttribute().setThis(self._this.attachEdgeStringAttribute(stdstring(name)), &self._this), str)
+			return EdgeAttribute(EdgeStringAttribute().setThis(dereference(self._this).attachEdgeStringAttribute(stdstring(name)), &self._this), str)
 
 
 	def getEdgeAttribute(self, name, ofType):
@@ -945,11 +945,11 @@ cdef class Graph:
 			raise Exception("Attribute name has to be a string")
 
 		if ofType == int:
-			return EdgeAttribute(EdgeIntAttribute().setThis(self._this.getEdgeIntAttribute(stdstring(name)), &self._this), int)
+			return EdgeAttribute(EdgeIntAttribute().setThis(dereference(self._this).getEdgeIntAttribute(stdstring(name)), &self._this), int)
 		elif ofType == float:
-			return EdgeAttribute(EdgeDoubleAttribute().setThis(self._this.getEdgeDoubleAttribute(stdstring(name)), &self._this), float)
+			return EdgeAttribute(EdgeDoubleAttribute().setThis(dereference(self._this).getEdgeDoubleAttribute(stdstring(name)), &self._this), float)
 		elif ofType == str:
-			return EdgeAttribute(EdgeStringAttribute().setThis(self._this.getEdgeStringAttribute(stdstring(name)), &self._this), str)
+			return EdgeAttribute(EdgeStringAttribute().setThis(dereference(self._this).getEdgeStringAttribute(stdstring(name)), &self._this), str)
 
 	def detachEdgeAttribute(self, name):
 		"""
@@ -968,7 +968,7 @@ cdef class Graph:
 		"""
 		if not isinstance(name, str):
 			raise Exception("Attribute name has to be a string")
-		self._this.detachEdgeAttribute(stdstring(name))
+		dereference(self._this).detachEdgeAttribute(stdstring(name))
 
 cdef class GraphW:
 	"""
@@ -1019,64 +1019,64 @@ cdef class GraphW:
 
 	# Inherit all read operations from Graph by delegation
 	def numberOfNodes(self):
-		return self._this.numberOfNodes()
+		return dereference(self._this).numberOfNodes()
 
 	def numberOfEdges(self):
-		return self._this.numberOfEdges()
+		return dereference(self._this).numberOfEdges()
 
 	def upperNodeIdBound(self):
-		return self._this.upperNodeIdBound()
+		return dereference(self._this).upperNodeIdBound()
 
 	def upperEdgeIdBound(self):
-		return self._this.upperEdgeIdBound()
+		return dereference(self._this).upperEdgeIdBound()
 
 	def degree(self, u):
-		return self._this.degree(u)
+		return dereference(self._this).degree(u)
 
 	def degreeIn(self, u):
-		return self._this.degreeIn(u)
+		return dereference(self._this).degreeIn(u)
 
 	def degreeOut(self, u):
-		return self._this.degreeOut(u)
+		return dereference(self._this).degreeOut(u)
 
 	def weightedDegree(self, u, countSelfLoopsTwice=False):
-		return self._this.weightedDegree(u, countSelfLoopsTwice)
+		return dereference(self._this).weightedDegree(u, countSelfLoopsTwice)
 
 	def weightedDegreeIn(self, u, countSelfLoopsTwice=False):
-		return self._this.weightedDegreeIn(u, countSelfLoopsTwice)
+		return dereference(self._this).weightedDegreeIn(u, countSelfLoopsTwice)
 
 	def isIsolated(self, u):
-		return self._this.isIsolated(u)
+		return dereference(self._this).isIsolated(u)
 
 	def hasNode(self, u):
-		return self._this.hasNode(u)
+		return dereference(self._this).hasNode(u)
 
 	def hasEdge(self, u, v):
-		return self._this.hasEdge(u, v)
+		return dereference(self._this).hasEdge(u, v)
 
 	def weight(self, u, v):
-		return self._this.weight(u, v)
+		return dereference(self._this).weight(u, v)
 
 	def isWeighted(self):
-		return self._this.isWeighted()
+		return dereference(self._this).isWeighted()
 
 	def isDirected(self):
-		return self._this.isDirected()
+		return dereference(self._this).isDirected()
 
 	def totalEdgeWeight(self):
-		return self._this.totalEdgeWeight()
+		return dereference(self._this).totalEdgeWeight()
 
 	def numberOfSelfLoops(self):
-		return self._this.numberOfSelfLoops()
+		return dereference(self._this).numberOfSelfLoops()
 
 	def checkConsistency(self):
-		return self._this.checkConsistency()
+		return dereference(self._this).checkConsistency()
 
 	def hasEdgeIds(self):
-		return self._this.hasEdgeIds()
+		return dereference(self._this).hasEdgeIds()
 
 	def edgeId(self, node u, node v):
-		return self._this.edgeId(u, v)
+		return dereference(self._this).edgeId(u, v)
 
 	# Write operations - moved from Graph
 	def indexEdges(self, bool_t force = False):
@@ -1090,7 +1090,7 @@ cdef class GraphW:
 		force : bool, optional
 			Force re-indexing of edges. Default: False
 		"""
-		self._this.indexEdges(force)
+		dereference(self._this).indexEdges(force)
 
 	def addNode(self):
 		"""
@@ -1103,7 +1103,7 @@ cdef class GraphW:
 		int
 			The new node.
 		"""
-		return self._this.addNode()
+		return dereference(self._this).addNode()
 
 	def addNodes(self, numberOfNewNodes):
 		"""
@@ -1123,7 +1123,7 @@ cdef class GraphW:
 			The id of the last node added.
 		"""
 		assert(numberOfNewNodes >= 0)
-		return self._this.addNodes(numberOfNewNodes)
+		return dereference(self._this).addNodes(numberOfNewNodes)
 
 	def removeNode(self, u):
 		"""
@@ -1138,7 +1138,7 @@ cdef class GraphW:
 		u : int
 			Id of node to be removed.
 		"""
-		self._this.removeNode(u)
+		dereference(self._this).removeNode(u)
 
 	def restoreNode(self, u):
 		"""
@@ -1151,7 +1151,7 @@ cdef class GraphW:
 		u : int
 			The input node.
 		"""
-		self._this.restoreNode(u)
+		dereference(self._this).restoreNode(u)
 
 	def addEdge(self, u, v, w=1.0, addMissing = False, checkMultiEdge = False):
 		"""
@@ -1183,26 +1183,26 @@ cdef class GraphW:
 		bool
 			Indicates whether the edge has been added. Is `False` in case :code:`checkMultiEdge` is set to `True` and the new edge would have been a multi-edge.
 		"""
-		if not (self._this.hasNode(u) and self._this.hasNode(v)):
+		if not (dereference(self._this).hasNode(u) and dereference(self._this).hasNode(v)):
 			if not addMissing:
 				raise RuntimeError("Cannot create edge ({0}, {1}) as at least one end point does not exist".format(u,v))
 
 			k = max(u, v)
-			previous_num_nodes = self._this.numberOfNodes()
-			if k >= self._this.upperNodeIdBound():
-				self._this.addNodes(k - self._this.upperNodeIdBound() + 1)
+			previous_num_nodes = dereference(self._this).numberOfNodes()
+			if k >= dereference(self._this).upperNodeIdBound():
+				dereference(self._this).addNodes(k - dereference(self._this).upperNodeIdBound() + 1)
 				# removing the nodes that have not been added by this edge
-				for node in range(previous_num_nodes, self._this.numberOfNodes()):
+				for node in range(previous_num_nodes, dereference(self._this).numberOfNodes()):
 					if node != u and node != v:
-						self._this.removeNode(node)
+						dereference(self._this).removeNode(node)
 
-			if not self._this.hasNode(u):
-				self._this.restoreNode(u)
+			if not dereference(self._this).hasNode(u):
+				dereference(self._this).restoreNode(u)
 
-			if not self._this.hasNode(v):
-				self._this.restoreNode(v)
+			if not dereference(self._this).hasNode(v):
+				dereference(self._this).restoreNode(v)
 
-		return self._this.addEdge(u, v, w, checkMultiEdge)
+		return dereference(self._this).addEdge(u, v, w, checkMultiEdge)
 
 	def addEdges(self, inputData, addMissing = False, checkMultiEdge = False):
 		"""
@@ -1269,7 +1269,7 @@ cdef class GraphW:
 		else:
 			for i in range(numEdges):
 				# Calling Cython interface of addEdge directly for higher performance.
-				self._this.addEdge(row[i], col[i], data[i], checkMultiEdge)
+				dereference(self._this).addEdge(row[i], col[i], data[i], checkMultiEdge)
 
 		return self
 
@@ -1288,7 +1288,7 @@ cdef class GraphW:
 		w : float
 			Edge weight.
 		"""
-		self._this.setWeight(u, v, w)
+		dereference(self._this).setWeight(u, v, w)
 		return self
 
 	def increaseWeight(self, u, v, w):
@@ -1306,7 +1306,7 @@ cdef class GraphW:
 		w : float
 			Edge weight.
 		"""
-		self._this.increaseWeight(u, v, w)
+		dereference(self._this).increaseWeight(u, v, w)
 		return self
 
 	def removeEdge(self, u, v):
@@ -1322,7 +1322,7 @@ cdef class GraphW:
 		v : int
 			Endpoint of edge.
 		"""
-		self._this.removeEdge(u, v)
+		dereference(self._this).removeEdge(u, v)
 		return self
 
 	def removeAllEdges(self):
@@ -1331,7 +1331,7 @@ cdef class GraphW:
 
 		Removes all the edges in the graph.
 		"""
-		self._this.removeAllEdges()
+		dereference(self._this).removeAllEdges()
 
 	def removeSelfLoops(self):
 		"""
@@ -1339,7 +1339,7 @@ cdef class GraphW:
 
 		Removes all self-loops from the graph.
 		"""
-		self._this.removeSelfLoops()
+		dereference(self._this).removeSelfLoops()
 
 	def removeMultiEdges(self):
 		"""
@@ -1347,7 +1347,7 @@ cdef class GraphW:
 
 		Removes all multi-edges from the graph.
 		"""
-		self._this.removeMultiEdges()
+		dereference(self._this).removeMultiEdges()
 
 	def swapEdge(self, node s1, node t1, node s2, node t2):
 		"""
@@ -1372,7 +1372,7 @@ cdef class GraphW:
 		t2 : int
 			Target node of the second edge.
 		"""
-		self._this.swapEdge(s1, t1, s2, t2)
+		dereference(self._this).swapEdge(s1, t1, s2, t2)
 		return self
 
 	def sortEdges(self):
@@ -1382,7 +1382,7 @@ cdef class GraphW:
 		Sorts the adjacency arrays by node id. While the running time is linear this
 		temporarily duplicates the memory.
 		"""
-		self._this.sortEdges()
+		dereference(self._this).sortEdges()
 
 	# Iterator and callback methods
 	def forNodes(self, object callback):
@@ -1399,7 +1399,7 @@ cdef class GraphW:
 		cdef NodeCallbackWrapper* wrapper
 		try:
 			wrapper = new NodeCallbackWrapper(callback)
-			self._this.forNodes[NodeCallbackWrapper](dereference(wrapper))
+			dereference(self._this).forNodes[NodeCallbackWrapper](dereference(wrapper))
 		finally:
 			del wrapper
 
@@ -1417,7 +1417,7 @@ cdef class GraphW:
 		cdef NodeCallbackWrapper* wrapper
 		try:
 			wrapper = new NodeCallbackWrapper(callback)
-			self._this.forNodesInRandomOrder[NodeCallbackWrapper](dereference(wrapper))
+			dereference(self._this).forNodesInRandomOrder[NodeCallbackWrapper](dereference(wrapper))
 		finally:
 			del wrapper
 
@@ -1436,7 +1436,7 @@ cdef class GraphW:
 		cdef NodePairCallbackWrapper* wrapper
 		try:
 			wrapper = new NodePairCallbackWrapper(callback)
-			self._this.forNodePairs[NodePairCallbackWrapper](dereference(wrapper))
+			dereference(self._this).forNodePairs[NodePairCallbackWrapper](dereference(wrapper))
 		finally:
 			del wrapper
 
@@ -1455,7 +1455,7 @@ cdef class GraphW:
 		cdef EdgeCallBackWrapper* wrapper
 		try:
 			wrapper = new EdgeCallBackWrapper(callback)
-			self._this.forEdges[EdgeCallBackWrapper](dereference(wrapper))
+			dereference(self._this).forEdges[EdgeCallBackWrapper](dereference(wrapper))
 		finally:
 			del wrapper
 
@@ -1476,7 +1476,7 @@ cdef class GraphW:
 		cdef EdgeCallBackWrapper* wrapper
 		try:
 			wrapper = new EdgeCallBackWrapper(callback)
-			self._this.forEdgesOf[EdgeCallBackWrapper](u, dereference(wrapper))
+			dereference(self._this).forEdgesOf[EdgeCallBackWrapper](u, dereference(wrapper))
 		finally:
 			del wrapper
 
@@ -1497,7 +1497,7 @@ cdef class GraphW:
 		cdef EdgeCallBackWrapper* wrapper
 		try:
 			wrapper = new EdgeCallBackWrapper(callback)
-			self._this.forInEdgesOf[EdgeCallBackWrapper](u, dereference(wrapper))
+			dereference(self._this).forInEdgesOf[EdgeCallBackWrapper](u, dereference(wrapper))
 		finally:
 			del wrapper
 
@@ -1507,8 +1507,8 @@ cdef class GraphW:
 
 		Iterates over the nodes of the graph.
 		"""
-		it = self._this.nodeRange().begin()
-		while it != self._this.nodeRange().end():
+		it = dereference(self._this).nodeRange().begin()
+		while it != dereference(self._this).nodeRange().end():
 			yield dereference(it)
 			preincrement(it)
 
@@ -1524,8 +1524,8 @@ cdef class GraphW:
 
 		It does not follow the order of edge ids (if present).
 		"""
-		it = self._this.edgeRange().begin()
-		while it != self._this.edgeRange().end():
+		it = dereference(self._this).edgeRange().begin()
+		while it != dereference(self._this).edgeRange().end():
 			yield dereference(it).u, dereference(it).v
 			preincrement(it)
 
@@ -1535,8 +1535,8 @@ cdef class GraphW:
 
 		Iterates over the edges of the graph and their weights.
 		"""
-		it = self._this.edgeWeightRange().begin()
-		while it != self._this.edgeWeightRange().end():
+		it = dereference(self._this).edgeWeightRange().begin()
+		while it != dereference(self._this).edgeWeightRange().end():
 			yield dereference(it).u, dereference(it).v, dereference(it).weight
 			preincrement(it)
 
@@ -1551,8 +1551,8 @@ cdef class GraphW:
 		u : int
 			The input node.
 		"""
-		it = self._this.neighborRange(u).begin()
-		while it != self._this.neighborRange(u).end():
+		it = dereference(self._this).neighborRange(u).begin()
+		while it != dereference(self._this).neighborRange(u).end():
 			yield dereference(it)
 			preincrement(it)
 
@@ -1567,8 +1567,8 @@ cdef class GraphW:
 		u : int
 			The input node.
 		"""
-		it = self._this.inNeighborRange(u).begin()
-		while it != self._this.inNeighborRange(u).end():
+		it = dereference(self._this).inNeighborRange(u).begin()
+		while it != dereference(self._this).inNeighborRange(u).end():
 			yield dereference(it)
 			preincrement(it)
 
@@ -1585,11 +1585,11 @@ cdef class GraphW:
 		u : int
 			The input node.
 		"""
-		if not self._this.isWeighted():
+		if not dereference(self._this).isWeighted():
 			raise RuntimeError("iterNeighborsWeights: Use this iterator only on weighted graphs.")
 
-		it = self._this.weightNeighborRange(u).begin()
-		while it != self._this.weightNeighborRange(u).end():
+		it = dereference(self._this).weightNeighborRange(u).begin()
+		while it != dereference(self._this).weightNeighborRange(u).end():
 			yield dereference(it)
 			preincrement(it)
 
@@ -1606,11 +1606,11 @@ cdef class GraphW:
 		u : int
 			The input node.
 		"""
-		if not self._this.isWeighted():
+		if not dereference(self._this).isWeighted():
 			raise RuntimeError("iterInNeighborsWeights: Use this iterator only on weighted graphs.")
 
-		it = self._this.weightInNeighborRange(u).begin()
-		while it != self._this.weightInNeighborRange(u).end():
+		it = dereference(self._this).weightInNeighborRange(u).begin()
+		while it != dereference(self._this).weightInNeighborRange(u).end():
 			yield dereference(it)
 			preincrement(it)
 
@@ -1656,11 +1656,11 @@ cdef class GraphW:
 			raise Exception("Attribute name has to be a string")
 
 		if ofType == int:
-			return NodeAttribute(NodeIntAttribute().setThis(self._this.attachNodeIntAttribute(stdstring(name)), &self._this), int)
+			return NodeAttribute(NodeIntAttribute().setThis(dereference(self._this).attachNodeIntAttribute(stdstring(name)), &self._this), int)
 		elif ofType == float:
-			return NodeAttribute(NodeDoubleAttribute().setThis(self._this.attachNodeDoubleAttribute(stdstring(name)), &self._this), float)
+			return NodeAttribute(NodeDoubleAttribute().setThis(dereference(self._this).attachNodeDoubleAttribute(stdstring(name)), &self._this), float)
 		elif ofType == str:
-			return NodeAttribute(NodeStringAttribute().setThis(self._this.attachNodeStringAttribute(stdstring(name)), &self._this), str)
+			return NodeAttribute(NodeStringAttribute().setThis(dereference(self._this).attachNodeStringAttribute(stdstring(name)), &self._this), str)
 
 	def getNodeAttribute(self, name, ofType):
 		"""
@@ -1692,11 +1692,11 @@ cdef class GraphW:
 			raise Exception("Attribute name has to be a string")
 
 		if ofType == int:
-			return NodeAttribute(NodeIntAttribute().setThis(self._this.getNodeIntAttribute(stdstring(name)), &self._this), int)
+			return NodeAttribute(NodeIntAttribute().setThis(dereference(self._this).getNodeIntAttribute(stdstring(name)), &self._this), int)
 		elif ofType == float:
-			return NodeAttribute(NodeDoubleAttribute().setThis(self._this.getNodeDoubleAttribute(stdstring(name)), &self._this), float)
+			return NodeAttribute(NodeDoubleAttribute().setThis(dereference(self._this).getNodeDoubleAttribute(stdstring(name)), &self._this), float)
 		elif ofType == str:
-			return NodeAttribute(NodeStringAttribute().setThis(self._this.getNodeStringAttribute(stdstring(name)), &self._this), str)
+			return NodeAttribute(NodeStringAttribute().setThis(dereference(self._this).getNodeStringAttribute(stdstring(name)), &self._this), str)
 
 	def detachNodeAttribute(self, name):
 		"""
@@ -1715,7 +1715,7 @@ cdef class GraphW:
 		"""
 		if not isinstance(name, str):
 			raise Exception("Attribute name has to be a string")
-		self._this.detachNodeAttribute(stdstring(name))
+		dereference(self._this).detachNodeAttribute(stdstring(name))
 
 	def attachEdgeAttribute(self, name, ofType):
 		"""
@@ -1757,11 +1757,11 @@ cdef class GraphW:
 			raise Exception("Attribute name has to be a string")
 
 		if ofType == int:
-			return EdgeAttribute(EdgeIntAttribute().setThis(self._this.attachEdgeIntAttribute(stdstring(name)), &self._this), int)
+			return EdgeAttribute(EdgeIntAttribute().setThis(dereference(self._this).attachEdgeIntAttribute(stdstring(name)), &self._this), int)
 		elif ofType == float:
-			return EdgeAttribute(EdgeDoubleAttribute().setThis(self._this.attachEdgeDoubleAttribute(stdstring(name)), &self._this), float)
+			return EdgeAttribute(EdgeDoubleAttribute().setThis(dereference(self._this).attachEdgeDoubleAttribute(stdstring(name)), &self._this), float)
 		elif ofType == str:
-			return EdgeAttribute(EdgeStringAttribute().setThis(self._this.attachEdgeStringAttribute(stdstring(name)), &self._this), str)
+			return EdgeAttribute(EdgeStringAttribute().setThis(dereference(self._this).attachEdgeStringAttribute(stdstring(name)), &self._this), str)
 
 
 	def getEdgeAttribute(self, name, ofType):
@@ -1794,11 +1794,11 @@ cdef class GraphW:
 			raise Exception("Attribute name has to be a string")
 
 		if ofType == int:
-			return EdgeAttribute(EdgeIntAttribute().setThis(self._this.getEdgeIntAttribute(stdstring(name)), &self._this), int)
+			return EdgeAttribute(EdgeIntAttribute().setThis(dereference(self._this).getEdgeIntAttribute(stdstring(name)), &self._this), int)
 		elif ofType == float:
-			return EdgeAttribute(EdgeDoubleAttribute().setThis(self._this.getEdgeDoubleAttribute(stdstring(name)), &self._this), float)
+			return EdgeAttribute(EdgeDoubleAttribute().setThis(dereference(self._this).getEdgeDoubleAttribute(stdstring(name)), &self._this), float)
 		elif ofType == str:
-			return EdgeAttribute(EdgeStringAttribute().setThis(self._this.getEdgeStringAttribute(stdstring(name)), &self._this), str)
+			return EdgeAttribute(EdgeStringAttribute().setThis(dereference(self._this).getEdgeStringAttribute(stdstring(name)), &self._this), str)
 
 	def detachEdgeAttribute(self, name):
 		"""
@@ -1817,7 +1817,7 @@ cdef class GraphW:
 		"""
 		if not isinstance(name, str):
 			raise Exception("Attribute name has to be a string")
-		self._this.detachEdgeAttribute(stdstring(name))
+		dereference(self._this).detachEdgeAttribute(stdstring(name))
 
 def GraphFromCoo(inputData, n=0, bool_t weighted=False, bool_t directed=False, bool_t edgesIndexed=False):
 	"""
@@ -1874,32 +1874,32 @@ def GraphFromCoo(inputData, n=0, bool_t weighted=False, bool_t directed=False, b
 cdef class NodeIntAttribute:
 
 	cdef setThis(self, _NodeIntAttribute& other, _Graph* G):
-		self._this.swap(other)
+		dereference(self._this).swap(other)
 		return self
 
 	def __getitem__(self, node):
 		try:
-			value = self._this.get(node)
+			value = dereference(self._this).get(node)
 		except Exception as e:
 			raise ValueError(str(e))
 		return value
 
 	def getName(self):
-		return self._this.getName()
+		return dereference(self._this).getName()
 
 	def __setitem__(self, node, value):
 		try:
-			self._this.set(node, value)
+			dereference(self._this).set(node, value)
 		except Exception as e:
 			raise ValueError(str(e))
 
 	def __iter__(self):
 		try:
-			self._iter = self._this.begin()
+			self._iter = dereference(self._this).begin()
 		except Exception as e:
 			raise ValueError(str(e))
 
-		self._stopiter = self._this.end()
+		self._stopiter = dereference(self._this).end()
 		return self
 
 	def __next__(self):
@@ -1910,39 +1910,39 @@ cdef class NodeIntAttribute:
 		return val
 
 	def write(self, path: str):
-		return self._this.write(stdstring(path))
+		return dereference(self._this).write(stdstring(path))
 
 	def read(self, path: str):
-		return self._this.read(stdstring(path))
+		return dereference(self._this).read(stdstring(path))
 
 
 cdef class NodeDoubleAttribute:
 	cdef setThis(self, _NodeDoubleAttribute& other, _Graph* G):
-		self._this.swap(other)
+		dereference(self._this).swap(other)
 		return self
 
 	def __getitem__(self, node):
 		try:
-			value = self._this.get(node)
+			value = dereference(self._this).get(node)
 		except Exception as e:
 			raise ValueError(str(e))
 		return value
 
 	def getName(self):
-		return self._this.getName()
+		return dereference(self._this).getName()
 
 	def __setitem__(self, node, value):
 		try:
-			self._this.set(node, value)
+			dereference(self._this).set(node, value)
 		except Exception as e:
 			raise ValueError(str(e))
 
 	def __iter__(self):
 		try:
-			self._iter = self._this.begin()
+			self._iter = dereference(self._this).begin()
 		except Exception as e:
 			raise ValueError(str(e))
-		self._stopiter = self._this.end()
+		self._stopiter = dereference(self._this).end()
 		return self
 
 	def __next__(self):
@@ -1953,39 +1953,39 @@ cdef class NodeDoubleAttribute:
 		return val
 
 	def write(self, path: str):
-		return self._this.write(stdstring(path))
+		return dereference(self._this).write(stdstring(path))
 
 	def read(self, path: str):
-		return self._this.read(stdstring(path))
+		return dereference(self._this).read(stdstring(path))
 
 cdef class NodeStringAttribute:
 
 	cdef setThis(self, _NodeStringAttribute& other, _Graph* G):
-		self._this.swap(other)
+		dereference(self._this).swap(other)
 		return self
 
 	def getName(self):
-		return self._this.getName()
+		return dereference(self._this).getName()
 
 	def __getitem__(self, node):
 		try:
-			value = pystring(self._this.get(node))
+			value = pystring(dereference(self._this).get(node))
 		except Exception as e:
 			raise ValueError(str(e))
 		return value
 
 	def __setitem__(self, node, value):
 		try:
-			self._this.set(node, stdstring(value))
+			dereference(self._this).set(node, stdstring(value))
 		except Exception as e:
 			raise ValueError(str(e))
 
 	def __iter__(self):
 		try:
-			self._iter = self._this.begin()
+			self._iter = dereference(self._this).begin()
 		except Exception as e:
 			raise ValueError(str(e))
-		self._stopiter = self._this.end()
+		self._stopiter = dereference(self._this).end()
 		return self
 
 	def __next__(self):
@@ -1997,10 +1997,10 @@ cdef class NodeStringAttribute:
 		return val
 
 	def write(self, path: str):
-		return self._this.write(stdstring(path))
+		return dereference(self._this).write(stdstring(path))
 
 	def read(self, path: str):
-		return self._this.read(stdstring(path))
+		return dereference(self._this).read(stdstring(path))
 
 class NodeAttribute:
 	"""
@@ -2068,20 +2068,20 @@ class NodeAttribute:
 cdef class EdgeIntAttribute:
 
 	cdef setThis(self, _EdgeIntAttribute& other, _Graph* G):
-		self._this.swap(other)
+		dereference(self._this).swap(other)
 		return self
 
 	def __getitem__(self, edgeIdORnodePair):
 		try:
 			u, v = edgeIdORnodePair
 			try:
-				return self._this.get2(u, v)
+				return dereference(self._this).get2(u, v)
 			except Exception as e:
 				raise ValueError(str(e))
 		except TypeError:
 			pass
 		try:
-			return self._this.get(edgeIdORnodePair)
+			return dereference(self._this).get(edgeIdORnodePair)
 		except Exception as e:
 			raise ValueError(str(e))
 
@@ -2089,25 +2089,25 @@ cdef class EdgeIntAttribute:
 		try:
 			u, v = edgeIdORnodePair
 			try:
-				self._this.set2(u,v,value)
+				dereference(self._this).set2(u,v,value)
 				return
 			except Exception as e:
 				raise ValueError(str(e))
 		except TypeError:
 			pass
 		try:
-			self._this.set(edgeIdORnodePair, value)
+			dereference(self._this).set(edgeIdORnodePair, value)
 			return
 		except Exception as e:
 			raise ValueError(str(e))
 
 	def __iter__(self):
 		try:
-			self._iter = self._this.begin()
+			self._iter = dereference(self._this).begin()
 		except Exception as e:
 			raise ValueError(str(e))
 
-		self._stopiter = self._this.end()
+		self._stopiter = dereference(self._this).end()
 		return self
 
 	def __next__(self):
@@ -2118,27 +2118,27 @@ cdef class EdgeIntAttribute:
 		return val
 
 	def write(self, path: str):
-		return self._this.write(stdstring(path))
+		return dereference(self._this).write(stdstring(path))
 
 	def read(self, path: str):
-		return self._this.read(stdstring(path))
+		return dereference(self._this).read(stdstring(path))
 
 cdef class EdgeDoubleAttribute:
 	cdef setThis(self, _EdgeDoubleAttribute& other, _Graph* G):
-		self._this.swap(other)
+		dereference(self._this).swap(other)
 		return self
 
 	def __getitem__(self, edgeIdORnodePair):
 		try:
 			u, v = edgeIdORnodePair
 			try:
-				return self._this.get2(u, v)
+				return dereference(self._this).get2(u, v)
 			except Exception as e:
 				raise ValueError(str(e))
 		except TypeError:
 			pass
 		try:
-			return self._this.get(edgeIdORnodePair)
+			return dereference(self._this).get(edgeIdORnodePair)
 		except Exception as e:
 			raise ValueError(str(e))
 
@@ -2146,24 +2146,24 @@ cdef class EdgeDoubleAttribute:
 		try:
 			u, v = edgeIdORnodePair
 			try:
-				self._this.set2(u,v,value)
+				dereference(self._this).set2(u,v,value)
 				return
 			except Exception as e:
 				raise ValueError(str(e))
 		except TypeError:
 			pass
 		try:
-			self._this.set(edgeIdORnodePair, value)
+			dereference(self._this).set(edgeIdORnodePair, value)
 			return
 		except Exception as e:
 			raise ValueError(str(e))
 
 	def __iter__(self):
 		try:
-			self._iter = self._this.begin()
+			self._iter = dereference(self._this).begin()
 		except Exception as e:
 			raise ValueError(str(e))
-		self._stopiter = self._this.end()
+		self._stopiter = dereference(self._this).end()
 		return self
 
 	def __next__(self):
@@ -2174,28 +2174,28 @@ cdef class EdgeDoubleAttribute:
 		return val
 
 	def write(self, path: str):
-		return self._this.write(stdstring(path))
+		return dereference(self._this).write(stdstring(path))
 
 	def read(self, path: str):
-		return self._this.read(stdstring(path))
+		return dereference(self._this).read(stdstring(path))
 
 cdef class EdgeStringAttribute:
 
 	cdef setThis(self, _EdgeStringAttribute& other, _Graph* G):
-		self._this.swap(other)
+		dereference(self._this).swap(other)
 		return self
 
 	def __getitem__(self, edgeIdORnodePair):
 		try:
 			u, v = edgeIdORnodePair
 			try:
-				return pystring(self._this.get2(u, v))
+				return pystring(dereference(self._this).get2(u, v))
 			except Exception as e:
 				raise ValueError(str(e))
 		except TypeError:
 			pass
 		try:
-			return pystring(self._this.get(edgeIdORnodePair))
+			return pystring(dereference(self._this).get(edgeIdORnodePair))
 		except Exception as e:
 			raise ValueError(str(e))
 
@@ -2203,24 +2203,24 @@ cdef class EdgeStringAttribute:
 		try:
 			u, v = edgeIdORnodePair
 			try:
-				self._this.set2(u, v, stdstring(value))
+				dereference(self._this).set2(u, v, stdstring(value))
 				return
 			except Exception as e:
 				raise ValueError(str(e))
 		except TypeError:
 			pass
 		try:
-			self._this.set(edgeIdORnodePair, stdstring(value))
+			dereference(self._this).set(edgeIdORnodePair, stdstring(value))
 			return
 		except Exception as e:
 			raise ValueError(str(e))
 
 	def __iter__(self):
 		try:
-			self._iter = self._this.begin()
+			self._iter = dereference(self._this).begin()
 		except Exception as e:
 			raise ValueError(str(e))
-		self._stopiter = self._this.end()
+		self._stopiter = dereference(self._this).end()
 		return self
 
 	def __next__(self):
@@ -2232,10 +2232,10 @@ cdef class EdgeStringAttribute:
 		return val
 
 	def write(self, path: str):
-		return self._this.write(stdstring(path))
+		return dereference(self._this).write(stdstring(path))
 
 	def read(self, path: str):
-		return self._this.read(stdstring(path))
+		return dereference(self._this).read(stdstring(path))
 
 class EdgeAttribute:
 	"""
@@ -2369,7 +2369,7 @@ cdef class SpanningForest:
 
 	def __cinit__(self, Graph G not None):
 		self._G = G
-		self._this = new _SpanningForest(G._this)
+		self._this = new _SpanningForest(dereference(dereference(G._this)))
 
 
 	def __dealloc__(self):
@@ -2381,7 +2381,7 @@ cdef class SpanningForest:
 
 		Executes the algorithm.
 		"""
-		self._this.run()
+		dereference(self._this).run()
 		return self
 
 	def getForest(self):
@@ -2395,7 +2395,7 @@ cdef class SpanningForest:
 		networkit.Graph
 			The computed spanning forest.
 		"""
-		return Graph().setThis(self._this.getForest())
+		return Graph().setThis(dereference(self._this).getForest())
 
 cdef class RandomMaximumSpanningForest(Algorithm):
 	"""
@@ -2414,10 +2414,10 @@ cdef class RandomMaximumSpanningForest(Algorithm):
 	def __cinit__(self, Graph G not None, vector[double] attribute = vector[double]()):
 		self._G = G
 		if attribute.empty():
-			self._this = new _RandomMaximumSpanningForest(G._this)
+			self._this = new _RandomMaximumSpanningForest(dereference(dereference(G._this)))
 		else:
 			self._attribute = move(attribute)
-			self._this = new _RandomMaximumSpanningForest(G._this, self._attribute)
+			self._this = new _RandomMaximumSpanningForest(dereference(dereference(G._this)), self._attribute)
 
 	def getMSF(self, bool_t move):
 		"""
@@ -2497,9 +2497,9 @@ cdef class UnionMaximumSpanningForest(Algorithm):
 		self._G = G
 
 		if attribute.empty():
-			self._this = new _UnionMaximumSpanningForest(G._this)
+			self._this = new _UnionMaximumSpanningForest(dereference(dereference(G._this)))
 		else:
-			self._this = new _UnionMaximumSpanningForest(G._this, attribute)
+			self._this = new _UnionMaximumSpanningForest(dereference(dereference(G._this)), attribute)
 
 	def getUMSF(self, bool_t move = False):
 		"""
