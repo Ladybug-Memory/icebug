@@ -100,7 +100,7 @@ def create_graph_arrow_optimized(df, directed=False):
     print(f"Creating Graph with CSR constructor: n={n_nodes}, directed={directed}")
 
     # Create NetworKit Graph using the new fromCSR method
-    graph = nk.GraphR.fromCSR(n_nodes, directed, indices_arrow, indptr_arrow)
+    graph = nk.Graph.fromCSR(n_nodes, directed, indices_arrow, indptr_arrow)
 
     # CRITICAL: Keep Arrow arrays alive by storing them in a registry keyed by graph id
     # The C++ CSR graph holds raw pointers to the Arrow array data

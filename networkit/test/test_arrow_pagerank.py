@@ -104,7 +104,7 @@ def create_graph_arrow_optimized(df, directed=False):
     
     print(f"Creating Graph with CSR constructor: n={n_nodes}, directed={directed}")
     # Create NetworKit Graph using the new fromCSR method
-    graph = nk.GraphR.fromCSR(n_nodes, directed, indices_arrow, indptr_arrow, indices_arrow, indptr_arrow)
+    graph = nk.Graph.fromCSR(n_nodes, directed, indices_arrow, indptr_arrow)
     
     print(f"Created NetworKit graph: {graph.numberOfNodes()} nodes, {graph.numberOfEdges()} edges")
     return graph

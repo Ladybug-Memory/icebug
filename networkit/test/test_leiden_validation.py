@@ -50,7 +50,7 @@ def create_graph_arrow_optimized(df, directed=False):
     indices_arrow = pa.array(sorted_targets, type=pa.uint64())
     indptr_arrow = pa.array(indptr, type=pa.uint64())
 
-    graph = nk.GraphR.fromCSR(n_nodes, directed, indices_arrow, indptr_arrow)
+    graph = nk.Graph.fromCSR(n_nodes, directed, indices_arrow, indptr_arrow)
 
     graph_id = id(graph)
     _arrow_registry[graph_id] = {
