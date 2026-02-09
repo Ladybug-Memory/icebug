@@ -257,12 +257,12 @@ protected:
      * (for directed graphs inEdges is searched, while for indirected outEdges
      * is searched, which gives the same result as indexInOutEdgeArray).
      */
-    virtual index indexInInEdgeArray(node v, node u) const;
+    virtual index indexInInEdgeArray(node v, node u) const = 0;
 
     /**
      * Returns the index of node v in the array of outgoing edges of node u.
      */
-    virtual index indexInOutEdgeArray(node u, node v) const;
+    virtual index indexInOutEdgeArray(node u, node v) const = 0;
 
     // CSR helper methods
     /**
@@ -625,34 +625,17 @@ public:
      */
     template <bool InEdges = false>
     class NeighborRange {
-        const Graph *G;
-        node u{none};
-        mutable std::vector<node> neighborBuffer;
-        mutable bool initialized{false};
-
-        void initialize() const {
-            if (initialized)
-                return;
-
-            neighborBuffer = G->getNeighborsVector(u, InEdges);
-            initialized = true;
-        }
+        std::shared_ptr<std::vector<node>> neighborBuffer;
 
     public:
-        NeighborRange(const Graph &G, node u) : G(&G), u(u) {}
-        NeighborRange() : G(nullptr) {}
+        NeighborRange(const Graph &G, node u)
+            : neighborBuffer(
+                std::make_shared<std::vector<node>>(G.getNeighborsVector(u, InEdges))) {}
+        NeighborRange() : neighborBuffer(std::make_shared<std::vector<node>>()) {}
 
-        NeighborIterator begin() const {
-            assert(G);
-            initialize();
-            return NeighborIterator(neighborBuffer.begin());
-        }
+        NeighborIterator begin() const { return NeighborIterator(neighborBuffer->begin()); }
 
-        NeighborIterator end() const {
-            assert(G);
-            initialize();
-            return NeighborIterator(neighborBuffer.end());
-        }
+        NeighborIterator end() const { return NeighborIterator(neighborBuffer->end()); }
     };
 
     using OutNeighborRange = NeighborRange<false>;
@@ -665,40 +648,29 @@ public:
      */
     template <bool InEdges = false>
     class NeighborWeightRange {
-        const Graph *G;
-        node u{none};
-        mutable std::vector<node> neighborBuffer;
-        mutable std::vector<edgeweight> weightBuffer;
-        mutable bool initialized{false};
-
-        void initialize() const {
-            if (initialized)
-                return;
-
-            auto [neighbors, weights] = G->getNeighborsWithWeightsVector(u, InEdges);
-            neighborBuffer = std::move(neighbors);
-            weightBuffer = std::move(weights);
-            initialized = true;
-        }
+        std::shared_ptr<std::vector<node>> neighborBuffer;
+        std::shared_ptr<std::vector<edgeweight>> weightBuffer;
 
     public:
-        NeighborWeightRange(const Graph &G, node u) : G(&G), u(u) {}
-        NeighborWeightRange() : G(nullptr) {}
+        NeighborWeightRange(const Graph &G, node u) {
+            auto [neighbors, weights] = G.getNeighborsWithWeightsVector(u, InEdges);
+            neighborBuffer = std::make_shared<std::vector<node>>(std::move(neighbors));
+            weightBuffer = std::make_shared<std::vector<edgeweight>>(std::move(weights));
+        }
+        NeighborWeightRange()
+            : neighborBuffer(std::make_shared<std::vector<node>>()),
+              weightBuffer(std::make_shared<std::vector<edgeweight>>()) {}
 
         NeighborWeightIterator begin() const {
-            assert(G);
-            initialize();
             return NeighborWeightIterator(
-                typename std::vector<node>::const_iterator(neighborBuffer.begin()),
-                typename std::vector<edgeweight>::const_iterator(weightBuffer.begin()));
+                typename std::vector<node>::const_iterator(neighborBuffer->begin()),
+                typename std::vector<edgeweight>::const_iterator(weightBuffer->begin()));
         }
 
         NeighborWeightIterator end() const {
-            assert(G);
-            initialize();
             return NeighborWeightIterator(
-                typename std::vector<node>::const_iterator(neighborBuffer.end()),
-                typename std::vector<edgeweight>::const_iterator(weightBuffer.end()));
+                typename std::vector<node>::const_iterator(neighborBuffer->end()),
+                typename std::vector<edgeweight>::const_iterator(weightBuffer->end()));
         }
     };
 
@@ -875,7 +847,7 @@ public:
     /**
      * Get the id of the given edge.
      */
-    virtual edgeid edgeId(node u, node v) const;
+    virtual edgeid edgeId(node u, node v) const = 0;
 
     /**
      * Get the Edge (u,v) of the given id. (inverse to edgeId)
@@ -1135,11 +1107,7 @@ public:
      * @return @a i-th (outgoing) neighbor of @a u, or @c none if no such
      * neighbor exists.
      */
-    node getIthNeighbor(Unsafe, [[maybe_unused]] node u, [[maybe_unused]] index i) const {
-        // Base Graph class only supports CSR format
-        throw std::runtime_error(
-            "getIthNeighbor not supported in base Graph class - use GraphW for mutable operations");
-    }
+    virtual node getIthNeighbor(Unsafe, node u, index i) const = 0;
 
     /**
      * Return the weight to the i-th (outgoing) neighbor of @a u.
@@ -1149,11 +1117,18 @@ public:
      * @return @a edge weight to the i-th (outgoing) neighbor of @a u, or @c +inf if no such
      * neighbor exists.
      */
-    edgeweight getIthNeighborWeight(Unsafe, [[maybe_unused]] node u,
-                                    [[maybe_unused]] index i) const {
-        // Base Graph class only supports CSR format
-        throw std::runtime_error("getIthNeighborWeight not supported in base Graph class - use "
-                                 "GraphW for mutable operations");
+    virtual edgeweight getIthNeighborWeight(node u, index i) const = 0;
+
+    /**
+     * Return the weight to the i-th (outgoing) neighbor of @a u - unsafe version
+     * that assumes valid indices.
+     *
+     * @param u Node.
+     * @param i index.
+     * @return @a edge weight to the i-th (outgoing) neighbor of @a u.
+     */
+    edgeweight getIthNeighborWeight(Unsafe, node u, index i) const {
+        return getIthNeighborWeight(u, i);
     }
 
     /**
@@ -1245,11 +1220,7 @@ public:
      * @return @a i-th (outgoing) neighbor of @a u, or @c none if no such
      * neighbor exists.
      */
-    node getIthNeighbor([[maybe_unused]] node u, [[maybe_unused]] index i) const {
-        // Base Graph class only supports CSR format
-        throw std::runtime_error(
-            "getIthNeighbor not supported in base Graph class - use GraphW for mutable operations");
-    }
+    virtual node getIthNeighbor(node u, index i) const = 0;
 
     /**
      * Return the i-th (incoming) neighbor of @a u.
@@ -1259,11 +1230,7 @@ public:
      * @return @a i-th (incoming) neighbor of @a u, or @c none if no such
      * neighbor exists.
      */
-    node getIthInNeighbor([[maybe_unused]] node u, [[maybe_unused]] index i) const {
-        // Base Graph class only supports CSR format
-        throw std::runtime_error("getIthInNeighbor not supported in base Graph class - use GraphW "
-                                 "for mutable operations");
-    }
+    virtual node getIthInNeighbor(node u, index i) const = 0;
 
     /**
      * Return the weight to the i-th (outgoing) neighbor of @a u.
@@ -1273,11 +1240,6 @@ public:
      * @return @a edge weight to the i-th (outgoing) neighbor of @a u, or @c +inf if no such
      * neighbor exists.
      */
-    edgeweight getIthNeighborWeight([[maybe_unused]] node u, [[maybe_unused]] index i) const {
-        // Base Graph class only supports CSR format
-        throw std::runtime_error("getIthNeighborWeight not supported in base Graph class - use "
-                                 "GraphW for mutable operations");
-    }
 
     /**
      * Get i-th (outgoing) neighbor of @a u and the corresponding edge weight.
@@ -1287,26 +1249,17 @@ public:
      * @return pair: i-th (outgoing) neighbor of @a u and the corresponding
      * edge weight, or @c defaultEdgeWeight if unweighted.
      */
-    std::pair<node, edgeweight> getIthNeighborWithWeight([[maybe_unused]] node u,
-                                                         [[maybe_unused]] index i) const {
-        // Base Graph class only supports CSR format
-        throw std::runtime_error("getIthNeighborWithWeight not supported in base Graph class - use "
-                                 "GraphW for mutable operations");
-    }
+    virtual std::pair<node, edgeweight> getIthNeighborWithWeight(node u, index i) const = 0;
 
     /**
-     * Get i-th (outgoing) neighbor of @a u and the corresponding edge weight.
+     * Get i-th (outgoing) neighbor of @a u and the corresponding edge weight - unsafe version.
      *
      * @param u Node.
-     * @param i index; should be in [0, degreeOut(u))
-     * @return pair: i-th (outgoing) neighbor of @a u and the corresponding
-     * edge weight, or @c defaultEdgeWeight if unweighted.
+     * @param i index.
+     * @return pair: i-th (outgoing) neighbor of @a u and the corresponding edge weight.
      */
-    std::pair<node, edgeweight> getIthNeighborWithWeight(Unsafe, [[maybe_unused]] node u,
-                                                         [[maybe_unused]] index i) const {
-        // Base Graph class only supports CSR format
-        throw std::runtime_error("getIthNeighborWithWeight not supported in base Graph class - use "
-                                 "GraphW for mutable operations");
+    std::pair<node, edgeweight> getIthNeighborWithWeight(Unsafe, node u, index i) const {
+        return getIthNeighborWithWeight(u, i);
     }
 
     /**
@@ -1317,12 +1270,7 @@ public:
      * @return pair: i-th (outgoing) neighbor of @a u and the corresponding
      * edge id, or @c none if no such neighbor exists.
      */
-    std::pair<node, edgeid> getIthNeighborWithId([[maybe_unused]] node u,
-                                                 [[maybe_unused]] index i) const {
-        // Base Graph class only supports CSR format
-        throw std::runtime_error("getIthNeighborWithId not supported in base Graph class - use "
-                                 "GraphW for mutable operations");
-    }
+    virtual std::pair<node, edgeid> getIthNeighborWithId(node u, index i) const = 0;
 
     /* NODE ITERATORS */
 
