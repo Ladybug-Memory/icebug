@@ -250,9 +250,44 @@ public:
     template <typename Lambda>
     void sortNeighbors(node u, Lambda lambda) {
         assert(hasNode(u));
-        std::sort(outEdges[u].begin(), outEdges[u].end(), lambda);
-        if (isDirected()) {
-            std::sort(inEdges[u].begin(), inEdges[u].end(), lambda);
+
+        if ((degreeIn(u) < 2) && (degree(u) < 2)) {
+            return;
+        }
+
+        // Sort the outEdge-Attributes
+        std::vector<index> outIndices(outEdges[u].size());
+        std::iota(outIndices.begin(), outIndices.end(), 0);
+        std::ranges::sort(outIndices,
+                          [&](index a, index b) { return lambda(outEdges[u][a], outEdges[u][b]); });
+
+        Aux::ArrayTools::applyPermutation(outEdges[u].begin(), outEdges[u].end(),
+                                          outIndices.begin());
+
+        if (weighted) {
+            Aux::ArrayTools::applyPermutation(outEdgeWeights[u].begin(), outEdgeWeights[u].end(),
+                                              outIndices.begin());
+        }
+
+        if (edgesIndexed) {
+            Aux::ArrayTools::applyPermutation(outEdgeIds[u].begin(), outEdgeIds[u].end(),
+                                              outIndices.begin());
+        }
+
+        if (directed) {
+            // Sort in-edges by the same ordering (by target node)
+            // First, find the permutation that sorts inEdges[u] by the corresponding outEdges
+            std::vector<index> inIndices(inEdges[u].size());
+            std::iota(inIndices.begin(), inIndices.end(), 0);
+            std::ranges::sort(
+                inIndices, [&](index a, index b) { return lambda(inEdges[u][a], inEdges[u][b]); });
+            Aux::ArrayTools::applyPermutation(inEdges[u].begin(), inEdges[u].end(),
+                                              inIndices.begin());
+
+            if (edgesIndexed) {
+                Aux::ArrayTools::applyPermutation(inEdgeIds[u].begin(), inEdgeIds[u].end(),
+                                                  inIndices.begin());
+            }
         }
     }
 
@@ -665,6 +700,12 @@ public:
         }
         return outEdges[v].size() == 0;
     }
+
+    edgeid edgeId(node u, node v) const override;
+
+    index indexInOutEdgeArray(node u, node v) const override;
+
+    index indexInInEdgeArray(node v, node u) const override;
 
     /**
      * Return the i-th (outgoing) neighbor of @a u.

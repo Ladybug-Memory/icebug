@@ -92,6 +92,43 @@ void GraphW::indexEdges(bool force) {
                          // needs to create edge ids
 }
 
+edgeid GraphW::edgeId(node u, node v) const {
+    if (!edgesIndexed) {
+        throw std::runtime_error("edges have not been indexed - call indexEdges first");
+    }
+
+    index i = indexInOutEdgeArray(u, v);
+
+    if (i == none) {
+        throw std::runtime_error("Edge does not exist");
+    }
+    edgeid id = outEdgeIds[u][i];
+    return id;
+}
+
+index GraphW::indexInOutEdgeArray(node u, node v) const {
+    for (index i = 0; i < outEdges[u].size(); i++) {
+        node x = outEdges[u][i];
+        if (x == v) {
+            return i;
+        }
+    }
+    return none;
+}
+
+index GraphW::indexInInEdgeArray(node v, node u) const {
+    if (!directed) {
+        return indexInOutEdgeArray(v, u);
+    }
+    for (index i = 0; i < inEdges[v].size(); i++) {
+        node x = inEdges[v][i];
+        if (x == u) {
+            return i;
+        }
+    }
+    return none;
+}
+
 /** GRAPH INFORMATION **/
 
 void GraphW::shrinkToFit() {

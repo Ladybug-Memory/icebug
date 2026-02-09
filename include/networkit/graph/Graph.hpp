@@ -257,12 +257,12 @@ protected:
      * (for directed graphs inEdges is searched, while for indirected outEdges
      * is searched, which gives the same result as indexInOutEdgeArray).
      */
-    index indexInInEdgeArray(node v, node u) const;
+    virtual index indexInInEdgeArray(node v, node u) const;
 
     /**
      * Returns the index of node v in the array of outgoing edges of node u.
      */
-    index indexInOutEdgeArray(node u, node v) const;
+    virtual index indexInOutEdgeArray(node u, node v) const;
 
     // CSR helper methods
     /**
@@ -875,7 +875,7 @@ public:
     /**
      * Get the id of the given edge.
      */
-    edgeid edgeId(node u, node v) const;
+    virtual edgeid edgeId(node u, node v) const;
 
     /**
      * Get the Edge (u,v) of the given id. (inverse to edgeId)
