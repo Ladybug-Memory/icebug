@@ -362,7 +362,7 @@ void Lamg<Matrix>::setup(const Matrix &laplacianMatrix, const Graph &G) {
 
 template <class Matrix>
 void Lamg<Matrix>::setup(const Matrix &laplacianMatrix) {
-    Graph G = MatrixTools::matrixToGraph(laplacianMatrix);
+    auto G = MatrixTools::matrixToGraph(laplacianMatrix);
     setup(laplacianMatrix, G);
 }
 

@@ -20,7 +20,7 @@ namespace NetworKit {
 
 Sparsifier::Sparsifier(const Graph &inputGraph) : inputGraph(inputGraph) {}
 
-Graph Sparsifier::getGraph() {
+GraphW Sparsifier::getGraph() {
     if (!hasOutput)
         throw std::runtime_error("Error: run must be called first");
 

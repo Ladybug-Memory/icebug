@@ -285,6 +285,28 @@ protected:
      */
     count degreeCSR(node u, bool incoming = false) const;
 
+    /**
+     * Virtual method to get neighbors as a vector.
+     * This enables polymorphic iteration over neighbors regardless of storage format.
+     *
+     * @param u Node.
+     * @param inEdges If true, get incoming neighbors; otherwise outgoing.
+     * @return Vector of neighbor nodes (filtered to only existing nodes).
+     */
+    virtual std::vector<node> getNeighborsVector(node u, bool inEdges = false) const = 0;
+
+    /**
+     * Virtual method to get neighbors with weights as vectors.
+     * This enables polymorphic iteration over weighted neighbors regardless of storage format.
+     *
+     * @param u Node.
+     * @param inEdges If true, get incoming neighbors; otherwise outgoing.
+     * @return Pair of vectors: neighbors and corresponding weights (filtered to only existing
+     * nodes).
+     */
+    virtual std::pair<std::vector<node>, std::vector<edgeweight>>
+    getNeighborsWithWeightsVector(node u, bool inEdges = false) const = 0;
+
 private:
     /**
      * Computes the weighted in/out degree of node @a u.
@@ -612,20 +634,7 @@ public:
             if (initialized)
                 return;
 
-            std::pair<const node *, count> neighbors;
-            if (InEdges) {
-                neighbors = G->getCSRInNeighbors(u);
-            } else {
-                neighbors = G->getCSROutNeighbors(u);
-            }
-
-            neighborBuffer.clear();
-            neighborBuffer.reserve(neighbors.second);
-            for (count i = 0; i < neighbors.second; ++i) {
-                if (G->exists[neighbors.first[i]]) {
-                    neighborBuffer.push_back(neighbors.first[i]);
-                }
-            }
+            neighborBuffer = G->getNeighborsVector(u, InEdges);
             initialized = true;
         }
 
@@ -635,20 +644,12 @@ public:
 
         NeighborIterator begin() const {
             assert(G);
-            if (!G->usingCSR) {
-                throw std::runtime_error("NeighborRange iterators require CSR format");
-            }
-
             initialize();
             return NeighborIterator(neighborBuffer.begin());
         }
 
         NeighborIterator end() const {
             assert(G);
-            if (!G->usingCSR) {
-                throw std::runtime_error("NeighborRange iterators require CSR format");
-            }
-
             initialize();
             return NeighborIterator(neighborBuffer.end());
         }
@@ -674,25 +675,9 @@ public:
             if (initialized)
                 return;
 
-            std::pair<const node *, count> neighbors;
-            if (InEdges) {
-                neighbors = G->getCSRInNeighbors(u);
-            } else {
-                neighbors = G->getCSROutNeighbors(u);
-            }
-
-            neighborBuffer.clear();
-            weightBuffer.clear();
-            neighborBuffer.reserve(neighbors.second);
-            weightBuffer.reserve(neighbors.second);
-
-            for (count i = 0; i < neighbors.second; ++i) {
-                if (G->exists[neighbors.first[i]]) {
-                    neighborBuffer.push_back(neighbors.first[i]);
-                    // For CSR graphs, all edges have default weight
-                    weightBuffer.push_back(defaultEdgeWeight);
-                }
-            }
+            auto [neighbors, weights] = G->getNeighborsWithWeightsVector(u, InEdges);
+            neighborBuffer = std::move(neighbors);
+            weightBuffer = std::move(weights);
             initialized = true;
         }
 
@@ -702,10 +687,6 @@ public:
 
         NeighborWeightIterator begin() const {
             assert(G);
-            if (!G->usingCSR) {
-                throw std::runtime_error("NeighborWeightRange iterators require CSR format");
-            }
-
             initialize();
             return NeighborWeightIterator(
                 typename std::vector<node>::const_iterator(neighborBuffer.begin()),
@@ -714,10 +695,6 @@ public:
 
         NeighborWeightIterator end() const {
             assert(G);
-            if (!G->usingCSR) {
-                throw std::runtime_error("NeighborWeightRange iterators require CSR format");
-            }
-
             initialize();
             return NeighborWeightIterator(
                 typename std::vector<node>::const_iterator(neighborBuffer.end()),
@@ -981,15 +958,7 @@ public:
      * @note The existence of the node is not checked. Calling this function with a non-existing
      * node results in a segmentation fault. Node existence can be checked by calling hasNode(u).
      */
-    virtual count degree(node v) const {
-        assert(hasNode(v));
-        if (usingCSR) {
-            return degreeCSR(v, false);
-        }
-        // Base Graph only supports CSR, GraphW will override for vector access
-        throw std::runtime_error(
-            "Base Graph class only supports CSR format. Use GraphW for mutable graphs.");
-    }
+    virtual count degree(node v) const = 0;
 
     /**
      * Get the number of incoming neighbors of @a v.
@@ -1000,14 +969,7 @@ public:
      * @note The existence of the node is not checked. Calling this function with a non-existing
      * node results in a segmentation fault. Node existence can be checked by calling hasNode(u).
      */
-    virtual count degreeIn(node v) const {
-        assert(hasNode(v));
-        if (usingCSR) {
-            return directed ? degreeCSR(v, true) : degreeCSR(v, false);
-        }
-        // Base Graph class only supports CSR format
-        throw std::runtime_error("Graph class requires CSR arrays for degree operations");
-    }
+    virtual count degreeIn(node v) const = 0;
 
     /**
      * Get the number of outgoing neighbors of @a v.
@@ -1024,15 +986,7 @@ public:
      * @param v Node.
      * @return @c true if the node is isolated (= degree is 0)
      */
-    virtual bool isIsolated(node v) const {
-        if (!exists[v])
-            throw std::runtime_error("Error, the node does not exist!");
-        if (usingCSR) {
-            return degreeCSR(v, false) == 0 && (!directed || degreeCSR(v, true) == 0);
-        }
-        // Base Graph class only supports CSR format
-        throw std::runtime_error("Graph class requires CSR arrays for isolation check");
-    }
+    virtual bool isIsolated(node v) const = 0;
 
     /**
      * Returns the weighted degree of @a u.

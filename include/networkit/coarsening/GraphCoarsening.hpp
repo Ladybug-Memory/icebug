@@ -30,9 +30,9 @@ public:
 
     void run() override = 0;
 
-    const Graph &getCoarseGraph() const;
+    const GraphW &getCoarseGraph() const;
 
-    Graph &getCoarseGraph();
+    GraphW &getCoarseGraph();
 
     /**
      * Get mapping from fine to coarse node.

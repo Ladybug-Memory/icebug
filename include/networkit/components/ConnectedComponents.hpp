@@ -11,6 +11,7 @@
 #include <memory>
 
 #include <networkit/components/ComponentDecomposition.hpp>
+#include <networkit/graph/GraphW.hpp>
 
 namespace NetworKit {
 
@@ -43,7 +44,7 @@ public:
      * (i.e. re-numbered from 0 to n-1). If false, the node ids will not be changed.
      * @return The largest connected component of the input graph @a G.
      */
-    static Graph extractLargestConnectedComponent(const Graph &G, bool compactGraph = false);
+    static GraphW extractLargestConnectedComponent(const Graph &G, bool compactGraph = false);
 
 private:
     std::unique_ptr<ConnectedComponentsDetails::ConnectedComponentsImpl<false>> impl;

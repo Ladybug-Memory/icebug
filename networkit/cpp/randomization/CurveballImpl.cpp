@@ -117,7 +117,7 @@ nodepair_vector CurveballAdjacencyList::getEdges() const {
 CurveballMaterialization::CurveballMaterialization(const CurveballAdjacencyList &adj_list)
     : adjacencyList(adj_list) {}
 
-Graph CurveballMaterialization::toGraph(bool parallel) {
+GraphW CurveballMaterialization::toGraph(bool parallel) {
     GraphW G(adjacencyList.numberOfNodes(), false, false);
 
     if (parallel)
@@ -515,7 +515,7 @@ void CurveballIM::run(const trade_vector &trades) {
     return;
 }
 
-Graph CurveballIM::getGraph(bool parallel) const {
+GraphW CurveballIM::getGraph(bool parallel) const {
     CurveballMaterialization gb(adjList);
 
     return gb.toGraph(parallel);

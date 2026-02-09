@@ -59,7 +59,7 @@ void GlobalCurveball::run() {
     hasRun = true;
 }
 
-Graph GlobalCurveball::getGraph() {
+GraphW GlobalCurveball::getGraph() {
     assureFinished();
     return impl->getGraph();
 }

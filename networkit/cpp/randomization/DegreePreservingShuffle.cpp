@@ -166,7 +166,7 @@ void DegreePreservingShuffle::run() {
     }
 }
 
-Graph DegreePreservingShuffle::getGraph() const {
+GraphW DegreePreservingShuffle::getGraph() const {
     const auto n = G->numberOfNodes();
     assert(permutation.size() == n);
     // localPerm introduced due to a bug in AppleClang 11.03. Direct access to permutation

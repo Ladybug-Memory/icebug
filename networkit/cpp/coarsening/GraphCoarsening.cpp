@@ -11,12 +11,12 @@ namespace NetworKit {
 
 GraphCoarsening::GraphCoarsening(const Graph &G) : Algorithm(), G(&G) {}
 
-const Graph &GraphCoarsening::getCoarseGraph() const {
+const GraphW &GraphCoarsening::getCoarseGraph() const {
     assureFinished();
     return Gcoarsened;
 }
 
-Graph &GraphCoarsening::getCoarseGraph() {
+GraphW &GraphCoarsening::getCoarseGraph() {
     assureFinished();
     return Gcoarsened;
 }

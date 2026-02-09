@@ -96,7 +96,7 @@ std::vector<node>
 CliqueDetect::getMaximumWeightClique(const std::vector<node> &nodes,
                                      const std::vector<edgeweight> &seedToNodeWeight) const {
 
-    Graph s = GraphTools::subgraphFromNodes(*g, nodes.begin(), nodes.end(), true);
+    GraphW s = GraphTools::subgraphFromNodes(*g, nodes.begin(), nodes.end(), true);
     std::vector<node> maxClique;
 
     Aux::IncrementalUniformRandomSelector selector;

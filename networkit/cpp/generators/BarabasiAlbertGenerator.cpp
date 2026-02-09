@@ -71,7 +71,7 @@ struct RNG {
 
 GraphW BarabasiAlbertGenerator::generate() {
     if (!nMax)
-        return Graph();
+        return GraphW();
 
     if (sequential) {
         return generateBatagelj();

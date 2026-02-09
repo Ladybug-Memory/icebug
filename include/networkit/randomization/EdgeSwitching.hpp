@@ -110,7 +110,7 @@ protected:
 class EdgeSwitching : public Algorithm {
 public:
     /// Constructs an EdgeSwitch algorithm that contains a COPY of the input graph.
-    explicit EdgeSwitching(const Graph &G, double numberOfSwitchesPerEdge = 10.0,
+    explicit EdgeSwitching(const GraphW &G, double numberOfSwitchesPerEdge = 10.0,
                            bool degreePreservingShufflePreprocessing = true);
 
     ~EdgeSwitching() override = default;
@@ -122,13 +122,13 @@ public:
     void run() override { inPlaceAlgorithm.run(); }
 
     /// Return a reference to the perturbed graph
-    const Graph &getGraph() const { return ownedGraph; }
+    const GraphW &getGraph() const { return ownedGraph; }
 
     /**
      * Move graph owned by the algorithm out.
      * @warning Do not call run() after calling moveGraph()
      */
-    Graph moveGraph() { return std::move(ownedGraph); }
+    GraphW moveGraph() { return std::move(ownedGraph); }
 
     /**
      * Returns twice the total number of non-rejected swaps carried out during calls to run().

@@ -3,6 +3,7 @@
 
 #include <networkit/base/Algorithm.hpp>
 #include <networkit/graph/Graph.hpp>
+#include <networkit/graph/GraphW.hpp>
 #include <networkit/structures/Partition.hpp>
 
 namespace NetworKit {
@@ -34,7 +35,7 @@ public:
      * (i.e. re-numbered from 0 to n-1). If false, the node ids will not be changed.
      * @return The largest (weakly) connected component of the input graph @a G.
      */
-    static Graph extractLargestConnectedComponent(const Graph &G, bool compactGraph);
+    static GraphW extractLargestConnectedComponent(const Graph &G, bool compactGraph);
 
 private:
     const Graph *G;

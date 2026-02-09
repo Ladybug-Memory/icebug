@@ -16,7 +16,7 @@ GlobalThresholdFilter::GlobalThresholdFilter(const Graph &graph,
                                              bool above)
     : graph(&graph), attribute(attribute), threshold(threshold), above(above) {}
 
-Graph GlobalThresholdFilter::calculate() {
+GraphW GlobalThresholdFilter::calculate() {
     if (!graph->hasEdgeIds()) {
         throw std::runtime_error("edges have not been indexed - call indexEdges first");
     }
@@ -49,7 +49,7 @@ Graph GlobalThresholdFilter::calculate() {
     return sGraph;
 }
 
-Graph GlobalThresholdFilter::calculateUndirected() {
+GraphW GlobalThresholdFilter::calculateUndirected() {
     // Create an edge-less graph.
     GraphW sGraph(graph->upperNodeIdBound(), graph->isWeighted(), graph->isDirected());
     count edgeCount = 0;

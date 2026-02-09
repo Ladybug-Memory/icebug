@@ -47,7 +47,7 @@ void NeighborhoodFunctionHeuristic::run() {
         diam.run();
         dia = diam.getDiameter().first;
     } else {
-        Graph Gcopy = GraphTools::toUnweighted(*G);
+        GraphW Gcopy = GraphTools::toUnweighted(*G);
         Diameter diam(Gcopy);
         diam.run();
         dia = diam.getDiameter().first;

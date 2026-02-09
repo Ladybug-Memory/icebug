@@ -71,7 +71,7 @@ public:
      *
      * @return graph at the current state
      */
-    Graph getGraph() const;
+    GraphW getGraph() const;
 
     /**
      * Get coordinates in native representation

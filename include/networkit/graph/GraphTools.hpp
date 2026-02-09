@@ -352,7 +352,7 @@ void merge(GraphW &G, const Graph &G1);
  * @param  nodeIdMap The map providing the information about the node ids.
  * @return           Returns a compacted Graph.
  */
-Graph getCompactedGraph(const Graph &graph, const std::unordered_map<node, node> &nodeIdMap);
+GraphW getCompactedGraph(const Graph &graph, const std::unordered_map<node, node> &nodeIdMap);
 
 /**
  * Computes a map of node ids.
@@ -397,7 +397,7 @@ node augmentGraph(GraphW &G);
  * Constructs an augmented graph as required by ForestCentrality. With respect to the input graph G,
  * the augmented graph has a new root node connected to all the other nodes in the graph.
  */
-std::pair<Graph, node> createAugmentedGraph(const Graph &G);
+std::pair<GraphW, node> createAugmentedGraph(const Graph &G);
 
 /**
  * Sorts the adjacency arrays by increasing or decreasing edge weight. Edge ids are used

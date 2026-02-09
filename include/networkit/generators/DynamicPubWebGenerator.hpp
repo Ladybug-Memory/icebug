@@ -24,7 +24,7 @@ public:
     DynamicPubWebGenerator(count numNodes, count numberOfDenseAreas, coordinate neighborhoodRadius,
                            count maxNumberOfNeighbors, bool writeInitialGraphToStream = true);
 
-    Graph getGraph() const { return G; }
+    GraphW getGraph() const { return G; }
 
     /**
      * Generate event stream.

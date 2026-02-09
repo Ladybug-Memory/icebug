@@ -22,8 +22,8 @@ void WeaklyConnectedComponents::run() {
     hasRun = true;
 }
 
-Graph WeaklyConnectedComponents::extractLargestWeaklyConnectedComponent(const Graph &G,
-                                                                        bool compactGraph) {
+GraphW WeaklyConnectedComponents::extractLargestWeaklyConnectedComponent(const Graph &G,
+                                                                         bool compactGraph) {
     return ConnectedComponentsDetails::ConnectedComponentsImpl<
         true>::extractLargestConnectedComponent(G, compactGraph);
 }

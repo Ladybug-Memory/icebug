@@ -109,7 +109,7 @@ private:
 public:
     CurveballMaterialization(const CurveballAdjacencyList &adj_list);
 
-    Graph toGraph(bool parallel);
+    GraphW toGraph(bool parallel);
 
 private:
     void toGraphParallel(GraphW &G);
@@ -169,7 +169,7 @@ public:
         return numAffectedEdges;
     }
 
-    Graph getGraph(bool parallel) const;
+    GraphW getGraph(bool parallel) const;
 
     nodepair_vector getEdges() const;
 
