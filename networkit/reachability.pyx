@@ -49,7 +49,7 @@ cdef class ReachableNodes(Algorithm):
 
 	def __cinit__(self, Graph G, exact = True):
 		self._G = G
-		self._this = new _ReachableNodes(G._this, exact)
+		self._this = new _ReachableNodes(dereference(G._this), exact)
 
 	def numberOfReachableNodes(self, node u):
 		"""
@@ -164,7 +164,7 @@ cdef class AllSimplePaths(Algorithm):
 
 	def __cinit__(self, Graph G, source, target, cutoff=none):
 		self._G = G
-		self._this = new _AllSimplePaths(G._this, source, target, cutoff)
+		self._this = new _AllSimplePaths(dereference(G._this), source, target, cutoff)
 
 	def numberOfSimplePaths(self):
 		"""

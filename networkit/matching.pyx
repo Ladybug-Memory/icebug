@@ -111,7 +111,7 @@ cdef class Matching:
 		bool
 			True if this is a proper matching.
 		"""
-		return self._this.isProper(G._this)
+		return self._this.isProper(dereference(G._this))
 
 	def size(self, Graph G):
 		"""
@@ -129,7 +129,7 @@ cdef class Matching:
 		int
 			Total number of edges in the matching.
 		"""
-		return self._this.size(G._this)
+		return self._this.size(dereference(G._this))
 
 	def mate(self, node v):
 		"""
@@ -165,7 +165,7 @@ cdef class Matching:
 		float
 			Total weight of edges in this matching.
 		"""
-		return self._this.weight(G._this)
+		return self._this.weight(dereference(G._this))
 
 	def toPartition(self, Graph G):
 		"""
@@ -184,7 +184,7 @@ cdef class Matching:
 		networkit.Partition
 			The resulting partition.
 		"""
-		return Partition().setThis(self._this.toPartition(G._this))
+		return Partition().setThis(self._this.toPartition(dereference(G._this)))
 
 	def getVector(self):
 		""" 
@@ -252,9 +252,9 @@ cdef class PathGrowingMatcher(Matcher):
 	def __cinit__(self, Graph G not None, edgeScores=None):
 		self.G = G
 		if edgeScores is not None:
-			self._this = new _PathGrowingMatcher(G._this, edgeScores)
+			self._this = new _PathGrowingMatcher(dereference(G._this), edgeScores)
 		else:
-			self._this = new _PathGrowingMatcher(G._this)
+			self._this = new _PathGrowingMatcher(dereference(G._this))
 
 cdef extern from "<networkit/matching/SuitorMatcher.hpp>":
 	cdef cppclass _SuitorMather "NetworKit::SuitorMatcher"(_Matcher):
@@ -284,7 +284,7 @@ cdef class SuitorMatcher(Matcher):
 	"""
 	def __cinit__(self, Graph G not None, sortSuitor = True, checkSortedEdges = False):
 		self.G = G
-		self._this = new _SuitorMather(G._this, sortSuitor, checkSortedEdges)
+		self._this = new _SuitorMather(dereference(G._this), sortSuitor, checkSortedEdges)
 
 cdef class BMatching:
 	""" 
@@ -300,7 +300,7 @@ cdef class BMatching:
 	def __cinit__(self, Graph G = None, second = None):
 		if G is not None:
 			self._G = G
-			self._this = move(_BMatching(G._this, <vector[count]> second))
+			self._this = move(_BMatching(dereference(G._this), <vector[count]> second))
 		else:
 			self._this = move(_BMatching())
 
@@ -509,9 +509,9 @@ cdef class BSuitorMatcher(BMatcher):
 
 		self._G = G
 		if isinstance(second, list):
-			self._this = new _BSuitorMatcher(G._this, <vector[count]> second)
+			self._this = new _BSuitorMatcher(dereference(G._this), <vector[count]> second)
 		elif isinstance(second, int):
-			self._this = new _BSuitorMatcher(G._this, <count> second)
+			self._this = new _BSuitorMatcher(dereference(G._this), <count> second)
 		else:
 			raise Exception("Error: the second parameter must be either an int (global b-value), a list of ints (single b-values for all nodes) or a path to the file, containing b-values for every node.")
 
@@ -555,8 +555,8 @@ cdef class DynamicBSuitorMatcher(BSuitorMatcher, DynAlgorithm):
 		
 		self._G = G
 		if isinstance(second, list):
-			self._this = new _DynamicBSuitorMatcher(G._this, <vector[count]> second)
+			self._this = new _DynamicBSuitorMatcher(dereference(G._this), <vector[count]> second)
 		elif isinstance(second, int):
-			self._this = new _DynamicBSuitorMatcher(G._this, <count> second)
+			self._this = new _DynamicBSuitorMatcher(dereference(G._this), <count> second)
 		else:
 			raise Exception("Error: the second parameter must be either an int (global b-value), a list of ints (single b-values for all nodes) or a path to the file, containing b-values for every node.")

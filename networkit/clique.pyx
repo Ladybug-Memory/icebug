@@ -83,14 +83,14 @@ cdef class MaximalCliques(Algorithm):
 			self._py_callback = callback
 			self._callback = new NodeVectorCallbackWrapper(callback)
 			try:
-				self._this = new _MaximalCliques(self._G._this, dereference(self._callback))
+				self._this = new _MaximalCliques(self._dereference(G._this), dereference(self._callback))
 			except BaseException as e:
 				del self._callback
 				self._callback = NULL
 				raise e
 		else:
 			self._callback = NULL
-			self._this = new _MaximalCliques(self._G._this, maximumOnly)
+			self._this = new _MaximalCliques(self._dereference(G._this), maximumOnly)
 
 	def __dealloc__(self):
 		if not self._callback == NULL:

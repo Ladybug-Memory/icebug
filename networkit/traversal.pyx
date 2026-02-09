@@ -116,7 +116,7 @@ cdef class Traversal:
 				sources = <vector[node]?>start
 			except TypeError:
 				sources = [<node?>start]
-			BFSfrom[vector[node].iterator, TraversalNodeDistCallbackWrapper](graph._this, sources.begin(),sources.end(), dereference(wrapper))
+			BFSfrom[vector[node].iterator, TraversalNodeDistCallbackWrapper](dereference(graph._this), sources.begin(),sources.end(), dereference(wrapper))
 		finally:
 			del wrapper
 
@@ -141,7 +141,7 @@ cdef class Traversal:
 
 		try:
 			wrapper = new TraversalEdgeCallBackWrapper(callback)
-			BFSEdgesFrom[TraversalEdgeCallBackWrapper](graph._this, start, dereference(wrapper))
+			BFSEdgesFrom[TraversalEdgeCallBackWrapper](dereference(graph._this), start, dereference(wrapper))
 		finally:
 			del wrapper
 
@@ -164,7 +164,7 @@ cdef class Traversal:
 		cdef TraversalNodeCallbackWrapper *wrapper
 		try:
 			wrapper = new TraversalNodeCallbackWrapper(callback)
-			DFSfrom[TraversalNodeCallbackWrapper](graph._this, start, dereference(wrapper))
+			DFSfrom[TraversalNodeCallbackWrapper](dereference(graph._this), start, dereference(wrapper))
 		finally:
 			del wrapper
 
@@ -187,7 +187,7 @@ cdef class Traversal:
 		cdef TraversalEdgeCallBackWrapper *wrapper
 		try:
 			wrapper = new TraversalEdgeCallBackWrapper(callback)
-			DFSEdgesFrom[TraversalEdgeCallBackWrapper](graph._this, start, dereference(wrapper))
+			DFSEdgesFrom[TraversalEdgeCallBackWrapper](dereference(graph._this), start, dereference(wrapper))
 		finally:
 			del wrapper
 
@@ -217,6 +217,6 @@ cdef class Traversal:
 				sources = <vector[node]?>start
 			except TypeError:
 				sources = [<node?>start]
-			DijkstraFrom[vector[node].iterator, TraversalNodeDistCallbackWrapper](graph._this, sources.begin(),sources.end(), dereference(wrapper))
+			DijkstraFrom[vector[node].iterator, TraversalNodeDistCallbackWrapper](dereference(graph._this), sources.begin(),sources.end(), dereference(wrapper))
 		finally:
 			del wrapper

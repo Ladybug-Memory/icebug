@@ -407,7 +407,7 @@ cdef class GraphUpdater:
 	def __cinit__(self, Graph G):
 		cdef _GraphW gw
 		self._G = G
-		gw = _GraphW(G._this)
+		gw = _GraphW(dereference(G._this))
 		self._this = new _GraphUpdater(gw)
 		G.setThisFromGraphW(gw)
 

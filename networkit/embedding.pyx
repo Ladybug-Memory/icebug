@@ -55,7 +55,7 @@ cdef class Node2Vec(Algorithm):
  
 	def __cinit__(self, Graph G, P=1, Q=1, L=80, N=10, D=128):
 		self._G = G
-		self._this = new _Node2Vec(G._this, P, Q, L, N, D)
+		self._this = new _Node2Vec(dereference(G._this), P, Q, L, N, D)
 
 	def getFeatures(self):
 		"""

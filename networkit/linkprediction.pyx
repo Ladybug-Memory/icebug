@@ -159,7 +159,7 @@ cdef class KatzIndex(LinkPredictor):
 		if G is None:
 			self._this = new _KatzIndex(maxPathLength, dampingValue)
 		else:
-			self._this = new _KatzIndex(G._this, maxPathLength, dampingValue)
+			self._this = new _KatzIndex(dereference(G._this), maxPathLength, dampingValue)
 
 cdef extern from "<networkit/linkprediction/CommonNeighborsIndex.hpp>":
 
@@ -183,7 +183,7 @@ cdef class CommonNeighborsIndex(LinkPredictor):
 		if G is None:
 			self._this = new _CommonNeighborsIndex()
 		else:
-			self._this = new _CommonNeighborsIndex(G._this)
+			self._this = new _CommonNeighborsIndex(dereference(G._this))
 
 cdef extern from "<networkit/linkprediction/PreferentialAttachmentIndex.hpp>":
 
@@ -210,7 +210,7 @@ cdef class PreferentialAttachmentIndex(LinkPredictor):
 		if G is None:
 			self._this = new _PreferentialAttachmentIndex()
 		else:
-			self._this = new _PreferentialAttachmentIndex(G._this)
+			self._this = new _PreferentialAttachmentIndex(dereference(G._this))
 
 cdef extern from "<networkit/linkprediction/JaccardIndex.hpp>":
 
@@ -236,7 +236,7 @@ cdef class JaccardIndex(LinkPredictor):
 		if G is None:
 			self._this = new _JaccardIndex()
 		else:
-			self._this = new _JaccardIndex(G._this)
+			self._this = new _JaccardIndex(dereference(G._this))
 
 cdef extern from "<networkit/linkprediction/AdamicAdarIndex.hpp>":
 
@@ -263,7 +263,7 @@ cdef class AdamicAdarIndex(LinkPredictor):
 		if G is None:
 			self._this = new _AdamicAdarIndex()
 		else:
-			self._this = new _AdamicAdarIndex(G._this)
+			self._this = new _AdamicAdarIndex(dereference(G._this))
 
 cdef extern from "<networkit/linkprediction/UDegreeIndex.hpp>":
 
@@ -287,7 +287,7 @@ cdef class UDegreeIndex(LinkPredictor):
 		if G is None:
 			self._this = new _UDegreeIndex()
 		else:
-			self._this = new _UDegreeIndex(G._this)
+			self._this = new _UDegreeIndex(dereference(G._this))
 
 cdef extern from "<networkit/linkprediction/VDegreeIndex.hpp>":
 
@@ -311,7 +311,7 @@ cdef class VDegreeIndex(LinkPredictor):
 		if G is None:
 			self._this = new _VDegreeIndex()
 		else:
-			self._this = new _VDegreeIndex(G._this)
+			self._this = new _VDegreeIndex(dereference(G._this))
 
 cdef extern from "<networkit/linkprediction/AlgebraicDistanceIndex.hpp>":
 
@@ -344,7 +344,7 @@ cdef class AlgebraicDistanceIndex(LinkPredictor):
 		if G is None:
 			self._this = new _AlgebraicDistanceIndex(numberSystems, numberIterations, omega, norm)
 		else:
-			self._this = new _AlgebraicDistanceIndex(G._this, numberSystems, numberIterations, omega, norm)
+			self._this = new _AlgebraicDistanceIndex(dereference(G._this), numberSystems, numberIterations, omega, norm)
 
 	def preprocess(self):
 		""" 
@@ -383,7 +383,7 @@ cdef class NeighborhoodDistanceIndex(LinkPredictor):
 		if G is None:
 			self._this = new _NeighborhoodDistanceIndex()
 		else:
-			self._this = new _NeighborhoodDistanceIndex(G._this)
+			self._this = new _NeighborhoodDistanceIndex(dereference(G._this))
 
 cdef extern from "<networkit/linkprediction/TotalNeighborsIndex.hpp>":
 
@@ -410,7 +410,7 @@ cdef class TotalNeighborsIndex(LinkPredictor):
 		if G is None:
 			self._this = new _TotalNeighborsIndex()
 		else:
-			self._this = new _TotalNeighborsIndex(G._this)
+			self._this = new _TotalNeighborsIndex(dereference(G._this))
 
 cdef extern from "<networkit/linkprediction/NeighborsMeasureIndex.hpp>":
 
@@ -437,7 +437,7 @@ cdef class NeighborsMeasureIndex(LinkPredictor):
 		if G is None:
 			self._this = new _NeighborsMeasureIndex()
 		else:
-			self._this = new _NeighborsMeasureIndex(G._this)
+			self._this = new _NeighborsMeasureIndex(dereference(G._this))
 
 cdef extern from "<networkit/linkprediction/SameCommunityIndex.hpp>":
 
@@ -461,7 +461,7 @@ cdef class SameCommunityIndex(LinkPredictor):
 		if G is None:
 			self._this = new _SameCommunityIndex()
 		else:
-			self._this = new _SameCommunityIndex(G._this)
+			self._this = new _SameCommunityIndex(dereference(G._this))
 
 cdef extern from "<networkit/linkprediction/AdjustedRandIndex.hpp>":
 
@@ -485,7 +485,7 @@ cdef class AdjustedRandIndex(LinkPredictor):
 		if G is None:
 			self._this = new _AdjustedRandIndex()
 		else:
-			self._this = new _AdjustedRandIndex(G._this)
+			self._this = new _AdjustedRandIndex(dereference(G._this))
 
 cdef extern from "<networkit/linkprediction/ResourceAllocationIndex.hpp>":
 
@@ -512,7 +512,7 @@ cdef class ResourceAllocationIndex(LinkPredictor):
 		if G is None:
 			self._this = new _ResourceAllocationIndex()
 		else:
-			self._this = new _ResourceAllocationIndex(G._this)
+			self._this = new _ResourceAllocationIndex(dereference(G._this))
 
 cdef extern from "<networkit/linkprediction/RandomLinkSampler.hpp>" namespace "NetworKit::RandomLinkSampler":
 
@@ -544,7 +544,7 @@ cdef class RandomLinkSampler:
 		networkit.Graph
 			A graph that contains the given percentage of links from G.
 		"""
-		return Graph().setThis(byPercentage(G._this, percentage))
+		return Graph().setThis(byPercentage(dereference(G._this), percentage))
 
 	@staticmethod
 	def byCount(Graph G, count numLinks):
@@ -567,7 +567,7 @@ cdef class RandomLinkSampler:
 		networkit.Graph
 			A graph that contains the given number of links from G.
 		"""
-		return Graph().setThis(byCount(G._this, numLinks))
+		return Graph().setThis(byCount(dereference(G._this), numLinks))
 
 cdef extern from "<networkit/linkprediction/EvaluationMetric.hpp>":
 
@@ -746,7 +746,7 @@ cdef class MissingLinksFinder:
 	cdef _MissingLinksFinder* _this
 
 	def __cinit__(self, Graph G):
-		self._this = new _MissingLinksFinder(G._this)
+		self._this = new _MissingLinksFinder(dereference(G._this))
 
 	def __dealloc__(self):
 		del self._this
@@ -829,7 +829,7 @@ cdef class NeighborhoodUtility:
 		list(int)
 			A list containing all the nodes in the neighboorhood-union of u and v.
 		"""
-		return getNeighborsUnion(G._this, u, v)
+		return getNeighborsUnion(dereference(G._this), u, v)
 
 	@staticmethod
 	def getCommonNeighbors(Graph G, node u, node v):
@@ -852,7 +852,7 @@ cdef class NeighborhoodUtility:
 		list(int)
 			A list containing the node-ids of all common neighbors of u and v.
 		"""
-		return getCommonNeighbors(G._this, u, v)
+		return getCommonNeighbors(dereference(G._this), u, v)
 
 cdef extern from "<networkit/linkprediction/LinkThresholder.hpp>" namespace "NetworKit::LinkThresholder":
 

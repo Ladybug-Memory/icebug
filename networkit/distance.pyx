@@ -413,7 +413,7 @@ cdef class AdamicAdarDistance:
 
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _AdamicAdarDistance(G._this)
+		self._this = new _AdamicAdarDistance(dereference(G._this))
 
 	def __dealloc__(self):
 		del self._this
@@ -513,7 +513,7 @@ cdef class Diameter(Algorithm):
 
 	def __cinit__(self, Graph G not None, algo = DiameterAlgo.AUTOMATIC, error = -1., nSamples = 0):
 		self._G = G
-		self._this = new _Diameter(G._this, algo, error, nSamples)
+		self._this = new _Diameter(dereference(G._this), algo, error, nSamples)
 
 	def getDiameter(self):
 		"""
@@ -554,7 +554,7 @@ cdef class Eccentricity:
 		tuple(int, float)
 			First index is the farthest node v from u, and the second index is the length of the shortest path from u to v.
 		"""
-		return getValue(G._this, v)
+		return getValue(dereference(G._this), v)
 
 cdef extern from "<networkit/distance/EffectiveDiameterApproximation.hpp>" namespace "NetworKit::EffectiveDiameterApproximation":
 
@@ -588,7 +588,7 @@ cdef class EffectiveDiameterApproximation(Algorithm):
 
 	def __cinit__(self, Graph G not None, double ratio=0.9, count k=64, count r=7):
 		self._G = G
-		self._this = new _EffectiveDiameterApproximation(G._this, ratio, k, r)
+		self._this = new _EffectiveDiameterApproximation(dereference(G._this), ratio, k, r)
 
 	def getEffectiveDiameter(self):
 		"""
@@ -625,7 +625,7 @@ cdef class EffectiveDiameter(Algorithm):
 
 	def __cinit__(self, Graph G not None, double ratio=0.9):
 		self._G = G
-		self._this = new _EffectiveDiameter(G._this, ratio)
+		self._this = new _EffectiveDiameter(dereference(G._this), ratio)
 
 	def getEffectiveDiameter(self):
 		"""
@@ -672,7 +672,7 @@ cdef class HopPlotApproximation(Algorithm):
 
 	def __cinit__(self, Graph G not None, count maxDistance=0, count k=64, count r=7):
 		self._G = G
-		self._this = new _HopPlotApproximation(G._this, maxDistance, k, r)
+		self._this = new _HopPlotApproximation(dereference(G._this), maxDistance, k, r)
 
 	def getHopPlot(self):
 		"""
@@ -714,7 +714,7 @@ cdef class NeighborhoodFunction(Algorithm):
 
 	def __cinit__(self, Graph G not None):
 		self._G = G
-		self._this = new _NeighborhoodFunction(G._this)
+		self._this = new _NeighborhoodFunction(dereference(G._this))
 
 	def getNeighborhoodFunction(self):
 		"""
@@ -760,7 +760,7 @@ cdef class NeighborhoodFunctionApproximation(Algorithm):
 
 	def __cinit__(self, Graph G not None, count k=64, count r=7):
 		self._G = G
-		self._this = new _NeighborhoodFunctionApproximation(G._this, k, r)
+		self._this = new _NeighborhoodFunctionApproximation(dereference(G._this), k, r)
 
 	def getNeighborhoodFunction(self):
 		"""
@@ -828,12 +828,12 @@ cdef class Volume:
 		if type(r) is float or type(r) is int:
 			_r = r
 			with nogil:
-				_v = volume(<_Graph> G._this, <double> _r, <count> samples)
+				_v = volume(<_Graph> dereference(G._this), <double> _r, <count> samples)
 			return _v
 		elif type(r) is list and all(is_number(item) for item in r):
 			_rs = r
 			with nogil:
-				_vs = volume(<_Graph> G._this, <vector[double]> _rs, <count> samples)
+				_vs = volume(<_Graph> dereference(G._this), <vector[double]> _rs, <count> samples)
 			return _vs
 		else:
 			pass
@@ -867,7 +867,7 @@ cdef class JaccardDistance:
 	def __cinit__(self, Graph G, vector[count] triangles):
 		self._G = G
 		self._triangles = triangles
-		self._this = new _JaccardDistance(G._this, self._triangles)
+		self._this = new _JaccardDistance(dereference(G._this), self._triangles)
 
 	def __dealloc__(self):
 		del self._this
@@ -908,7 +908,7 @@ cdef class JaccardSimilarityAttributizer:
 	def __cinit__(self, Graph G, vector[count] triangles):
 		self._G = G
 		self._triangles = triangles
-		self._this = new _JaccardDistance(G._this, self._triangles)
+		self._this = new _JaccardDistance(dereference(G._this), self._triangles)
 
 	def __dealloc__(self):
 		del self._this
@@ -967,7 +967,7 @@ cdef class AlgebraicDistance:
 
 	def __cinit__(self, Graph G, count numberSystems=10, count numberIterations=30, double omega=0.5, index norm=0, bool_t withEdgeScores=False):
 		self._G = G
-		self._this = new _AlgebraicDistance(G._this, numberSystems, numberIterations, omega, norm, withEdgeScores)
+		self._this = new _AlgebraicDistance(dereference(G._this), numberSystems, numberIterations, omega, norm, withEdgeScores)
 
 	def __dealloc__(self):
 		del self._this
@@ -1012,7 +1012,7 @@ cdef class CommuteTimeDistance(Algorithm):
 
 	def __cinit__(self,  Graph G, double tol = 0.1):
 		self._G = G
-		self._this = new _CommuteTimeDistance(G._this, tol)
+		self._this = new _CommuteTimeDistance(dereference(G._this), tol)
 
 	def runApproximation(self):
 		""" 
@@ -1129,7 +1129,7 @@ cdef class NeighborhoodFunctionHeuristic(Algorithm):
 
 	def __cinit__(self, Graph G not None, count nSamples=0, strategy=SelectionStrategy.SPLIT):
 		self._G = G
-		self._this = new _NeighborhoodFunctionHeuristic(G._this, nSamples, strategy)
+		self._this = new _NeighborhoodFunctionHeuristic(dereference(G._this), nSamples, strategy)
 
 	def getNeighborhoodFunction(self):
 		"""
@@ -1167,7 +1167,7 @@ cdef class APSP(Algorithm):
 
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _APSP(G._this)
+		self._this = new _APSP(dereference(G._this))
 
 	def __dealloc__(self):
 		self._G = None
@@ -1242,9 +1242,9 @@ cdef class SPSP(Algorithm):
 	def __cinit__(self, Graph G not None, vector[node] sources, vector[node] targets = []):
 		self._G = G
 		if not targets.empty():
-			self._this = new _SPSP(G._this, sources.begin(), sources.end(), targets.begin(), targets.end())
+			self._this = new _SPSP(dereference(G._this), sources.begin(), sources.end(), targets.begin(), targets.end())
 		else:
-			self._this = new _SPSP(G._this, sources.begin(), sources.end())
+			self._this = new _SPSP(dereference(G._this), sources.begin(), sources.end())
 
 	def __dealloc__(self):
 		self._G = None
@@ -1340,7 +1340,7 @@ cdef class DynAPSP(APSP, DynAlgorithm):
 		"""
 	def __init__(self, Graph G):
 		self._G = G
-		self._this = new _DynAPSP(G._this)
+		self._this = new _DynAPSP(dereference(G._this))
 
 
 
@@ -1371,7 +1371,7 @@ cdef class BFS(SSSP):
 
 	def __cinit__(self, Graph G, source, storePaths=True, storeNodesSortedByDistance=False, target=none):
 		self._G = G
-		self._this = new _BFS(G._this, source, storePaths, storeNodesSortedByDistance, target)
+		self._this = new _BFS(dereference(G._this), source, storePaths, storeNodesSortedByDistance, target)
 
 cdef extern from "<networkit/distance/Dijkstra.hpp>":
 
@@ -1400,7 +1400,7 @@ cdef class Dijkstra(SSSP):
 	"""
 	def __cinit__(self, Graph G, source, storePaths=True, storeNodesSortedByDistance=False, node target=none):
 		self._G = G
-		self._this = new _Dijkstra(G._this, source, storePaths, storeNodesSortedByDistance, target)
+		self._this = new _Dijkstra(dereference(G._this), source, storePaths, storeNodesSortedByDistance, target)
 
 cdef extern from "<networkit/distance/MultiTargetBFS.hpp>":
 	cdef cppclass _MultiTargetBFS "NetworKit::MultiTargetBFS"(_STSP):
@@ -1424,7 +1424,7 @@ cdef class MultiTargetBFS(STSP):
 
 	def __cinit__(self, Graph G, node source, vector[node] targets):
 		self._G = G
-		self._this = new _MultiTargetBFS(G._this, source, targets.begin(), targets.end())
+		self._this = new _MultiTargetBFS(dereference(G._this), source, targets.begin(), targets.end())
 		self.targets = targets
 
 cdef extern from "<networkit/distance/MultiTargetDijkstra.hpp>":
@@ -1449,7 +1449,7 @@ cdef class MultiTargetDijkstra(STSP):
 
 	def __cinit__(self, Graph G, node source, vector[node] targets):
 		self._G = G
-		self._this = new _MultiTargetDijkstra(G._this, source, targets.begin(), targets.end())
+		self._this = new _MultiTargetDijkstra(dereference(G._this), source, targets.begin(), targets.end())
 		self.targets = targets
 
 cdef extern from "<networkit/distance/DynBFS.hpp>":
@@ -1472,7 +1472,7 @@ cdef class DynBFS(DynSSSP):
 	"""
 	def __cinit__(self, Graph G, source):
 		self._G = G
-		self._this = new _DynBFS(G._this, source)
+		self._this = new _DynBFS(dereference(G._this), source)
 
 cdef extern from "<networkit/distance/DynDijkstra.hpp>":
 
@@ -1495,7 +1495,7 @@ cdef class DynDijkstra(DynSSSP):
 	"""
 	def __cinit__(self, Graph G, source):
 		self._G = G
-		self._this = new _DynDijkstra(G._this, source)
+		self._this = new _DynDijkstra(dereference(G._this), source)
 
 cdef cppclass PathCallbackWrapper:
 	void* callback
@@ -1538,7 +1538,7 @@ cdef class BidirectionalBFS(STSP):
 	"""
 
 	def __cinit__(self, Graph G, node source, node target, bool_t storePred=True):
-		self._this = new _BidirectionalBFS(G._this, source, target, storePred)
+		self._this = new _BidirectionalBFS(dereference(G._this), source, target, storePred)
 
 cdef extern from "<networkit/distance/BidirectionalDijkstra.hpp>":
 	cdef cppclass _BidirectionalDijkstra "NetworKit::BidirectionalDijkstra"(_STSP):
@@ -1568,7 +1568,7 @@ cdef class BidirectionalDijkstra(STSP):
 	"""
 
 	def __cinit__(self, Graph G, node source, node target, bool_t storePred=True):
-		self._this = new _BidirectionalDijkstra(G._this, source, target, storePred)
+		self._this = new _BidirectionalDijkstra(dereference(G._this), source, target, storePred)
 
 cdef extern from "<networkit/distance/AStar.hpp>":
 	cdef cppclass _AStar "NetworKit::AStar"(_STSP):
@@ -1598,7 +1598,7 @@ cdef class AStar(STSP):
 	cdef vector[double] heu
 	def __cinit__(self, Graph G, vector[double] &heu, node source, node target, bool_t storePred=True):
 		self.heu = heu
-		self._this = new _AStar(G._this, self.heu, source, target, storePred)
+		self._this = new _AStar(dereference(G._this), self.heu, source, target, storePred)
 
 cdef extern from "<networkit/reachability/AllSimplePaths.hpp>":
 
@@ -1633,7 +1633,7 @@ cdef class AllSimplePaths:
 
 	def __cinit__(self,  Graph G, source, target, cutoff=none):
 		self._G = G
-		self._this = new _AllSimplePaths(G._this, source, target, cutoff)
+		self._this = new _AllSimplePaths(dereference(G._this), source, target, cutoff)
 		from warnings import warn
 		warn("networkit.distance.AllSimplePaths is deprecated, use networkit.reachability.AllSimplePaths")
 
@@ -1715,7 +1715,7 @@ cdef class ReverseBFS(SSSP):
 
 	def __cinit__(self, Graph G, source, storePaths=True, storeNodesSortedByDistance=False, target=none):
 		self._G = G
-		self._this = new _ReverseBFS(G._this, source, storePaths, storeNodesSortedByDistance, target)
+		self._this = new _ReverseBFS(dereference(G._this), source, storePaths, storeNodesSortedByDistance, target)
 
 cdef extern from "<networkit/distance/PrunedLandmarkLabeling.hpp>":
 
@@ -1742,7 +1742,7 @@ cdef class PrunedLandmarkLabeling(Algorithm):
 
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _PrunedLandmarkLabeling(G._this)
+		self._this = new _PrunedLandmarkLabeling(dereference(G._this))
 
 	def __dealloc__(self):
 		self._G = None
@@ -1795,7 +1795,7 @@ cdef class DynPrunedLandmarkLabeling(Algorithm, DynAlgorithm):
 
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _DynPrunedLandmarkLabeling(G._this)
+		self._this = new _DynPrunedLandmarkLabeling(dereference(G._this))
 
 	def __dealloc__(self):
 		self._G = None

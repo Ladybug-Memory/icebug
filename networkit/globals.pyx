@@ -42,7 +42,7 @@ cdef class ClusteringCoefficient:
 		"""
 		cdef double ret
 		with nogil:
-			ret = sequentialAvgLocal(G._this)
+			ret = sequentialAvgLocal(dereference(G._this))
 		return ret
 
 	@staticmethod
@@ -61,7 +61,7 @@ cdef class ClusteringCoefficient:
 		"""
 		cdef double ret
 		with nogil:
-			ret = approxAvgLocal(G._this, trials)
+			ret = approxAvgLocal(dereference(G._this), trials)
 		return ret
 
 	@staticmethod
@@ -78,7 +78,7 @@ cdef class ClusteringCoefficient:
 		"""
 		cdef double ret
 		with nogil:
-			ret = exactGlobal(G._this)
+			ret = exactGlobal(dereference(G._this))
 		return ret
 
 	@staticmethod
@@ -97,7 +97,7 @@ cdef class ClusteringCoefficient:
 		"""
 		cdef double ret
 		with nogil:
-			ret = approxGlobal(G._this, trials)
+			ret = approxGlobal(dereference(G._this), trials)
 		return ret
 
 #external imports

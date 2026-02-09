@@ -58,6 +58,7 @@ cdef extern from "<algorithm>" namespace "std":
 
 cdef extern from "<memory>" namespace "std":
 	shared_ptr[T] static_pointer_cast[T, U](shared_ptr[U] ptr) nogil
+	shared_ptr[T] make_shared[T](...) nogil
 
 cdef extern from "cython_helper.h":
 	void throw_runtime_error(string message)
@@ -78,11 +79,8 @@ cdef extern from "<networkit/graph/Graph.hpp>":
 		edgeweight weight
 
 	cdef cppclass _Graph "NetworKit::Graph":
-		_Graph() except +
-		_Graph(count, bool_t, bool_t, bool_t) except +
-		_Graph(const _Graph& other) except +
-		_Graph(const _Graph& other, bool_t weighted, bool_t directed, bool_t edgesIndexed) except +
-		_Graph(count n, bool_t directed, shared_ptr[UInt64Array] outIndices, shared_ptr[UInt64Array] outIndptr, shared_ptr[UInt64Array] inIndices, shared_ptr[UInt64Array] inIndptr) except +
+		# Graph is now abstract - cannot be instantiated directly
+		# Use GraphW or GraphR instead
 		bool_t hasEdgeIds() except +
 		edgeid edgeId(node, node) except +
 		count numberOfNodes() except +
@@ -153,6 +151,12 @@ cdef extern from "<networkit/graph/GraphW.hpp>":
 		void swapEdge(node s1, node t1, node s2, node t2) except +
 		void compactEdges() except +
 		void sortEdges() except +
+
+cdef extern from "<networkit/graph/GraphR.hpp>":
+	cdef cppclass _GraphR "NetworKit::GraphR" (_Graph):
+		_GraphR(count n, bool_t directed, vector[node] outIndices, vector[index] outIndptr, vector[node] inIndices, vector[index] inIndptr) except +
+		_GraphR(count n, bool_t directed, shared_ptr[UInt64Array] outIndices, shared_ptr[UInt64Array] outIndptr, shared_ptr[UInt64Array] inIndices, shared_ptr[UInt64Array] inIndptr) except +
+		_GraphR(const _GraphR& other) except +
 
 cdef extern from "<networkit/graph/Graph.hpp>":
 	cdef cppclass _NodeIterator "NetworKit::Graph::NodeIterator":
@@ -339,7 +343,7 @@ cdef extern from "<networkit/graph/Graph.hpp>":
 		void swap(_EdgeStringAttribute& other)
 
 cdef class Graph:
-	cdef _Graph _this
+	cdef shared_ptr[_Graph] _this  # Polymorphic: can hold GraphW or GraphR
 	cdef dict _arrow_arrays
 	cdef setThis(self, _Graph& other)
 	cdef setThisFromGraphW(self, _GraphW& other)

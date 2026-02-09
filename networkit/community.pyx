@@ -146,7 +146,7 @@ cdef class ClusteringGenerator:
 		networkit.Partition
 			The generated partition.
 		"""
-		return Partition().setThis(self._this.makeSingletonClustering(G._this))
+		return Partition().setThis(self._this.makeSingletonClustering(dereference(G._this)))
 	def makeOneClustering(self, Graph G):
 		"""  
 		makeOneClustering(G)
@@ -163,7 +163,7 @@ cdef class ClusteringGenerator:
 		networkit.Partition
 			The generated partition.
 		"""
-		return Partition().setThis(self._this.makeOneClustering(G._this))
+		return Partition().setThis(self._this.makeOneClustering(dereference(G._this)))
 	def makeRandomClustering(self, Graph G, count k):
 		"""  
 		makeRandomClustering(G, k)
@@ -182,7 +182,7 @@ cdef class ClusteringGenerator:
 		networkit.Partition
 			The generated partition.
 		"""
-		return Partition().setThis(self._this.makeRandomClustering(G._this, k))
+		return Partition().setThis(self._this.makeRandomClustering(dereference(G._this), k))
 	def makeContinuousBalancedClustering(self, Graph G, count k):
 		"""  
 		makeContinuousBalancedClustering(G, k)
@@ -201,7 +201,7 @@ cdef class ClusteringGenerator:
 		networkit.Partition
 			The generated partition.
 		"""
-		return Partition().setThis(self._this.makeContinuousBalancedClustering(G._this, k))
+		return Partition().setThis(self._this.makeContinuousBalancedClustering(dereference(G._this), k))
 	def makeNoncontinuousBalancedClustering(self, Graph G, count k):
 		"""  
 		makeNoncontinuousBalancedClustering(G, k)
@@ -222,7 +222,7 @@ cdef class ClusteringGenerator:
 		networkit.Partition
 			The generated partition.
 		"""
-		return Partition().setThis(self._this.makeNoncontinuousBalancedClustering(G._this, k))
+		return Partition().setThis(self._this.makeNoncontinuousBalancedClustering(dereference(G._this), k))
 
 cdef extern from "<networkit/community/GraphClusteringTools.hpp>" namespace "NetworKit::GraphClusteringTools":
 
@@ -256,9 +256,9 @@ cdef class GraphClusteringTools:
 			Imbalance of the partition.
 		"""
 		if graph is not None:
-			return getImbalance(zeta._this, G._this)
+			return getImbalance(dereference(zeta._this), dereference(G._this))
 		else:
-			return getImbalance(zeta._this)
+			return getImbalance(dereference(zeta._this))
 
 	@staticmethod
 	def communicationGraph(Graph graph, Partition zeta):
@@ -285,7 +285,7 @@ cdef class GraphClusteringTools:
 		networkit.Graph
 			Communication graph given by the input graph and its partition.
 		"""
-		return Graph().setThis(communicationGraph(graph._this, zeta._this))
+		return Graph().setThis(communicationGraph(dereference(graph._this), dereference(zeta._this)))
 	@staticmethod
 	def weightedDegreeWithCluster(Graph graph, Partition zeta, node u, index cid):
 		"""  
@@ -309,7 +309,7 @@ cdef class GraphClusteringTools:
 		float
 			weighted degree of node u for cluster index cid.
 		"""
-		return weightedDegreeWithCluster(graph._this, zeta._this, u, cid)
+		return weightedDegreeWithCluster(dereference(graph._this), dereference(zeta._this), u, cid)
 	@staticmethod
 	def isProperClustering(Graph G, Partition zeta):
 		"""  
@@ -329,7 +329,7 @@ cdef class GraphClusteringTools:
 		bool
 			True if the partition is a proper clustering, False if not.
 		"""
-		return isProperClustering(G._this, zeta._this)
+		return isProperClustering(dereference(G._this), dereference(zeta._this))
 	@staticmethod
 	def isSingletonClustering(Graph G, Partition zeta):
 		"""  
@@ -349,7 +349,7 @@ cdef class GraphClusteringTools:
 		bool
 			True if the partition is a singleton clustering, False if not.
 		"""
-		return isSingletonClustering(G._this, zeta._this)
+		return isSingletonClustering(dereference(G._this), dereference(zeta._this))
 	@staticmethod
 	def isOneClustering(Graph G, Partition zeta):
 		"""  
@@ -369,7 +369,7 @@ cdef class GraphClusteringTools:
 		bool
 			True if the partition is a one clustering, False if not.
 		"""
-		return isOneClustering(G._this, zeta._this)
+		return isOneClustering(dereference(G._this), dereference(zeta._this))
 	@staticmethod
 	def equalClustering(Partition zeta, Partition eta, Graph G):
 		"""  
@@ -391,7 +391,7 @@ cdef class GraphClusteringTools:
 		bool
 			True if both partitions are the same, False if not.
 		"""
-		return equalClusterings(zeta._this, eta._this, G._this)
+		return equalClusterings(dereference(zeta._this), eta._this, dereference(G._this))
 
 cdef extern from "<networkit/community/PartitionIntersection.hpp>":
 
@@ -425,7 +425,7 @@ cdef class PartitionIntersection:
 		networkit.Partition
 			The intersection of zeta and eta.
 		"""
-		return Partition().setThis(self._this.calculate(zeta._this, eta._this))
+		return Partition().setThis(self._this.calculate(dereference(zeta._this), eta._this))
 
 cdef extern from "<networkit/community/Coverage.hpp>":
 
@@ -459,7 +459,7 @@ cdef class Coverage:
 		float
 			The coverage in the given Partition.
 		"""
-		return self._this.getQuality(zeta._this, G._this)
+		return self._this.getQuality(dereference(zeta._this), dereference(G._this))
 
 
 cdef extern from "<networkit/community/EdgeCut.hpp>":
@@ -494,7 +494,7 @@ cdef class EdgeCut:
 		float
 			The edgeCut in the given Partition.
 		"""
-		return self._this.getQuality(zeta._this, G._this)
+		return self._this.getQuality(dereference(zeta._this), dereference(G._this))
 
 
 cdef extern from "<networkit/community/Modularity.hpp>":
@@ -542,7 +542,7 @@ cdef class Modularity:
 		"""
 		cdef double ret
 		with nogil:
-			ret = self._this.getQuality(zeta._this, G._this)
+			ret = self._this.getQuality(dereference(zeta._this), dereference(G._this))
 		return ret
 
 cdef extern from "<networkit/community/HubDominance.hpp>":
@@ -590,7 +590,7 @@ cdef class HubDominance:
 		float
 			The average hub dominance in the given Partition or Cover.
 		"""
-		return self._this.getQuality(zeta._this, G._this)
+		return self._this.getQuality(dereference(zeta._this), dereference(G._this))
 
 cdef extern from "<networkit/community/PLM.hpp>":
 
@@ -633,7 +633,7 @@ cdef class PLM(CommunityDetector):
 
 	def __cinit__(self, Graph G not None, refine=False, gamma=1.0, par="balanced", maxIter=32, turbo=True, recurse=True):
 		self._G = G
-		self._this = new _PLM(G._this, refine, gamma, stdstring(par), maxIter, turbo, recurse)
+		self._this = new _PLM(dereference(G._this), refine, gamma, stdstring(par), maxIter, turbo, recurse)
 
 	def getTiming(self):
 		"""  
@@ -670,7 +670,7 @@ cdef class PLM(CommunityDetector):
 		networkit.Graph
 			Pair of coarsened graph and node-mappings from fine to coarse graph.
 		"""
-		cdef pair[_Graph, vector[node]] result = move(PLM_coarsen(G._this, zeta._this))
+		cdef pair[_Graph, vector[node]] result = move(PLM_coarsen(dereference(G._this), dereference(zeta._this)))
 		return (Graph().setThis(result.first), result.second)
 
 	@staticmethod
@@ -738,7 +738,7 @@ cdef class ParallelLeiden(CommunityDetector):
 
 	def __cinit__(self, Graph G not None, int iterations = 3, bool_t randomize = True, double gamma = 1):
 		self._G = G
-		self._this = new _ParallelLeiden(G._this,iterations,randomize,gamma)
+		self._this = new _ParallelLeiden(dereference(G._this),iterations,randomize,gamma)
 
 cdef class ParallelLeidenView(CommunityDetector):
 	""" 
@@ -775,7 +775,7 @@ cdef class ParallelLeidenView(CommunityDetector):
 
 	def __cinit__(self, Graph G not None, int iterations = 3, bool_t randomize = True, double gamma = 1):
 		self._G = G
-		self._this = new _ParallelLeidenView(G._this,iterations,randomize,gamma)
+		self._this = new _ParallelLeidenView(dereference(G._this),iterations,randomize,gamma)
 
 cdef extern from "<networkit/community/LouvainMapEquation.hpp>":
 	cdef cppclass _LouvainMapEquation "NetworKit::LouvainMapEquation"(_CommunityDetectionAlgorithm):
@@ -801,7 +801,7 @@ cdef class LouvainMapEquation(CommunityDetector):
 
 	def __cinit__(self, Graph G not None, hierarchical = False, maxIterations = 32, parallelizationStrategy = "relaxmap"):
 		self._G = G
-		self._this = new _LouvainMapEquation(G._this, hierarchical, maxIterations, stdstring(parallelizationStrategy))
+		self._this = new _LouvainMapEquation(dereference(G._this), hierarchical, maxIterations, stdstring(parallelizationStrategy))
 
 cdef extern from "<networkit/community/PLP.hpp>":
 
@@ -850,9 +850,9 @@ cdef class PLP(CommunityDetector):
 
 
 		if baseClustering is None:
-			self._this = new _PLP(G._this, updateThreshold, maxIterations)
+			self._this = new _PLP(dereference(G._this), updateThreshold, maxIterations)
 		else:
-			self._this = new _PLP(G._this, baseClustering._this, updateThreshold)
+			self._this = new _PLP(dereference(G._this), baseClustering._this, updateThreshold)
 
 
 	def numberOfIterations(self):
@@ -918,7 +918,7 @@ cdef class LFM(OverlappingCommunityDetector):
 	def __cinit__(self, Graph G not None, SelectiveCommunityDetector scd not None):
 		self._G = G
 		self._scd = scd
-		self._this = new _LFM(G._this, dereference(scd._this))
+		self._this = new _LFM(dereference(G._this), dereference(scd._this))
 
 cdef extern from "<networkit/community/LPDegreeOrdered.hpp>":
 
@@ -934,7 +934,7 @@ cdef class LPDegreeOrdered(CommunityDetector):
 
 	def __cinit__(self, Graph G not None):
 		self._G = G
-		self._this = new _LPDegreeOrdered(G._this)
+		self._this = new _LPDegreeOrdered(dereference(G._this))
 
 	def numberOfIterations(self):
 		""" 
@@ -977,7 +977,7 @@ cdef class CutClustering(CommunityDetector):
 	"""
 	def __cinit__(self, Graph G not None,  edgeweight alpha):
 		self._G = G
-		self._this = new _CutClustering(G._this, alpha)
+		self._this = new _CutClustering(dereference(G._this), alpha)
 
 	@staticmethod
 	def getClusterHierarchy(Graph G not None):
@@ -1005,7 +1005,7 @@ cdef class CutClustering(CommunityDetector):
 		cdef map[double, _Partition] result
 		# FIXME: this probably copies the whole hierarchy because of exception handling, using move might fix this
 		with nogil:
-			result = CutClustering_getClusterHierarchy(G._this)
+			result = CutClustering_getClusterHierarchy(dereference(G._this))
 		pyResult = {}
 		# FIXME: this code copies the partitions a lot!
 		for res in result:
@@ -1054,7 +1054,7 @@ cdef class NodeStructuralRandMeasure(DissimilarityMeasure):
 		"""			
 		cdef double ret
 		with nogil:
-			ret = self._this.getDissimilarity(G._this, first._this, second._this)
+			ret = self._this.getDissimilarity(dereference(G._this), first._this, second._this)
 		return ret
 
 
@@ -1095,7 +1095,7 @@ cdef class GraphStructuralRandMeasure(DissimilarityMeasure):
 		"""		
 		cdef double ret
 		with nogil:
-			ret = self._this.getDissimilarity(G._this, first._this, second._this)
+			ret = self._this.getDissimilarity(dereference(G._this), first._this, second._this)
 		return ret
 
 
@@ -1133,7 +1133,7 @@ cdef class JaccardMeasure(DissimilarityMeasure):
 		"""	
 		cdef double ret
 		with nogil:
-			ret = self._this.getDissimilarity(G._this, first._this, second._this)
+			ret = self._this.getDissimilarity(dereference(G._this), first._this, second._this)
 		return ret
 
 cdef extern from "<networkit/community/NMIDistance.hpp>":
@@ -1173,7 +1173,7 @@ cdef class NMIDistance(DissimilarityMeasure):
 		"""			
 		cdef double ret
 		with nogil:
-			ret = self._this.getDissimilarity(G._this, first._this, second._this)
+			ret = self._this.getDissimilarity(dereference(G._this), first._this, second._this)
 		return ret
 
 cdef extern from "<networkit/community/AdjustedRandMeasure.hpp>":
@@ -1211,7 +1211,7 @@ cdef class AdjustedRandMeasure(DissimilarityMeasure):
 		"""	
 		cdef double ret
 		with nogil:
-			ret = self._this.getDissimilarity(G._this, first._this, second._this)
+			ret = self._this.getDissimilarity(dereference(G._this), first._this, second._this)
 		return ret
 
 cdef extern from "<networkit/community/LocalCommunityEvaluation.hpp>":
@@ -1425,7 +1425,7 @@ cdef class IntrapartitionDensity(LocalPartitionEvaluation):
 		The partition that shall be evaluated.
 	"""
 	def __cinit__(self):
-		self._this = new _IntrapartitionDensity(self._G._this, self._P._this)
+		self._this = new _IntrapartitionDensity(self._dereference(G._this), self._P._this)
 
 	def getGlobal(self):
 		""" 
@@ -1474,7 +1474,7 @@ cdef class IsolatedInterpartitionConductance(LocalPartitionEvaluation):
 		The partition that shall be evaluated.
 	"""
 	def __cinit__(self):
-		self._this = new _IsolatedInterpartitionConductance(self._G._this, self._P._this)
+		self._this = new _IsolatedInterpartitionConductance(self._dereference(G._this), self._P._this)
 
 cdef extern from "<networkit/community/IsolatedInterpartitionExpansion.hpp>":
 
@@ -1507,7 +1507,7 @@ cdef class IsolatedInterpartitionExpansion(LocalPartitionEvaluation):
 		The partition that shall be evaluated.
 	"""
 	def __cinit__(self):
-		self._this = new _IsolatedInterpartitionExpansion(self._G._this, self._P._this)
+		self._this = new _IsolatedInterpartitionExpansion(self._dereference(G._this), self._P._this)
 
 cdef extern from "<networkit/community/CoverHubDominance.hpp>":
 
@@ -1538,7 +1538,7 @@ cdef class CoverHubDominance(LocalCoverEvaluation):
 		The cover that shall be evaluated.
 	"""
 	def __cinit__(self):
-		self._this = new _CoverHubDominance(self._G._this, self._C._this)
+		self._this = new _CoverHubDominance(self._dereference(G._this), self._C._this)
 
 cdef extern from "<networkit/community/PartitionHubDominance.hpp>":
 
@@ -1568,7 +1568,7 @@ cdef class PartitionHubDominance(LocalPartitionEvaluation):
 		The partition that shall be evaluated.
 	"""
 	def __cinit__(self):
-		self._this = new _PartitionHubDominance(self._G._this, self._P._this)
+		self._this = new _PartitionHubDominance(self._dereference(G._this), self._P._this)
 
 cdef extern from "<networkit/community/PartitionFragmentation.hpp>":
 
@@ -1590,7 +1590,7 @@ cdef class PartitionFragmentation(LocalPartitionEvaluation):
 		The partition that shall be evaluated.
 	"""
 	def __cinit__(self):
-		self._this = new _PartitionFragmentation(self._G._this, self._P._this)
+		self._this = new _PartitionFragmentation(self._dereference(G._this), self._P._this)
 
 cdef extern from "<networkit/community/StablePartitionNodes.hpp>":
 
@@ -1615,7 +1615,7 @@ cdef class StablePartitionNodes(LocalPartitionEvaluation):
 		The partition that shall be evaluated.
 	"""
 	def __cinit__(self):
-		self._this = new _StablePartitionNodes(self._G._this, self._P._this)
+		self._this = new _StablePartitionNodes(self._dereference(G._this), self._P._this)
 
 
 	def isStable(self, node u):
@@ -1675,7 +1675,7 @@ cdef class CoverF1Similarity(LocalCoverEvaluation):
 	"""
 	cdef Cover _reference
 	def __cinit__(self, Graph G not None, Cover C not None, Cover reference not None):
-		self._this = new _CoverF1Similarity(G._this, C._this, reference._this)
+		self._this = new _CoverF1Similarity(dereference(G._this), C._this, reference._this)
 		self._reference = reference
 		assert(self._G == G)
 		assert(self._C == C)
@@ -2067,10 +2067,10 @@ cdef class OverlappingNMIDistance(DissimilarityMeasure):
 		cdef double ret
 		if isinstance(first, Partition) and isinstance(second, Partition):
 			with nogil:
-				ret = self._this.getDissimilarity(G._this, (<Partition>(first))._this, (<Partition>(second))._this)
+				ret = self._this.getDissimilarity(dereference(G._this), (<Partition>(first))._this, (<Partition>(second))._this)
 		elif isinstance(first, Cover) and isinstance(second, Cover):
 			with nogil:
-				ret = self._this.getDissimilarity(G._this, (<Cover>(first))._this, (<Cover>(second))._this)
+				ret = self._this.getDissimilarity(dereference(G._this), (<Cover>(first))._this, (<Cover>(second))._this)
 		else:
 			raise TypeError("Error, first and second must both be either a Partition or a Cover")
 		return ret
