@@ -968,7 +968,7 @@ TEST_F(IOGTest, testNetworkitBinaryKonectIndexed) {
     ASSERT_TRUE(!G.isEmpty());
 
     NetworkitBinaryReader reader;
-    Graph G2 = reader.read("output/binary_konect");
+    GraphW G2 = reader.read("output/binary_konect");
     EXPECT_EQ(G2.isDirected(), true);
     EXPECT_EQ(G2.isWeighted(), true);
     ASSERT_EQ(G2.numberOfEdges(), G.numberOfEdges());
@@ -1009,7 +1009,7 @@ TEST_F(IOGTest, testNetworkitBinaryJazzIndexed) {
     ASSERT_TRUE(!G.isEmpty());
 
     NetworkitBinaryReader reader;
-    Graph G2 = reader.read("output/binary_jazz");
+    GraphW G2 = reader.read("output/binary_jazz");
     EXPECT_EQ(G2.isDirected(), false);
     EXPECT_EQ(G2.isWeighted(), false);
     ASSERT_EQ(G2.numberOfEdges(), G.numberOfEdges());
@@ -1044,7 +1044,7 @@ TEST_F(IOGTest, testNetworkitBinaryWikiIndexed) {
     ASSERT_TRUE(!G.isEmpty());
 
     NetworkitBinaryReader reader;
-    Graph G2 = reader.read("output/binary_wiki");
+    GraphW G2 = reader.read("output/binary_wiki");
     EXPECT_EQ(G2.isDirected(), true);
     EXPECT_EQ(G2.isWeighted(), false);
     ASSERT_EQ(G2.numberOfEdges(), G.numberOfEdges());

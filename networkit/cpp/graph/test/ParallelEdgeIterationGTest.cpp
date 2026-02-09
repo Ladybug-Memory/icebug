@@ -9,7 +9,7 @@
 #include <arrow/array.h>
 #include <arrow/buffer.h>
 #include <gtest/gtest.h>
-#include <networkit/graph/Graph.hpp>
+#include <networkit/graph/GraphR.hpp>
 
 namespace NetworKit {
 
@@ -36,7 +36,7 @@ TEST_F(ParallelEdgeIterationGTest, testParallelForEdgesCSR) {
     ASSERT_TRUE(indptrBuilder.Finish(&indptrArray).ok());
     auto indptrArrow = std::static_pointer_cast<arrow::UInt64Array>(indptrArray);
 
-    Graph G(n, false, indicesArrow, indptrArrow, indicesArrow, indptrArrow);
+    GraphR G(n, false, indicesArrow, indptrArrow, indicesArrow, indptrArrow);
 
     EXPECT_EQ(G.numberOfNodes(), 3);
     EXPECT_EQ(G.numberOfEdges(), 6); // Undirected stores both directions
@@ -88,7 +88,7 @@ TEST_F(ParallelEdgeIterationGTest, testParallelForEdgesDirectedCSR) {
     ASSERT_TRUE(inIndptrBuilder.Finish(&inIndptrArray).ok());
     auto inIndptrArrow = std::static_pointer_cast<arrow::UInt64Array>(inIndptrArray);
 
-    Graph G(n, true, outIndicesArrow, outIndptrArrow, inIndicesArrow, inIndptrArrow);
+    GraphR G(n, true, outIndicesArrow, outIndptrArrow, inIndicesArrow, inIndptrArrow);
 
     EXPECT_EQ(G.numberOfNodes(), 3);
     EXPECT_EQ(G.numberOfEdges(), 3);
@@ -143,7 +143,7 @@ TEST_F(ParallelEdgeIterationGTest, testParallelForEdgesLargeGraph) {
     ASSERT_TRUE(indptrBuilder.Finish(&indptrArray).ok());
     auto indptrArrow = std::static_pointer_cast<arrow::UInt64Array>(indptrArray);
 
-    Graph G(n, false, indicesArrow, indptrArrow, indicesArrow, indptrArrow);
+    GraphR G(n, false, indicesArrow, indptrArrow, indicesArrow, indptrArrow);
 
     EXPECT_EQ(G.numberOfNodes(), n);
 
@@ -199,7 +199,7 @@ TEST_F(ParallelEdgeIterationGTest, testPageRankStyleIteration) {
     ASSERT_TRUE(indptrBuilder.Finish(&indptrArray).ok());
     auto indptrArrow = std::static_pointer_cast<arrow::UInt64Array>(indptrArray);
 
-    Graph G(n, false, indicesArrow, indptrArrow, indicesArrow, indptrArrow);
+    GraphR G(n, false, indicesArrow, indptrArrow, indicesArrow, indptrArrow);
 
     // Run the pattern many times to ensure no hangs
     for (int iteration = 0; iteration < 50; iteration++) {

@@ -22,7 +22,7 @@ TEST_F(Graph2Benchmark, graphConstruction) {
     INFO("[BEGIN] (n=", n, ")");
     run.start();
 
-    Graph G(n);
+    GraphW G(n);
 
     run.stop();
     INFO("[DONE]", run.elapsedTag());
@@ -30,7 +30,7 @@ TEST_F(Graph2Benchmark, graphConstruction) {
 
 TEST_F(Graph2Benchmark, nodeIteration) {
     count n = 1e+7;
-    Graph G(n);
+    GraphW G(n);
 
     std::vector<node> nodes(n, 0);
 
@@ -46,7 +46,7 @@ TEST_F(Graph2Benchmark, nodeIteration) {
 
 TEST_F(Graph2Benchmark, parallelNodeIteration) {
     count n = 1e+7;
-    Graph G(n);
+    GraphW G(n);
 
     std::vector<node> nodes(n, 0);
 
@@ -62,7 +62,7 @@ TEST_F(Graph2Benchmark, parallelNodeIteration) {
 
 TEST_F(Graph2Benchmark, nodePairIteration) {
     count n = 1e+4;
-    Graph G(n);
+    GraphW G(n);
 
     Aux::Timer run;
     INFO("[BEGIN] (n=", n, ")");
@@ -150,7 +150,7 @@ TEST_F(Graph2Benchmark, parallelEdgeIteration) {
 
 TEST_F(Graph2Benchmark, parallelSumForNodes) {
     count n = 1e+7;
-    Graph G(n);
+    GraphW G(n);
 
     double sum = G.parallelSumForNodes([&](node) { return 1; });
 

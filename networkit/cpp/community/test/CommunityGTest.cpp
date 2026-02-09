@@ -128,7 +128,7 @@ TEST_F(CommunityGTest, testCommunicationGraph) {
     Partition halves = clusteringGenerator.makeContinuousBalancedClustering(G, parts);
 
     GraphW cg = GraphClusteringTools::communicationGraph(G, halves);
-    // only intra partition edges are (0,3, 2.5) and (1,2, 3.0) -> commGraph edgeweight=5.5
+    // only intra partition edges are (0,3, 2.5) and (1,2, 3.0) -> commGraphW edgeweight=5.5
     EXPECT_EQ(cg.numberOfNodes(), parts);
     EXPECT_EQ(cg.totalEdgeWeight(), 5.5);
 }
@@ -180,7 +180,7 @@ TEST_F(CommunityGTest, testIsolatedInterpartitionExpansion) {
 
 TEST_F(CommunityGTest, testStablePartitionNodes) {
     METISGraphReader reader;
-    Graph G = reader.read("input/PGPgiantcompo.graph");
+    GraphW G = reader.read("input/PGPgiantcompo.graph");
 
     ClusteringGenerator clusteringGenerator;
     Partition halves = clusteringGenerator.makeContinuousBalancedClustering(G, 2);
@@ -192,7 +192,7 @@ TEST_F(CommunityGTest, testStablePartitionNodes) {
 
 TEST_F(CommunityGTest, testLPdegreeOrdered) {
     METISGraphReader reader;
-    Graph G = reader.read("input/PGPgiantcompo.graph");
+    GraphW G = reader.read("input/PGPgiantcompo.graph");
 
     LPDegreeOrdered LP(G);
     LP.run();
@@ -284,7 +284,7 @@ TEST_F(CommunityGTest, testLabelPropagationOnManySmallClusters) {
 TEST_F(CommunityGTest, testPLM) {
     METISGraphReader reader;
     Modularity modularity;
-    Graph G = reader.read("input/PGPgiantcompo.graph");
+    GraphW G = reader.read("input/PGPgiantcompo.graph");
 
     PLM plm(G, false, 1.0);
     plm.run();
@@ -306,7 +306,7 @@ TEST_F(CommunityGTest, testPLM) {
 TEST_F(CommunityGTest, testParallelLeiden) {
     METISGraphReader reader;
     Modularity modularity;
-    Graph G = reader.read("input/caidaRouterLevel.graph");
+    GraphW G = reader.read("input/caidaRouterLevel.graph");
 
     ParallelLeiden pl(G);
     pl.VECTOR_OVERSIZE = 1;
@@ -359,7 +359,7 @@ TEST_F(CommunityGTest, testModularity) {
     DEBUG("testing modularity on clustering of complete graph with ", n, " nodes");
 
     // make complete graph
-    GraphW G = Graph(n);
+    GraphW G(n);
     G.forNodePairs([&](node u, node v) { G.addEdge(u, v); });
     DEBUG("total edge weight: ", G.totalEdgeWeight());
 
@@ -390,7 +390,7 @@ TEST_F(CommunityGTest, testCoverage) {
     DEBUG("testing coverage on clustering of complete graph with ", n, " nodes");
 
     // make complete graph
-    GraphW G = Graph(n);
+    GraphW G(n);
     G.forNodePairs([&](node u, node v) { G.addEdge(u, v); });
 
     ClusteringGenerator clusteringGenerator;
@@ -418,7 +418,7 @@ TEST_F(CommunityGTest, testClusteringEquality) {
     count n = 100;
 
     // make complete graph
-    GraphW G = Graph(n);
+    GraphW G(n);
     G.forNodePairs([&](node u, node v) { G.addEdge(u, v); });
 
     ClusteringGenerator clusteringGen;
@@ -469,7 +469,7 @@ TEST_F(CommunityGTest, testEdgeCutMeasure) {
 TEST_F(CommunityGTest, testJaccardMeasure) {
     count n = 100;
     // make complete graph
-    GraphW G = Graph(n);
+    GraphW G(n);
     G.forNodePairs([&](node u, node v) { G.addEdge(u, v); });
 
     ClusteringGenerator clusteringGen;
@@ -486,7 +486,7 @@ TEST_F(CommunityGTest, testJaccardMeasure) {
 TEST_F(CommunityGTest, testNodeStructuralRandMeasure) {
     count n = 100;
     // make complete graph
-    GraphW G = Graph(n);
+    GraphW G(n);
     G.forNodePairs([&](node u, node v) { G.addEdge(u, v); });
 
     ClusteringGenerator clusteringGen;
@@ -502,7 +502,7 @@ TEST_F(CommunityGTest, testNodeStructuralRandMeasure) {
 TEST_F(CommunityGTest, testGraphStructuralRandMeasure) {
     count n = 100;
     // make complete graph
-    GraphW G = Graph(n);
+    GraphW G(n);
     G.forNodePairs([&](node u, node v) { G.addEdge(u, v); });
 
     ClusteringGenerator clusteringGen;
@@ -518,7 +518,7 @@ TEST_F(CommunityGTest, testGraphStructuralRandMeasure) {
 
 TEST_F(CommunityGTest, testNMIDistance) {
     // two 1-clusterings should have NMID = 0 because H is 0
-    Graph G(1000);
+    GraphW G(1000);
 
     ClusteringGenerator clustGen;
     Partition one1 = clustGen.makeOneClustering(G);
@@ -555,7 +555,7 @@ TEST_F(CommunityGTest, testNMIDistance) {
 TEST_F(CommunityGTest, testSampledRandMeasures) {
     count n = 42;
     // make complete graph
-    GraphW G = Graph(n);
+    GraphW G(n);
     G.forNodePairs([&](node u, node v) { G.addEdge(u, v); });
     ClusteringGenerator clusteringGenerator;
     Partition one = clusteringGenerator.makeOneClustering(G);
@@ -567,8 +567,8 @@ TEST_F(CommunityGTest, testSampledRandMeasures) {
 
 TEST_F(CommunityGTest, debugParallelAgglomerativeAndPLM) {
     METISGraphReader reader;
-    Graph jazz = reader.read("input/jazz.graph");
-    Graph blog = reader.read("input/polblogs.graph");
+    GraphW jazz = reader.read("input/jazz.graph");
+    GraphW blog = reader.read("input/polblogs.graph");
     // FIXME: implementation of ParallelAgglomerativeClusterer needs overhaul
     Modularity modularity;
     ParallelAgglomerativeClusterer aggl(jazz);
@@ -606,7 +606,7 @@ TEST_F(CommunityGTest, testClusteringIntersection) {
     PartitionIntersection intersection;
     // make complete graph
     count n = 1200;
-    GraphW G = Graph(n);
+    GraphW G(n);
     G.forNodePairs([&](node u, node v) { G.addEdge(u, v); });
 
     ClusteringGenerator clusteringGenerator;
@@ -639,7 +639,7 @@ TEST_F(CommunityGTest, testMakeNoncontinuousClustering) {
     ClusteringGenerator generator;
     // make complete graph
     count n = 100;
-    GraphW G = Graph(n);
+    GraphW G(n);
     G.forNodePairs([&](node u, node v) { G.addEdge(u, v); });
 
     Partition con = generator.makeContinuousBalancedClustering(G, 10);
@@ -660,7 +660,7 @@ TEST_F(CommunityGTest, testHubDominance) {
 
     // make complete graph
     count n = 100;
-    GraphW G = Graph(n);
+    GraphW G(n);
     G.forNodePairs([&](node u, node v) { G.addEdge(u, v); });
     Partition con = generator.makeContinuousBalancedClustering(G, 10);
 
@@ -668,7 +668,7 @@ TEST_F(CommunityGTest, testHubDominance) {
 
     EXPECT_EQ(1u, hub.getQuality(con, G)) << "In complete graphs, the hub dominance is always 1";
 
-    G = Graph(100);
+    G = GraphW(100);
     EXPECT_EQ(0u, hub.getQuality(con, G))
         << "In graphs without nodes, the hub dominance is always 0";
 
@@ -724,7 +724,7 @@ TEST_F(CommunityGTest, testIntrapartitionDensity) {
     EXPECT_DOUBLE_EQ(1.0, den.getMinimumValue());
     EXPECT_DOUBLE_EQ(1.0, den.getGlobal());
 
-    G = Graph(100);
+    G = GraphW(100);
 
     den.run();
 
@@ -762,7 +762,7 @@ TEST_F(CommunityGTest, testPartitionFragmentation) {
     EXPECT_EQ(0, frag1.getUnweightedAverage());
     EXPECT_EQ(0, frag1.getWeightedAverage());
 
-    G = Graph(100);
+    G = GraphW(100);
     PartitionFragmentation frag2(G, con);
     frag2.run();
     EXPECT_DOUBLE_EQ(0.9, frag2.getMaximumValue());
@@ -797,7 +797,7 @@ TEST_F(CommunityGTest, testCoverHubDominanceConstructor) {
 
 TEST_F(CommunityGTest, testCoverF1Similarity) {
     count n = 20;
-    Graph G(n);
+    GraphW G(n);
 
     Cover C(n);
     C.setUpperBound(3);
@@ -855,8 +855,8 @@ TEST_F(CommunityGTest, testOverlappingNMIDistance) {
         auto A = toCover({{0, 1}, {0}}, n);
         auto B = toCover({{0}}, n);
 
-        auto value1 = distance.getDissimilarity(Graph(n), A, B);
-        auto value2 = distance.getDissimilarity(Graph(n), B, A);
+        auto value1 = distance.getDissimilarity(GraphW(n), A, B);
+        auto value2 = distance.getDissimilarity(GraphW(n), B, A);
         EXPECT_DOUBLE_EQ(value1, 0.0);
         EXPECT_DOUBLE_EQ(value2, 0.0);
     }
@@ -867,8 +867,8 @@ TEST_F(CommunityGTest, testOverlappingNMIDistance) {
         auto A = toCover({{0, 1}, {0}}, n);
         auto B = toCover({{0}, {1}}, n);
 
-        auto value1 = distance.getDissimilarity(Graph(n), A, B);
-        auto value2 = distance.getDissimilarity(Graph(n), B, A);
+        auto value1 = distance.getDissimilarity(GraphW(n), A, B);
+        auto value2 = distance.getDissimilarity(GraphW(n), B, A);
         EXPECT_DOUBLE_EQ(value1, 0.5);
         EXPECT_DOUBLE_EQ(value2, 0.5);
     }
@@ -879,8 +879,8 @@ TEST_F(CommunityGTest, testOverlappingNMIDistance) {
         auto A = toCover({{0, 1}}, n);
         auto B = toCover({{0}, {1}}, n);
 
-        auto value1 = distance.getDissimilarity(Graph(n), A, B);
-        auto value2 = distance.getDissimilarity(Graph(n), B, A);
+        auto value1 = distance.getDissimilarity(GraphW(n), A, B);
+        auto value2 = distance.getDissimilarity(GraphW(n), B, A);
         EXPECT_DOUBLE_EQ(value1, 1.0);
         EXPECT_DOUBLE_EQ(value2, 1.0);
     }
@@ -891,8 +891,8 @@ TEST_F(CommunityGTest, testOverlappingNMIDistance) {
         auto A = toCover({{0, 1}, {0}, {0}, {0}}, n);
         auto B = toCover({{0}}, n);
 
-        auto value1 = distance.getDissimilarity(Graph(n), A, B);
-        auto value2 = distance.getDissimilarity(Graph(n), B, A);
+        auto value1 = distance.getDissimilarity(GraphW(n), A, B);
+        auto value2 = distance.getDissimilarity(GraphW(n), B, A);
         EXPECT_DOUBLE_EQ(value1, 1.0 / 3.0);
         EXPECT_DOUBLE_EQ(value2, 1.0 / 3.0);
     }
@@ -919,14 +919,14 @@ TEST_F(CommunityGTest, testOverlappingNMIDistance) {
             auto partialCover =
                 toCover(std::vector<std::vector<node>>(full.begin(), full.begin() + i), n);
 
-            auto valueMin = distanceMin.getDissimilarity(Graph(n), partialCover, fullCover);
+            auto valueMin = distanceMin.getDissimilarity(GraphW(n), partialCover, fullCover);
             auto valueGeometric =
-                distanceGeometric.getDissimilarity(Graph(n), partialCover, fullCover);
+                distanceGeometric.getDissimilarity(GraphW(n), partialCover, fullCover);
             auto valueArithmetic =
-                distanceArithmetic.getDissimilarity(Graph(n), partialCover, fullCover);
-            auto valueMax = distanceMax.getDissimilarity(Graph(n), partialCover, fullCover);
+                distanceArithmetic.getDissimilarity(GraphW(n), partialCover, fullCover);
+            auto valueMax = distanceMax.getDissimilarity(GraphW(n), partialCover, fullCover);
             auto valueJointEntropy =
-                distanceJointEntropy.getDissimilarity(Graph(n), partialCover, fullCover);
+                distanceJointEntropy.getDissimilarity(GraphW(n), partialCover, fullCover);
 
             EXPECT_NEAR(valueMin, i == 0 ? 1.0 : 0.0, 1e-10);
             EXPECT_NEAR(valueMax, 1.0 - i / 10.0, 1e-10);
@@ -942,7 +942,7 @@ TEST_F(CommunityGTest, testOverlappingNMIDistance) {
         auto distance = OverlappingNMIDistance();
         count n1 = 10;
         count n2 = 20;
-        auto G1 = Graph(n1);
+        auto G1 = GraphW(n1);
         auto cover1 = toCover({}, n1);
         auto cover2 = toCover({}, n2);
         EXPECT_NO_THROW(distance.getDissimilarity(G1, cover1, cover1));
@@ -964,7 +964,7 @@ TEST_F(CommunityGTest, testLFM) {
     lfr.setMu(0.2);
     lfr.run();
 
-    Graph G = lfr.getGraph();
+    GraphW G = lfr.getGraph();
     Cover C(lfr.getPartition());
 
     LocalTightnessExpansion scd(G);

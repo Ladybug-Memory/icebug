@@ -28,14 +28,14 @@ namespace NetworKit {
 
 class MatcherGTest : public testing::Test {
 protected:
-    bool hasUnmatchedNeighbors(const Graph &G, const BMatching &M) {
+    bool hasUnmatchedNeighbors(const GraphW &G, const BMatching &M) {
         for (const auto e : G.edgeRange())
             if (M.isUnmatched(e.u) && M.isUnmatched(e.v))
                 return true;
         return false;
     }
 
-    bool hasUnmatchedNeighbors(const Graph &G, const Matching &M) {
+    bool hasUnmatchedNeighbors(const GraphW &G, const Matching &M) {
         for (const auto e : G.edgeRange())
             if (!M.isMatched(e.u) && !M.isMatched(e.v))
                 return true;

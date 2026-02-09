@@ -1198,7 +1198,7 @@ TYPED_TEST(MatricesGTest, testDiagonalMatrix) {
 }
 
 TYPED_TEST(MatricesGTest, testIncidenceMatrix) {
-    GraphW G = Graph(5, true);
+    GraphW G(5, true);
     G.addEdge(0, 1, 4.0);
     G.addEdge(0, 2, 9.0);
     G.addEdge(0, 3, 16.0);
@@ -1270,7 +1270,7 @@ TYPED_TEST(MatricesGTest, testIncidenceMatrix) {
 }
 
 TYPED_TEST(MatricesGTest, testIncidenceMatrixDirected) {
-    GraphW G = Graph(5, true, true);
+    GraphW G(5, true, true);
     G.addEdge(0, 1, 4.0);
     G.addEdge(0, 2, 9.0);
     G.addEdge(0, 3, 16.0);
@@ -1317,7 +1317,7 @@ TYPED_TEST(MatricesGTest, testNormalizedLaplacianOfGraph) {
         GTEST_SKIP() << "Skipping normalizedLaplacian test for DenseMatrix";
     }
 
-    Graph G = METISGraphReader{}.read("input/power.graph");
+    GraphW G = METISGraphReader{}.read("input/power.graph");
     DynamicMatrix DynMat = DynamicMatrix::normalizedLaplacianMatrix(G);
 
     // check properties of normalizedLaplacian
@@ -1456,7 +1456,7 @@ TYPED_TEST(MatricesGTest, testMatrixToGraph) {
     using Matrix = typename TestFixture::Matrix;
 
     Matrix mat = Matrix::adjacencyMatrix(METISGraphReader{}.read("input/power.graph"));
-    Graph G = MatrixTools::matrixToGraph(mat);
+    GraphW G = MatrixTools::matrixToGraph(mat);
 
     EXPECT_EQ(G.numberOfNodes(), 4941);
     EXPECT_EQ(G.numberOfEdges(), 6594);

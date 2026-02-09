@@ -24,7 +24,7 @@ TEST_F(GraphBenchmark, edgeInsertions_noop_seq) {
     int64_t n = this->n;
     Aux::Timer runtime;
 
-    Graph G(n);
+    GraphW G(n);
     int64_t i = 0;
     runtime.start();
     G.forNodePairs([&](node, node) { i++; });
@@ -39,7 +39,7 @@ TEST_F(GraphBenchmark, edgeInsertions_noop_par) {
     int64_t n = this->n;
     Aux::Timer runtime;
 
-    Graph G(n);
+    GraphW G(n);
     int64_t i = 0;
     runtime.start();
     G.parallelForNodePairs([&](node, node) { i++; });

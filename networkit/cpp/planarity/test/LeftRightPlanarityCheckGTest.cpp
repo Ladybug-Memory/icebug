@@ -13,7 +13,7 @@ class LeftRightPlanarityCheckGTest : public testing::Test {
 public:
     LeftRightPlanarityCheckGTest() = default;
     static constexpr int maxNumberOfNodes{10};
-    Graph pathGraph(count numNodes) {
+    GraphW pathGraph(count numNodes) {
         GraphW graph;
         graph.addNodes(numNodes);
         for (count i = 0; i < numNodes - 1; ++i) {
@@ -22,18 +22,7 @@ public:
         return graph;
     }
 
-    Graph cycleGraph(count numNodes) {
-        GraphW graph;
-        graph.addNodes(numNodes);
-        for (count i = 0; i < numNodes - 1; ++i) {
-            graph.addEdge(i, i + 1);
-        }
-        if (numNodes > 2)
-            graph.addEdge(numNodes - 2, 0);
-        return graph;
-    }
-
-    Graph starGraph(count numNodes) {
+    GraphW cycleGraph(count numNodes) {
         GraphW graph;
         graph.addNodes(numNodes);
         for (count i = 0; i < numNodes - 1; ++i) {
@@ -44,7 +33,18 @@ public:
         return graph;
     }
 
-    Graph binaryTreeGraph(count numNodes) {
+    GraphW starGraph(count numNodes) {
+        GraphW graph;
+        graph.addNodes(numNodes);
+        for (count i = 0; i < numNodes - 1; ++i) {
+            graph.addEdge(i, i + 1);
+        }
+        if (numNodes > 2)
+            graph.addEdge(numNodes - 2, 0);
+        return graph;
+    }
+
+    GraphW binaryTreeGraph(count numNodes) {
         GraphW graph(numNodes, true, false, true);
         for (count i = 0; i < numNodes; ++i) {
             count leftChild = 2 * i + 1;
@@ -59,7 +59,7 @@ public:
         return graph;
     }
 
-    Graph wheelGraph(count numNodes) {
+    GraphW wheelGraph(count numNodes) {
         GraphW graph(numNodes, false, false, true);
         if (numNodes < 4) {
             throw std::invalid_argument("A wheel graph requires at least 4 nodes.");
@@ -77,7 +77,7 @@ public:
         return graph;
     }
 
-    Graph completeGraph(count numNodes) {
+    GraphW completeGraph(count numNodes) {
         GraphW graph(numNodes, true);
 
         for (count i = 0; i < numNodes; ++i) {
@@ -108,7 +108,7 @@ public:
         return graph;
     }
 
-    Graph petersenGraph(count n, count k) {
+    GraphW petersenGraph(count n, count k) {
         GraphW graph(2 * n);
 
         for (count i = 0; i < n; ++i) {
@@ -320,8 +320,8 @@ TEST_F(LeftRightPlanarityCheckGTest, testOnePlanarOneNonPlanarSubGraph) {
 TEST_F(LeftRightPlanarityCheckGTest, testPlanarPetersenGraphs) {
     for (count n = 3; n < maxNumberOfNodes; ++n) {
         for (count k = 1; k <= std::floor(n / 2); ++k) {
-            const bool isPlanarPetersenGraph = k == 1 || (k == 2 && !(n & 1));
-            if (isPlanarPetersenGraph) {
+            const bool isPlanarPetersenGraphW = k == 1 || (k == 2 && !(n & 1));
+            if (isPlanarPetersenGraphW) {
                 GraphW graph = petersenGraph(n, k);
                 LeftRightPlanarityCheck test(graph);
                 test.run();
@@ -334,8 +334,8 @@ TEST_F(LeftRightPlanarityCheckGTest, testPlanarPetersenGraphs) {
 TEST_F(LeftRightPlanarityCheckGTest, testNonPlanarPetersenGraphs) {
     for (count n = 3; n < maxNumberOfNodes; ++n) {
         for (count k = 1; k <= std::floor(n / 2); ++k) {
-            const bool isNonPlanarPetersenGraph = !(k == 1 || (k == 2 && !(n & 1)));
-            if (isNonPlanarPetersenGraph) {
+            const bool isNonPlanarPetersenGraphW = !(k == 1 || (k == 2 && !(n & 1)));
+            if (isNonPlanarPetersenGraphW) {
                 GraphW graph = petersenGraph(n, k);
                 LeftRightPlanarityCheck test(graph);
                 test.run();

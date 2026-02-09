@@ -40,7 +40,7 @@ TEST(AlgebraicBFSGTest, testOnToyGraph) {
     EXPECT_EQ(1, bfs.distance(3));
     EXPECT_EQ(2, bfs.distance(4));
 
-    G = Graph(7, false, true);
+    G = GraphW(7, false, true);
     G.addEdge(0, 1);
     G.addEdge(0, 3);
     G.addEdge(1, 4);

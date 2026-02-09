@@ -33,14 +33,14 @@ TEST_F(AlgebraicMatchingCoarseningGTest, testContraction) {
     amc.run();
     t.stop();
     INFO("Algebraic matching coarsening took ", t.elapsedTag());
-    Graph coarseG = amc.getCoarseGraph();
+    GraphW coarseG = amc.getCoarseGraph();
     std::vector<node> amcFineToCoarse = amc.getFineToCoarseNodeMapping();
 
     t.start();
     MatchingCoarsening mc(G, matching);
     mc.run();
     t.stop();
-    INFO("Graph theoretic matching coarsening took ", t.elapsedTag());
+    INFO("GraphW theoretic matching coarsening took ", t.elapsedTag());
     std::vector<node> mcFineToCoarse = mc.getFineToCoarseNodeMapping();
 
     G.forNodes([&](node u) { EXPECT_EQ(mcFineToCoarse[u], amcFineToCoarse[u]); });

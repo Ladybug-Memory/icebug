@@ -50,7 +50,7 @@ TEST_F(CoarseningGTest, testParallelPartitionCoarseningOnErdosRenyi) {
     count n = 100;
 
     ErdosRenyiGenerator ERGen(n, 0.5);
-    Graph G = ERGen.generate();
+    GraphW G = ERGen.generate();
 
     ClusteringGenerator clusteringGen;
     Partition singleton = clusteringGen.makeSingletonClustering(G);
@@ -74,7 +74,7 @@ TEST_F(CoarseningGTest, testParallelPartitionCoarseningOnErdosRenyi) {
     Partition random = clusteringGen.makeRandomClustering(G, k);
     ParallelPartitionCoarsening coarsening2(G, random);
     coarsening2.run();
-    Graph GconRand = coarsening2.getCoarseGraph();
+    GraphW GconRand = coarsening2.getCoarseGraph();
 
     EXPECT_EQ(k, GconRand.numberOfNodes())
         << "graph contracted according to random clustering should have the same number of nodes "
@@ -87,7 +87,7 @@ TEST_F(CoarseningGTest, testSequentialPartitionCoarseningOnErdosRenyi) {
     count n = 100;
 
     ErdosRenyiGenerator ERGen(n, 0.5);
-    Graph G = ERGen.generate();
+    GraphW G = ERGen.generate();
 
     ClusteringGenerator clusteringGen;
     Partition singleton = clusteringGen.makeSingletonClustering(G);
@@ -111,7 +111,7 @@ TEST_F(CoarseningGTest, testSequentialPartitionCoarseningOnErdosRenyi) {
     Partition random = clusteringGen.makeRandomClustering(G, k);
     ParallelPartitionCoarsening coarsening2(G, random, false);
     coarsening2.run();
-    Graph GconRand = coarsening2.getCoarseGraph();
+    GraphW GconRand = coarsening2.getCoarseGraph();
 
     EXPECT_EQ(k, GconRand.numberOfNodes())
         << "graph contracted according to random clustering should have the same number of nodes "
@@ -131,9 +131,9 @@ TEST_F(CoarseningGTest, testSequentialPartitionCoarseningEdgeWeights) {
 
     ParallelPartitionCoarsening coarsening(G, random, false);
     coarsening.run();
-    Graph coarseGraph = coarsening.getCoarseGraph();
+    GraphW coarseGraphW = coarsening.getCoarseGraph();
 
-    ASSERT_EQ(G.totalEdgeWeight(), coarseGraph.totalEdgeWeight());
+    ASSERT_EQ(G.totalEdgeWeight(), coarseGraphW.totalEdgeWeight());
     std::vector<node> fineToCoarse = coarsening.getFineToCoarseNodeMapping();
     for (const auto &cluster : random.getSubsets()) {
         double degreeSum = 0.0;
@@ -141,7 +141,7 @@ TEST_F(CoarseningGTest, testSequentialPartitionCoarseningEdgeWeights) {
             degreeSum += G.weightedDegree(u, true);
         }
         node coarseNode = fineToCoarse[*cluster.begin()];
-        ASSERT_EQ(degreeSum, coarseGraph.weightedDegree(coarseNode, true));
+        ASSERT_EQ(degreeSum, coarseGraphW.weightedDegree(coarseNode, true));
     }
 }
 
@@ -156,9 +156,9 @@ TEST_F(CoarseningGTest, testParallelPartitionCoarseningEdgeWeights) {
 
     ParallelPartitionCoarsening coarsening(G, random, false);
     coarsening.run();
-    Graph coarseGraph = coarsening.getCoarseGraph();
+    GraphW coarseGraphW = coarsening.getCoarseGraph();
 
-    ASSERT_EQ(G.totalEdgeWeight(), coarseGraph.totalEdgeWeight());
+    ASSERT_EQ(G.totalEdgeWeight(), coarseGraphW.totalEdgeWeight());
     std::vector<node> fineToCoarse = coarsening.getFineToCoarseNodeMapping();
     for (const auto &cluster : random.getSubsets()) {
         double degreeSum = 0.0;
@@ -166,13 +166,13 @@ TEST_F(CoarseningGTest, testParallelPartitionCoarseningEdgeWeights) {
             degreeSum += G.weightedDegree(u, true);
         }
         node coarseNode = fineToCoarse[*cluster.begin()];
-        ASSERT_EQ(degreeSum, coarseGraph.weightedDegree(coarseNode, true));
+        ASSERT_EQ(degreeSum, coarseGraphW.weightedDegree(coarseNode, true));
     }
 }
 
 TEST_F(CoarseningGTest, testParallelPartitionCoarseningOnRealGraph) {
     METISGraphReader reader;
-    Graph G = reader.read("input/celegans_metabolic.graph");
+    GraphW G = reader.read("input/celegans_metabolic.graph");
 
     ClusteringGenerator clusteringGen;
     count k = 10; // number of clusters in random clustering
@@ -184,10 +184,10 @@ TEST_F(CoarseningGTest, testParallelPartitionCoarseningOnRealGraph) {
     ParallelPartitionCoarsening seqCoarsening(G, random, false);
     seqCoarsening.run();
 
-    Graph Gpar = parCoarsening.getCoarseGraph();
+    GraphW Gpar = parCoarsening.getCoarseGraph();
     EXPECT_EQ(k, Gpar.numberOfNodes());
 
-    Graph Gseq = seqCoarsening.getCoarseGraph();
+    GraphW Gseq = seqCoarsening.getCoarseGraph();
     EXPECT_EQ(k, Gseq.numberOfNodes());
 
     EXPECT_EQ(Gseq.numberOfEdges(), Gpar.numberOfEdges())
@@ -205,7 +205,7 @@ TEST_F(CoarseningGTest, testParallelPartitionCoarseningOnRealGraph) {
 
 TEST_F(CoarseningGTest, testPartitionCoarseningOnRealGraph) {
     METISGraphReader reader;
-    Graph G = reader.read("input/celegans_metabolic.graph");
+    GraphW G = reader.read("input/celegans_metabolic.graph");
 
     ClusteringGenerator clusteringGen;
     count k = 10; // number of clusters in random clustering
@@ -213,12 +213,12 @@ TEST_F(CoarseningGTest, testPartitionCoarseningOnRealGraph) {
 
     ParallelPartitionCoarsening parCoarsening(G, random, true);
     parCoarsening.run();
-    Graph Gpar = parCoarsening.getCoarseGraph();
+    GraphW Gpar = parCoarsening.getCoarseGraph();
     EXPECT_EQ(random.numberOfSubsets(), Gpar.numberOfNodes());
 
     ParallelPartitionCoarsening seqCoarsening(G, random, false);
     seqCoarsening.run();
-    Graph Gseq = seqCoarsening.getCoarseGraph();
+    GraphW Gseq = seqCoarsening.getCoarseGraph();
     EXPECT_EQ(random.numberOfSubsets(), Gseq.numberOfNodes());
 
     EXPECT_EQ(Gseq.numberOfEdges(), Gpar.numberOfEdges())
@@ -245,12 +245,12 @@ TEST_F(CoarseningGTest, testParallelPartitionCoarseningOnRealGraphWithLoops) {
 
     ParallelPartitionCoarsening parCoarsening(G, random, true);
     parCoarsening.run();
-    Graph Gpar = parCoarsening.getCoarseGraph();
+    GraphW Gpar = parCoarsening.getCoarseGraph();
     EXPECT_EQ(random.numberOfSubsets(), Gpar.numberOfNodes());
 
     ParallelPartitionCoarsening seqCoarsening(G, random, false);
     seqCoarsening.run();
-    Graph Gseq = seqCoarsening.getCoarseGraph();
+    GraphW Gseq = seqCoarsening.getCoarseGraph();
     EXPECT_EQ(random.numberOfSubsets(), Gseq.numberOfNodes());
 
     EXPECT_EQ(Gseq.numberOfEdges(), Gpar.numberOfEdges())
@@ -268,7 +268,7 @@ TEST_F(CoarseningGTest, testParallelPartitionCoarseningOnRealGraphWithLoops) {
 
 TEST_F(CoarseningGTest, testMatchingContractor) {
     METISGraphReader reader;
-    Graph G = reader.read("input/celegans_metabolic.graph");
+    GraphW G = reader.read("input/celegans_metabolic.graph");
 
     LocalMaxMatcher matcher(G);
     matcher.run();
@@ -277,7 +277,7 @@ TEST_F(CoarseningGTest, testMatchingContractor) {
 
     MatchingCoarsening coarsener(G, matching);
     coarsener.run();
-    Graph coarseG = coarsener.getCoarseGraph();
+    GraphW coarseG = coarsener.getCoarseGraph();
     std::vector<node> fineToCoarse = coarsener.getFineToCoarseNodeMapping();
 
     EXPECT_GE(coarseG.numberOfNodes(), 0.5 * G.numberOfNodes());
@@ -301,7 +301,7 @@ TEST_F(CoarseningGTest, testMatchingContractorWithSelfLoop) {
 
     MatchingCoarsening coarsener(G, matching);
     coarsener.run();
-    Graph coarseG = coarsener.getCoarseGraph();
+    GraphW coarseG = coarsener.getCoarseGraph();
     EXPECT_EQ(1u, coarseG.numberOfNodes());
 
     EXPECT_EQ(G.totalEdgeWeight(), coarseG.totalEdgeWeight());
@@ -309,7 +309,7 @@ TEST_F(CoarseningGTest, testMatchingContractorWithSelfLoop) {
 
 TEST_F(CoarseningGTest, testClusteringProjectorWithNClusterings) {
     ErdosRenyiGenerator gen(100, 0.5);
-    Graph Gfine = gen.generate();
+    GraphW Gfine = gen.generate();
 
     for (int n = 1; n < 10; ++n) {
         // get n-clustering of Gfine
@@ -319,7 +319,7 @@ TEST_F(CoarseningGTest, testClusteringProjectorWithNClusterings) {
         // contract Gfine according to n-clusterings
         ParallelPartitionCoarsening contract(Gfine, zetafine);
         contract.run();
-        Graph Gcoarse = contract.getCoarseGraph();
+        GraphW Gcoarse = contract.getCoarseGraph();
 
         // revert changes by projecting back into single partition
         Partition zetacoarse = clusteringGen.makeOneClustering(Gcoarse);

@@ -236,14 +236,14 @@ TEST_F(GeneratorsGTest, testConfigurationModelGeneratorWithEdgeSwitchingOnRealSe
     auto graphs = {"input/jazz.graph", "input/lesmis.graph"};
 
     for (auto path : graphs) {
-        Graph G = reader.read(path);
+        GraphW G = reader.read(path);
         count n = G.upperNodeIdBound();
         std::vector<count> sequence(n);
         G.forNodes([&](node u) { sequence[u] = G.degree(u); });
 
         bool skipTest = false;
         EdgeSwitchingMarkovChainGenerator gen(sequence, skipTest);
-        Graph G2 = gen.generate();
+        GraphW G2 = gen.generate();
 
         count volume = std::accumulate(sequence.begin(), sequence.end(), 0);
         EXPECT_EQ(volume, 2 * G2.numberOfEdges());
@@ -265,13 +265,13 @@ TEST_F(GeneratorsGTest, testConfigurationModelGeneratorWithRejectionSamplingOnRe
     auto graphs = {"input/jazz.graph", "input/lesmis.graph"};
 
     for (auto path : graphs) {
-        Graph G = reader.read(path);
+        GraphW G = reader.read(path);
         count n = G.numberOfNodes();
         std::vector<count> sequence(n);
         G.forNodes([&](node u) { sequence[u] = G.degree(u); });
 
         ConfigurationModel gen(sequence);
-        Graph G2 = gen.generate();
+        GraphW G2 = gen.generate();
 
         count volume = std::accumulate(sequence.begin(), sequence.end(), 0);
         EXPECT_EQ(volume, 2 * G2.numberOfEdges());
@@ -291,7 +291,7 @@ TEST_F(GeneratorsGTest, testDynamicBarabasiAlbertGeneratorSingleStep) {
     count k = 2; // number of edges added per node
     DynamicGraphSource *gen = new DynamicBarabasiAlbertGenerator(k);
     GraphEventProxy *Gproxy = gen->newGraph();
-    Graph *G = Gproxy->G;
+    GraphW *G = Gproxy->G;
 
     gen->initializeGraph();
 
@@ -318,7 +318,7 @@ TEST_F(GeneratorsGTest, testDynamicBarabasiAlbertGenerator) {
     DynamicGraphSource *gen = new DynamicBarabasiAlbertGenerator(2);
 
     GraphEventProxy *Gproxy = gen->newGraph();
-    Graph *G = Gproxy->G;
+    GraphW *G = Gproxy->G;
 
     gen->initializeGraph();
 
@@ -345,7 +345,7 @@ TEST_F(GeneratorsGTest, testDynamicBarabasiAlbertGenerator) {
 TEST_F(GeneratorsGTest, viewDynamicBarabasiAlbertGenerator) {
     DynamicGraphSource *gen = new DynamicBarabasiAlbertGenerator(2);
     GraphEventProxy *Gproxy = gen->newGraph();
-    Graph *G = Gproxy->G;
+    GraphW *G = Gproxy->G;
     gen->initializeGraph();
     count n = 42;
     gen->generateWhile([&]() { return (G->numberOfNodes() < n); });
@@ -486,7 +486,7 @@ TEST_F(GeneratorsGTest, testDynamicHyperbolicGeneratorOnMovedNodes) {
     // update moved nodes
     angles = getAngles(dynGen);
     radii = getRadii(dynGen);
-    Graph comparison = HyperbolicGenerator().generate(angles, radii, R);
+    GraphW comparison = HyperbolicGenerator().generate(angles, radii, R);
     EXPECT_EQ(G.numberOfEdges(), comparison.numberOfEdges());
 
     // heuristic criterion: Number of edges may change, but should not change much
@@ -558,7 +558,7 @@ TEST_F(GeneratorsGTest, testBarabasiAlbertGeneratorConstructor) {
     initGraph = GraphW(6);
     EXPECT_THROW(BarabasiAlbertGenerator generator(10, 9, initGraph, true), std::runtime_error);
 
-    // initGraph does not have consecutive node ids
+    // initGraphW does not have consecutive node ids
     initGraph.removeNode(0);
     EXPECT_THROW(BarabasiAlbertGenerator generator(3, 9, initGraph, true), std::runtime_error);
 }
@@ -569,7 +569,7 @@ TEST_F(GeneratorsGTest, testBarabasiAlbertGeneratorBatagelj) {
     count n0 = 3;
 
     BarabasiAlbertGenerator BarabasiAlbert(k, nMax, n0, true);
-    Graph G = BarabasiAlbert.generate();
+    GraphW G = BarabasiAlbert.generate();
 
     EXPECT_EQ(nMax, G.numberOfNodes());
     EXPECT_LE(G.numberOfEdges(), nMax * k);
@@ -595,7 +595,7 @@ TEST_F(GeneratorsGTest, generatetBarabasiAlbertGeneratorGraph) {
 
     BarabasiAlbertGenerator BarabasiAlbert(k, nMax, n0);
 
-    Graph G = BarabasiAlbert.generate();
+    GraphW G = BarabasiAlbert.generate();
     GraphIO io;
     io.writeAdjacencyList(G, "output/BarabasiGraph.txt");
 }
@@ -607,7 +607,7 @@ TEST_F(GeneratorsGTest, testParallelBarabasiAlbertGeneratorDistribution) {
 
     BarabasiAlbertGenerator BarabasiAlbert(k, nMax, n0, false);
 
-    Graph G = BarabasiAlbert.generate();
+    GraphW G = BarabasiAlbert.generate();
     G.forNodes([&G, k, n0](node u) {
         if (u < n0)
             return;
@@ -641,7 +641,7 @@ TEST_F(GeneratorsGTest, testErdosRenyiGenerator) {
     double p = 1.5 * (std::log(n) / (double)n);
 
     ErdosRenyiGenerator generator(n, p);
-    Graph G = generator.generate();
+    GraphW G = generator.generate();
     EXPECT_EQ(n, G.numberOfNodes());
     EXPECT_FALSE(G.isEmpty());
     EXPECT_TRUE(G.checkConsistency());
@@ -677,7 +677,7 @@ TEST_F(GeneratorsGTest, testRmatGenerator) {
     double d = 0.25;
 
     RmatGenerator rmat(scale, edgeFactor, a, b, c, d);
-    Graph G = rmat.generate();
+    GraphW G = rmat.generate();
 
     EXPECT_EQ(G.numberOfNodes(), n);
     EXPECT_LE(G.numberOfEdges(), n * edgeFactor);
@@ -716,7 +716,7 @@ TEST_F(GeneratorsGTest, testRmatGeneratorDistribution) {
     count totalEdges = 0;
     // Now we generate a bunch of graphs and count the edges.
     for (index k = 0; k < 1000; k++) {
-        Graph G = rmat.generate();
+        GraphW G = rmat.generate();
         G.forEdges([&edgeCount, &totalEdges](node u, node v) {
             edgeCount[u][v] += 1;
             totalEdges += 1;
@@ -741,7 +741,7 @@ TEST_F(GeneratorsGTest, testRmatGeneratorReduceNodes) {
     int reducedNodes = 4;
 
     RmatGenerator rmat(scale, edgeFactor, a, b, c, d, false, reducedNodes);
-    Graph G = rmat.generate();
+    GraphW G = rmat.generate();
 
     EXPECT_EQ(G.numberOfNodes(), n - reducedNodes);
     EXPECT_LE(G.numberOfEdges(), n * edgeFactor);
@@ -793,7 +793,7 @@ TEST_F(GeneratorsGTest, testChungLuGeneratorDegreeConsistency) {
         vec.push_back(grad);
     }
     ChungLuGenerator generator(vec);
-    Graph G = generator.generate();
+    GraphW G = generator.generate();
     /* We check to see if the actual degrees of our nodes vary too much from the expected ones.
      * However, we need to sort the expected degrees first, since the algorithm does this as well
      * and the nodes with the highest degrees are added first. */
@@ -815,7 +815,7 @@ TEST_F(GeneratorsGTest, testChungLuGeneratorVolumeConsistency) {
         expectedVolume += grad;
     }
     ChungLuGenerator generator(vec);
-    Graph G = generator.generate();
+    GraphW G = generator.generate();
     /* Check if volume is more than 10% off from the expected volume. */
     // TODO Is a 20% offset here sufficient? */
     EXPECT_NEAR(G.numberOfEdges() * 2, expectedVolume, 0.2 * expectedVolume);
@@ -854,7 +854,7 @@ TEST_F(GeneratorsGTest, testChungLuGeneratorAlamEtAlDegreeConsistency) {
         vec.push_back(grad);
     }
     ChungLuGeneratorAlamEtAl generator(vec);
-    Graph G = generator.generate();
+    GraphW G = generator.generate();
     /* We check to see if the actual degrees of our nodes vary too much from the expected ones.
      * However, we need to sort the expected degrees first, since the algorithm does this as well
      * and the nodes with the highest degrees are added first. */
@@ -876,7 +876,7 @@ TEST_F(GeneratorsGTest, testChungLuGeneratorAlamEtAlVolumeConsistency) {
         expectedVolume += grad;
     }
     ChungLuGeneratorAlamEtAl generator(vec);
-    Graph G = generator.generate();
+    GraphW G = generator.generate();
     /* Check if volume is more than 10% off from the expected volume. */
     // TODO Is a 20% offset here sufficient? */
     EXPECT_NEAR(G.numberOfEdges() * 2, expectedVolume, 0.2 * expectedVolume);
@@ -898,7 +898,7 @@ TEST_F(GeneratorsGTest, testHavelHakimiGeneratorOnRandomSequence) {
         realizable = hhgen.isRealizable();
 
         if (realizable) {
-            Graph G = hhgen.generate();
+            GraphW G = hhgen.generate();
             EXPECT_TRUE(G.checkConsistency());
             count volume = std::accumulate(sequence.begin(), sequence.end(), 0);
             EXPECT_EQ(volume, 2 * G.numberOfEdges());
@@ -911,13 +911,13 @@ TEST_F(GeneratorsGTest, testHavelHakimiGeneratorOnRealSequence) {
     auto graphs = {"input/jazz.graph", "input/lesmis.graph"};
 
     for (auto path : graphs) {
-        Graph G = reader.read(path);
+        GraphW G = reader.read(path);
         count n = G.numberOfNodes();
         std::vector<count> sequence(n);
         G.forNodes([&](node u) { sequence[u] = G.degree(u); });
 
         HavelHakimiGenerator hhgen(sequence);
-        Graph G2 = hhgen.generate();
+        GraphW G2 = hhgen.generate();
         EXPECT_TRUE(G.checkConsistency());
 
         count volume = std::accumulate(sequence.begin(), sequence.end(), 0);
@@ -941,7 +941,7 @@ TEST_F(GeneratorsGTest, testHavelHakimiGeneratorOnUnrealizableSequence) {
     EXPECT_THROW(hhgen.generate(), std::runtime_error);
 
     hhgen = HavelHakimiGenerator(seq, true);
-    Graph G = hhgen.generate();
+    GraphW G = hhgen.generate();
 
     G.forNodes([&](node u) { EXPECT_EQ(std::min<count>(seq[u], 10), G.degree(u)); });
 }
@@ -989,7 +989,7 @@ TEST_F(GeneratorsGTest, testDynamicForestFireGenerator) {
 TEST_F(GeneratorsGTest, testRegularRingLatticeGenerator) {
     int n0 = 10;
     int neighbors = 2;
-    auto testRingLattice = [&](Graph G) {
+    auto testRingLattice = [&](GraphW G) {
         EXPECT_EQ(n0, (int)G.numberOfNodes());
         EXPECT_EQ(n0 * neighbors, (int)G.numberOfEdges());
         G.forNodePairs([&](node u, node v) {
@@ -1009,7 +1009,7 @@ TEST_F(GeneratorsGTest, testRegularRingLatticeGenerator) {
 TEST_F(GeneratorsGTest, testWattsStrogatzGenerator) {
     int n0 = 10;
     int neighbors = 2;
-    auto testRingLattice = [&](Graph G) {
+    auto testRingLattice = [&](GraphW G) {
         G.forNodePairs([&](node u, node v) {
             int diff = std::abs((int)u - (int)v);
             if (u != v && (diff <= neighbors || diff >= n0 - neighbors)) {
@@ -1024,7 +1024,7 @@ TEST_F(GeneratorsGTest, testWattsStrogatzGenerator) {
     testRingLattice(wsg1.generate());
 
     WattsStrogatzGenerator wsg2 = WattsStrogatzGenerator(n0, neighbors, 0.3);
-    Graph G = wsg2.generate();
+    GraphW G = wsg2.generate();
     EXPECT_TRUE(G.checkConsistency());
     EXPECT_EQ(n0, (int)G.numberOfNodes());
     EXPECT_EQ(n0 * neighbors, (int)G.numberOfEdges());
@@ -1046,7 +1046,7 @@ TEST_F(GeneratorsGTest, testWattsStrogatzGeneratorBigKs) {
 TEST_F(GeneratorsGTest, testDorogovtsevMendesGenerator) {
     int n0 = 20;
     DorogovtsevMendesGenerator dmg = DorogovtsevMendesGenerator(n0);
-    Graph G = dmg.generate();
+    GraphW G = dmg.generate();
 
     EXPECT_EQ(n0, (int)G.numberOfNodes());
     EXPECT_EQ(2 * n0 - 3, (int)G.numberOfEdges());
@@ -1142,7 +1142,7 @@ TEST_F(GeneratorsGTest, testStochasticBlockmodel) {
     std::vector<index> membership = {0, 0, 0, 0, 0, 1, 1, 1, 1, 1};
     std::vector<std::vector<double>> affinity = {{1.0, 0.0}, {0.0, 1.0}};
     StochasticBlockmodel sbm(n, nBlocks, membership, affinity);
-    Graph G = sbm.generate();
+    GraphW G = sbm.generate();
 
     EXPECT_EQ(n, G.numberOfNodes());
     EXPECT_EQ(20u, G.numberOfEdges());
@@ -1213,14 +1213,14 @@ TEST_F(GeneratorsGTest, testConfigurationModelGeneratorOnRealSequence) {
     auto graphs = {"input/jazz.graph", "input/lesmis.graph"};
 
     for (auto path : graphs) {
-        Graph G = reader.read(path);
+        GraphW G = reader.read(path);
         count n = G.numberOfNodes();
         std::vector<count> sequence(n);
         G.forNodes([&](node u) { sequence[u] = G.degree(u); });
 
         bool skipTest = false;
         EdgeSwitchingMarkovChainGenerator gen(sequence, skipTest);
-        Graph G2 = gen.generate();
+        GraphW G2 = gen.generate();
 
         count volume = std::accumulate(sequence.begin(), sequence.end(), 0);
         EXPECT_EQ(volume, 2 * G2.numberOfEdges());
@@ -1285,9 +1285,9 @@ TEST_F(GeneratorsGTest, testLFRGenerator) {
     gen.generatePowerlawCommunitySizeSequence(10, 50, -1);
     gen.setMu(0.5);
     gen.run();
-    Graph G1 = gen.getMoveGraph();
+    GraphW G1 = gen.getMoveGraph();
     gen.run(); // should rewire the edges but nothing else
-    Graph G2 = gen.getMoveGraph();
+    GraphW G2 = gen.getMoveGraph();
     EXPECT_EQ(n, G1.numberOfNodes());
     EXPECT_EQ(n, G2.numberOfNodes());
     EXPECT_EQ(G1.numberOfEdges(), G2.numberOfEdges());
@@ -1317,7 +1317,7 @@ TEST_F(GeneratorsGTest, testLFRGeneratorWithRealData) {
     gen.setPartition(C);
     gen.setMu(mu);
     gen.run();
-    Graph G = gen.getGraph();
+    GraphW G = gen.getGraph();
     G.parallelForNodes([&](node u) { EXPECT_EQ(G.degree(u), degreeSequence[u]); });
     EXPECT_EQ(C.numberOfSubsets(), gen.getPartition().numberOfSubsets());
 }
@@ -1330,9 +1330,9 @@ TEST_F(GeneratorsGTest, testLFRGeneratorWithBinomialDistribution) {
     gen.generatePowerlawCommunitySizeSequence(10, 50, -1);
     gen.setMuWithBinomialDistribution(0.5);
     gen.run();
-    Graph G1 = gen.getMoveGraph();
+    GraphW G1 = gen.getMoveGraph();
     gen.run(); // should rewire the edges but nothing else
-    Graph G2 = gen.getMoveGraph();
+    GraphW G2 = gen.getMoveGraph();
     EXPECT_EQ(n, G1.numberOfNodes());
     EXPECT_EQ(n, G2.numberOfNodes());
     EXPECT_EQ(G1.numberOfEdges(), G2.numberOfEdges());
@@ -1344,7 +1344,7 @@ TEST_F(GeneratorsGTest, testMocnikGenerator) {
     double k = 2.6;
 
     MocnikGenerator Mocnik(dim, n, k);
-    Graph G(0);
+    GraphW G(0);
     EXPECT_TRUE(G.isEmpty());
     G = Mocnik.generate();
     EXPECT_FALSE(G.isEmpty());
@@ -1358,7 +1358,7 @@ TEST_F(GeneratorsGTest, testMocnikGeneratorBasic) {
     double k = 2.6;
 
     MocnikGeneratorBasic Mocnik(dim, n, k);
-    Graph G(0);
+    GraphW G(0);
     EXPECT_TRUE(G.isEmpty());
     G = Mocnik.generate();
     EXPECT_FALSE(G.isEmpty());
@@ -1385,7 +1385,7 @@ TEST_F(GeneratorsGTest, testPowerLawDegreeSequenceFromDegreeSequence) {
 TEST_F(GeneratorsGTest, testPowerLawDegreeSequenceFromGraph) {
     METISGraphReader reader;
     auto graphpath = "input/jazz.graph";
-    Graph G = reader.read(graphpath);
+    GraphW G = reader.read(graphpath);
 
     PowerlawDegreeSequence PLDS(G);
     PLDS.run();

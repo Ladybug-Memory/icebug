@@ -13,7 +13,7 @@ namespace NetworKit {
 class FloydWarshallGTest : public testing::Test {
 public:
     static constexpr edgeweight maxDistance = std::numeric_limits<edgeweight>::max();
-    Graph completeGraphK3() {
+    GraphW completeGraphK3() {
         GraphW graph(3, true);
         graph.addEdge(0, 1, 1);
         graph.addEdge(1, 2, 2);
@@ -21,7 +21,7 @@ public:
         return graph;
     }
 
-    Graph undirectedGraphWithNegativeEdge() {
+    GraphW undirectedGraphWithNegativeEdge() {
         GraphW graph(3, true);
         graph.addEdge(0, 1, 1);
         graph.addEdge(1, 2, 2);
@@ -29,7 +29,7 @@ public:
         return graph;
     }
 
-    Graph directedGraphNegativeEdge() {
+    GraphW directedGraphNegativeEdge() {
         GraphW graph(3, true, true);
         graph.addEdge(0, 1, 1);
         graph.addEdge(1, 2, -2);
@@ -37,7 +37,7 @@ public:
         return graph;
     }
 
-    Graph completGraphK5NegativeEdges() {
+    GraphW completGraphK5NegativeEdges() {
         GraphW graph(5, true);
         graph.addEdge(0, 1, -3);
         graph.addEdge(2, 3, -2);
@@ -53,7 +53,7 @@ public:
         return graph;
     }
 
-    Graph disconnectedGraph() {
+    GraphW disconnectedGraph() {
         GraphW graph(4, true);
         graph.addEdge(0, 1, 3);
         graph.addEdge(1, 2, 2);
@@ -61,7 +61,7 @@ public:
         return graph;
     }
 
-    Graph directedGraphWithNegativeSelfLoop() {
+    GraphW directedGraphWithNegativeSelfLoop() {
         GraphW graph(5, true, true);
         graph.addEdge(0, 1, 3);
         graph.addEdge(1, 1, -2); // self-loop with negative cycle

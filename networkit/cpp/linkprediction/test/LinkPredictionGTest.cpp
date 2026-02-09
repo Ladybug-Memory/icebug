@@ -157,7 +157,7 @@ TEST_F(LinkPredictionGTest, testLinkThresholderByPercentage) {
 }
 
 TEST_F(LinkPredictionGTest, testTrainingGraphGenerator) {
-    GraphW trainingGraph = RandomLinkSampler::byPercentage(G, 0.7);
+    GraphW trainingGraphW = RandomLinkSampler::byPercentage(G, 0.7);
     EXPECT_EQ(7, trainingGraph.numberOfEdges());
 }
 
@@ -235,7 +235,7 @@ TEST_F(LinkPredictionGTest, testKatzRunOnOrdering) {
     METISGraphReader graphReader;
     GraphW newG = graphReader.read("input/jazz.graph");
     KatzIndex katz(newG);
-    GraphW trainingGraph = RandomLinkSampler::byPercentage(newG, 0.7);
+    GraphW trainingGraphW = RandomLinkSampler::byPercentage(newG, 0.7);
     std::vector<std::pair<node, node>> nodePairs =
         MissingLinksFinder(trainingGraph).findAtDistance(2);
     std::vector<std::pair<std::pair<node, node>, double>> preds = katz.runOn(missingLinks);
