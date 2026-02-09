@@ -725,7 +725,7 @@ public:
      * @return @a i-th (outgoing) neighbor of @a u, or @c none if no such
      * neighbor exists.
      */
-    node getIthNeighbor(Unsafe, node u, index i) const { return outEdges[u][i]; }
+    node getIthNeighbor(Unsafe, node u, index i) const override { return outEdges[u][i]; }
 
     /**
      * Return the weight to the i-th (outgoing) neighbor of @a u.
@@ -747,7 +747,7 @@ public:
      * @return @a i-th (outgoing) neighbor of @a u, or @c none if no such
      * neighbor exists.
      */
-    node getIthNeighbor(node u, index i) const {
+    node getIthNeighbor(node u, index i) const override {
         if (!hasNode(u) || i >= outEdges[u].size())
             return none;
         return outEdges[u][i];
@@ -761,7 +761,7 @@ public:
      * @return @a i-th (incoming) neighbor of @a u, or @c none if no such
      * neighbor exists.
      */
-    node getIthInNeighbor(node u, index i) const {
+    node getIthInNeighbor(node u, index i) const override {
         if (!hasNode(u) || i >= inEdges[u].size())
             return none;
         return inEdges[u][i];
@@ -775,7 +775,7 @@ public:
      * @return @a edge weight to the i-th (outgoing) neighbor of @a u, or @c +inf if no such
      * neighbor exists.
      */
-    edgeweight getIthNeighborWeight(node u, index i) const {
+    edgeweight getIthNeighborWeight(node u, index i) const override {
         if (!hasNode(u) || i >= outEdges[u].size())
             return nullWeight;
         return isWeighted() ? outEdgeWeights[u][i] : defaultEdgeWeight;
@@ -789,7 +789,7 @@ public:
      * @return pair: i-th (outgoing) neighbor of @a u and the corresponding
      * edge weight, or @c defaultEdgeWeight if unweighted.
      */
-    std::pair<node, edgeweight> getIthNeighborWithWeight(node u, index i) const {
+    std::pair<node, edgeweight> getIthNeighborWithWeight(node u, index i) const override {
         if (!hasNode(u) || i >= outEdges[u].size())
             return {none, none};
         return getIthNeighborWithWeight(unsafe, u, i);
@@ -817,7 +817,7 @@ public:
      * @return pair: i-th (outgoing) neighbor of @a u and the corresponding
      * edge id, or @c none if no such neighbor exists.
      */
-    std::pair<node, edgeid> getIthNeighborWithId(node u, index i) const {
+    std::pair<node, edgeid> getIthNeighborWithId(node u, index i) const override {
         assert(hasEdgeIds());
         if (!hasNode(u) || i >= outEdges[u].size())
             return {none, none};
