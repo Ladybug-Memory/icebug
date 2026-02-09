@@ -752,6 +752,28 @@ public:
         }
     }
 
+protected:
+    /**
+     * Protected copy constructor for subclasses (like GraphW) that use vector-based storage.
+     * This constructor copies the graph without requiring CSR format.
+     * @param other The graph to copy.
+     * @param subclassCopy Flag to indicate this is a subclass copy (bypass CSR check).
+     */
+    Graph(const Graph &other, bool subclassCopy)
+        : n(other.n), m(other.m), storedNumberOfSelfLoops(other.storedNumberOfSelfLoops),
+          z(other.z), omega(other.omega), t(other.t), weighted(other.weighted),
+          directed(other.directed), edgesIndexed(other.edgesIndexed), deletedID(other.deletedID),
+          exists(other.exists), outEdgesCSRIndices(other.outEdgesCSRIndices),
+          outEdgesCSRIndptr(other.outEdgesCSRIndptr), inEdgesCSRIndices(other.inEdgesCSRIndices),
+          inEdgesCSRIndptr(other.inEdgesCSRIndptr), usingCSR(other.usingCSR),
+          // call special constructors to copy attribute maps
+          nodeAttributeMap(other.nodeAttributeMap, this),
+          edgeAttributeMap(other.edgeAttributeMap, this) {
+        // This constructor is for subclasses only - no CSR check
+        (void)subclassCopy; // Suppress unused parameter warning
+    }
+
+public:
     /** move constructor */
     Graph(Graph &&other) noexcept
         : n(other.n), m(other.m), storedNumberOfSelfLoops(other.storedNumberOfSelfLoops),

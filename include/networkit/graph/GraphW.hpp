@@ -80,7 +80,7 @@ public:
      * @param other The graph to copy.
      */
     GraphW(const GraphW &other)
-        : Graph(other), inEdges(other.inEdges), outEdges(other.outEdges),
+        : Graph(other, true), inEdges(other.inEdges), outEdges(other.outEdges),
           inEdgeWeights(other.inEdgeWeights), outEdgeWeights(other.outEdgeWeights),
           inEdgeIds(other.inEdgeIds), outEdgeIds(other.outEdgeIds) {}
 
