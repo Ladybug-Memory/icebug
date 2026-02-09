@@ -4,9 +4,11 @@
 
 This branch introduces a major architectural refactor of the NetworKit graph library, focusing on:
 
-1. **Immutable/Mutable Graph Separation**: Splitting the monolithic `Graph` class into immutable `Graph` and mutable `GraphW`
-2. **CSR Data Structure Migration**: Moving from vector-based adjacency lists to Apache Arrow CSR arrays for memory efficiency
-3. **Memory-Efficient Algorithms**: Introducing `CoarsenedGraphView` for algorithms that work with hierarchical graph structures
+1. **Abstract Graph Base Class**: `Graph` is now an abstract base class with pure virtual methods
+2. **Polymorphic Graph Types**: Two concrete implementations:
+   - `GraphR`: CSR-based (Arrow arrays), read-only, memory-efficient
+   - `GraphW`: Vector-based, mutable, supports dynamic modifications
+3. **Memory-Efficient Algorithms**: `CoarsenedGraphView` for algorithms that work with hierarchical graph structures
 4. **PyArrow Integration**: Enabling zero-copy graph construction from Python data science ecosystems
 5. **Parallel Leiden Algorithm**: A memory-efficient implementation of the Leiden community detection algorithm
 
@@ -15,13 +17,27 @@ This branch introduces a major architectural refactor of the NetworKit graph lib
 ### 1. Graph Class Hierarchy
 
 ```
-Graph (immutable, CSR-based)
+Graph (abstract base class)
+  ├── GraphR (immutable, CSR-based)
   └── GraphW (mutable, vector-based)
 ```
 
-#### Graph (Base Class - Immutable)
+#### Graph (Abstract Base Class)
 
-The base `Graph` class has been refactored to be **immutable** and uses **Apache Arrow CSR arrays** for memory-efficient storage:
+The `Graph` class is now an **abstract base class** defining the interface for all graph types:
+
+- **Interface**: Pure virtual methods for all graph operations
+- **No Direct Instances**: Cannot instantiate `Graph` directly
+- **Polymorphic**: All algorithms work with `const Graph&` and work with both `GraphR` and `GraphW`
+
+**Key Interface Methods:**
+- Read operations: `degree()`, `hasNode()`, `hasEdge()`, `weight()`, iteration methods
+- Virtual iteration: `forNodes()`, `forEdges()`, `forNeighborsOf()`
+- Must be implemented by subclasses
+
+#### GraphR (CSR-Based Implementation - Immutable)
+
+`GraphR` uses **Apache Arrow CSR arrays** for memory-efficient storage:
 
 - **Storage**: Arrow `UInt64Array` for indices and indptr
 - **Access Patterns**: Optimized for read-heavy workloads
@@ -29,38 +45,67 @@ The base `Graph` class has been refactored to be **immutable** and uses **Apache
 - **Interoperability**: Zero-copy construction from Parquet/Arrow formats
 
 **Key Features:**
-- Read-only operations: `degree()`, `hasNode()`, `hasEdge()`, `weight()`, iteration methods
+- Read-only operations (no mutation methods)
 - CSR-based iteration: `forNodes()`, `forEdges()`, `forNeighborsOf()`
 - Memory-efficient: Contiguous storage, better cache performance
 - Arrow integration: Direct construction from Arrow arrays
 
-#### GraphW (Writable Subclass - Mutable)
+**Copy Restrictions:**
+- Cannot copy `GraphW` to `GraphR` directly
+- Only `GraphR` can be copied to `GraphR` (both use CSR)
+- To convert `GraphW` to `GraphR`, must iterate edges and call `addEdge()`
+
+#### GraphW (Vector-Based Implementation - Mutable)
 
 `GraphW` extends `Graph` with mutation operations using traditional vector-based storage:
 
 - **Storage**: `std::vector<std::vector<node>>` for adjacency lists
 - **Operations**: `addNode()`, `addEdge()`, `removeNode()`, `removeEdge()`, `setWeight()`
 - **Use Case**: Graph construction, dynamic modifications, algorithm preprocessing
-- **Backward Compatibility**: Existing code can use `GraphW` where mutation is needed
+- **Copy Support**: Can copy `GraphW` to `GraphW` (copies vectors)
 
 **Migration Path:**
 ```cpp
 // Old way (mutating existing graph)
 Graph g(n);
-g.addEdge(u, v);  // No longer possible with base Graph
+g.addEdge(u, v);  // No longer works - Graph is abstract
 
 // New way (use GraphW for construction)
 GraphW gw(n);
 gw.addEdge(u, v);
-Graph g = gw;  // Convert to immutable for algorithms
+// Use gw directly with algorithms (const Graph& accepts GraphW)
 ```
 
-### 2. CSR Data Structure
+**Copy Constructor Fix:**
+The `GraphW` copy constructor uses a protected `Graph` constructor to bypass the CSR-only check:
+```cpp
+GraphW(const GraphW &other) : Graph(other, true), ...  // 'true' indicates subclass copy
+```
+
+### 2. Iterator Safety
+
+**Important**: The base `Graph::NeighborRange` creates a **new copy** of the neighbor vector in its constructor. This means:
+
+```cpp
+// WRONG - Creates two separate vectors, iterators are incompatible
+std::vector<node> neighbors(
+    G.neighborRange(u).begin(),
+    G.neighborRange(u).end()    // Different vector!
+);
+
+// CORRECT - Store range first, use same vector
+auto range = G.neighborRange(u);
+std::vector<node> neighbors(range.begin(), range.end());
+```
+
+This caused crashes in `SampledGraphStructuralRandMeasure` when run after other tests due to iterator comparison across different memory locations.
+
+### 3. CSR Data Structure
 
 The CSR (Compressed Sparse Row) format uses Apache Arrow for memory management:
 
 ```cpp
-// CSR structure
+// CSR structure in GraphR
 struct {
     std::shared_ptr<arrow::UInt64Array> outEdgesCSRIndices;  // Neighbor IDs
     std::shared_ptr<arrow::UInt64Array> outEdgesCSRIndptr;   // Row pointers
@@ -88,16 +133,16 @@ g = nk.Graph.fromCSR(n_nodes, directed=False,
                      outIndices=indices, outIndptr=indptr)
 ```
 
-### 3. CoarsenedGraphView
+### 4. CoarsenedGraphView
 
 A memory-efficient view for coarsening operations that avoids creating new graph structures:
 
 ```
 Original Graph (CSR)  ──▶  CoarsenedGraphView
-                                  │
-                                  │ (computes on-demand)
-                                  ▼
-                         Supernode adjacency
+                                 │
+                                 │ (computes on-demand)
+                                 ▼
+                        Supernode adjacency
 ```
 
 **How It Works:**
@@ -111,7 +156,7 @@ Original Graph (CSR)  ──▶  CoarsenedGraphView
 - Multilevel graph algorithms
 - Any algorithm that repeatedly coarsens/refines
 
-### 4. ParallelLeidenView
+### 5. ParallelLeidenView
 
 Memory-efficient implementation of the Leiden algorithm using `CoarsenedGraphView`:
 
@@ -131,8 +176,10 @@ Memory-efficient implementation of the Leiden algorithm using `CoarsenedGraphVie
 ### Core Graph Classes
 ```
 include/networkit/graph/
-├── Graph.hpp          # Immutable graph with CSR arrays
-├── Graph.cpp          # CSR-based implementation
+├── Graph.hpp          # Abstract base class with virtual interface
+├── Graph.cpp          # Base class implementations
+├── GraphR.hpp         # CSR-based immutable implementation
+├── GraphR.cpp         # CSR implementation
 ├── GraphW.hpp         # Mutable graph with vector storage
 └── GraphW.cpp         # Vector-based implementation
 ```
@@ -179,7 +226,7 @@ g = nk.graph.Graph(n=100)
 edges = [(0, 1), (1, 2), (2, 0)]
 g = nk.graph.GraphFromEdges(edges)
 
-# Zero-copy from Arrow (immutable)
+# Zero-copy from Arrow (creates GraphR)
 indices = pa.array([1, 2, 0, 2, 1], type=pa.uint64())
 indptr = pa.array([0, 2, 3, 5], type=pa.uint64())
 g = nk.graph.Graph.fromCSR(3, False, indices, indptr)
@@ -200,8 +247,8 @@ gw = GraphW(n=100, weighted=True, directed=False)
 gw.addEdge(0, 1, weight=1.0)
 gw.addEdge(1, 2, weight=2.0)
 
-# Convert to immutable Graph for algorithms
-g = gw  # Implicit conversion
+# Use with algorithms directly (const Graph& accepts GraphW)
+# No conversion needed!
 ```
 
 ### Algorithms
@@ -249,23 +296,35 @@ def fromCSR(n, directed, outIndices, outIndptr):
 Python Arrow Array (owner)
        │
        ▼ (shared_ptr)
-C++ Graph (reference)
+C++ GraphR (reference)
        │
        ▼ (raw pointer)
 Algorithm Access (use)
 ```
 
+### Copy Semantics
+
+| From | To | Method | Notes |
+|------|-----|--------|-------|
+| GraphW | GraphW | Copy constructor | Copies vectors |
+| GraphR | GraphR | Copy constructor | Shares Arrow arrays (immutable) |
+| GraphW | GraphR | Not supported | Must iterate and rebuild |
+| GraphR | GraphW | Copy constructor | Converts to vectors |
+
+**Note:** `GraphW(other, true)` protected constructor allows subclass copying without CSR check.
+
 ## Performance Considerations
 
-### When to Use Graph vs GraphW
+### When to Use GraphR vs GraphW
 
 | Use Case | Recommended Class | Reason |
 |----------|------------------|---------|
-| Algorithm execution | `Graph` | CSR is faster for read-heavy ops |
+| Algorithm execution | `GraphR` or `GraphW` | Both work via `const Graph&` |
 | Graph construction | `GraphW` | Vectors support dynamic modifications |
 | Streaming updates | `GraphW` | Mutable operations |
-| Large static graphs | `Graph` | Lower memory, better cache |
+| Large static graphs | `GraphR` | Lower memory, better cache |
 | Multilevel algorithms | `CoarsenedGraphView` | No memory overhead |
+| Arrow/Pandas interop | `GraphR` | Zero-copy construction |
 
 ### Memory Usage Comparison
 
@@ -273,8 +332,8 @@ For a graph with n nodes and m edges:
 
 | Format | Memory | Notes |
 |--------|--------|-------|
-| Vector-based (GraphW) | ~2m × sizeof(node) + overhead | Good for small graphs |
-| CSR (Graph) | ~m × sizeof(node) + n × sizeof(offset) | ~40-50% less memory |
+| Vector-based (GraphW) | ~2m × sizeof(node) + overhead | Good for construction |
+| CSR (GraphR) | ~m × sizeof(node) + n × sizeof(offset) | ~40-50% less memory |
 | CoarsenedGraphView | O(n) | No edge storage |
 
 ## Testing
@@ -282,8 +341,9 @@ For a graph with n nodes and m edges:
 ### Unit Tests
 ```bash
 # C++ tests
-./networkit_cpp_tests --gtest_filter="*ParallelLeidenView*"
-./networkit_cpp_tests --gtest_filter="*CoarsenedGraphView*"
+./networkit_tests --gtest_filter="*ParallelLeidenView*"
+./networkit_tests --gtest_filter="*CoarsenedGraphView*"
+./networkit_tests --gtest_filter="*Graph*"
 
 # Python tests
 python -m pytest networkit/test/test_parallel_leiden.py -v
@@ -291,18 +351,21 @@ python -m pytest networkit/test/test_arrow_pagerank.py -v
 ```
 
 ### Test Coverage
-- Graph/GraphW conversion and compatibility
+- Graph/GraphW/GraphR conversion and compatibility
 - CSR construction from Arrow arrays
+- Iterator safety (neighborRange called once)
 - ParallelLeidenView correctness vs standard Leiden
 - Memory safety with Arrow arrays
 - Directed and undirected graph handling
+- Copy constructor behavior (GraphW → GraphW, GraphR → GraphR)
 
 ## Migration Guide
 
 ### For Algorithm Developers
 
 1. **Read-only algorithms**: No changes needed - use `const Graph&`
-2. **Graph modifiers**: Change to `GraphW&` or create new `GraphW`
+2. **Graph construction**: Use `GraphW&` for mutation
+3. **Copy operations**: Be aware of copy restrictions
 
 ```cpp
 // Old
@@ -315,26 +378,60 @@ void myAlgorithm(GraphW& g) {
     g.addEdge(u, v);  // OK
 }
 
-// New - Option 2: Create GraphW from Graph
+// New - Option 2: Accept any Graph type (polymorphic)
 void myAlgorithm(const Graph& g) {
-    GraphW gw(g);  // Copy and make writable
-    gw.addEdge(u, v);
+    // Works with GraphR, GraphW, or CoarsenedGraphView
 }
+```
+
+**Important - Iterator Safety:**
+```cpp
+// WRONG - May crash or produce garbage
+std::vector<node> neighbors(
+    G.neighborRange(u).begin(),
+    G.neighborRange(u).end()
+);
+
+// CORRECT
+auto range = G.neighborRange(u);
+std::vector<node> neighbors(range.begin(), range.end());
 ```
 
 ### For Python Users
 
-Most existing code will work unchanged. For construction:
+Most existing code will work unchanged:
 
 ```python
-# Old (still works)
+# Old (still works - uses GraphW)
 g = nk.graph.Graph(100)
-g.addEdge(0, 1)  # Uses GraphW internally
+g.addEdge(0, 1)
 
-# New explicit way
+# New explicit way (if needed)
 from networkit.graph import GraphW
 gw = GraphW(100)
 gw.addEdge(0, 1)
-g = gw.toGraph()  # Convert to immutable
+# Algorithms accept GraphW directly
 ```
 
+## Known Issues and Fixes
+
+### 1. GraphW Copy Constructor
+**Issue:** `GraphW(const GraphW&)` called `Graph(other)` which threw exception for non-CSR graphs.
+
+**Fix:** Added protected `Graph(const Graph&, bool)` constructor that bypasses CSR check for subclass copying.
+
+### 2. NeighborRange Iterator Bug
+**Issue:** Calling `G.neighborRange(u).begin()` and `G.neighborRange(u).end()` creates two separate vectors.
+
+**Fix:** Store range in variable before using iterators:
+```cpp
+auto range = G.neighborRange(u);
+std::vector<node> neighbors(range.begin(), range.end());
+```
+
+### 3. SampledGraphStructuralRandMeasure Crash
+**Issue:** Test crashed with "cannot create std::vector larger than max_size()" when run after other tests.
+
+**Root Cause:** Iterator comparison across different vector allocations.
+
+**Fix:** Applied iterator safety pattern (see above).
