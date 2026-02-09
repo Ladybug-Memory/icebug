@@ -570,7 +570,7 @@ NetworKit::GraphW NetworKit::LFRGenerator::generate() {
     return getMoveGraph();
 }
 
-NetworKit::Graph NetworKit::LFRGenerator::getGraph() const {
+NetworKit::GraphW NetworKit::LFRGenerator::getGraph() const {
     if (!hasGraph)
         throw std::runtime_error("Run must be called first");
 

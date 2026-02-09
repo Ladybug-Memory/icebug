@@ -124,7 +124,7 @@ public:
      *
      * @return The generated graph.
      */
-    Graph getGraph() const;
+    GraphW getGraph() const;
 
     /**
      * Returns the generated graph using move semantics.

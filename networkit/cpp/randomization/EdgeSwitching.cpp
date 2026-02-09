@@ -57,7 +57,7 @@ void EdgeSwitchingInPlace::setNumberOfSwitchesPerEdge(double x) {
     numberOfSwitchesPerEdge = x;
 }
 
-EdgeSwitching::EdgeSwitching(const NetworKit::Graph &G, double numberOfSwitchesPerEdge,
+EdgeSwitching::EdgeSwitching(const NetworKit::GraphW &G, double numberOfSwitchesPerEdge,
                              bool doPreprocessing)
     : ownedGraph(doPreprocessing ? DegreePreservingShuffle::shuffleGraph(G) : G),
       inPlaceAlgorithm(ownedGraph, numberOfSwitchesPerEdge) {}

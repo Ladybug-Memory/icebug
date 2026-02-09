@@ -12,6 +12,7 @@
 #define NETWORKIT_COMPONENTS_STRONGLY_CONNECTED_COMPONENTS_HPP_
 
 #include <networkit/components/ComponentDecomposition.hpp>
+#include <networkit/graph/GraphW.hpp>
 
 namespace NetworKit {
 
@@ -40,8 +41,8 @@ public:
      * @param compactGraph If true, the node ids of the output graph will be compacted
      * (i.e. re-numbered from 0 to n-1). If false, the node ids will not be changed.
      */
-    static Graph extractLargestStronglyConnectedComponent(const Graph &G,
-                                                          bool compactGraph = false);
+    static GraphW extractLargestStronglyConnectedComponent(const Graph &G,
+                                                           bool compactGraph = false);
 };
 
 } // namespace NetworKit

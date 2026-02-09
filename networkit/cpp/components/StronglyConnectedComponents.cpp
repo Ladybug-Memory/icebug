@@ -122,10 +122,10 @@ void StronglyConnectedComponents::run() {
     hasRun = true;
 }
 
-Graph StronglyConnectedComponents::extractLargestStronglyConnectedComponent(const Graph &G,
-                                                                            bool compactGraph) {
+GraphW StronglyConnectedComponents::extractLargestStronglyConnectedComponent(const Graph &G,
+                                                                             bool compactGraph) {
     if (G.isEmpty())
-        return G;
+        return GraphW(G);
 
     StronglyConnectedComponents scc(G);
     scc.run();
@@ -134,8 +134,8 @@ Graph StronglyConnectedComponents::extractLargestStronglyConnectedComponent(cons
     const auto compSizes = component.subsetSizeMap();
     if (compSizes.size() == 1) {
         if (compactGraph && G.upperNodeIdBound() != G.numberOfNodes())
-            return GraphTools::getCompactedGraph(G, GraphTools::getContinuousNodeIds(G));
-        return G;
+            return GraphW(GraphTools::getCompactedGraph(G, GraphTools::getContinuousNodeIds(G)));
+        return GraphW(G);
     }
 
     const auto largestSCCIndex = std::max_element(compSizes.begin(), compSizes.end(),

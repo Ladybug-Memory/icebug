@@ -896,4 +896,64 @@ bool GraphW::hasEdgeImpl(node u, node v) const {
     return false;
 }
 
+std::vector<node> GraphW::getNeighborsVector(node u, bool inEdges) const {
+    std::vector<node> result;
+    if (inEdges) {
+        if (directed) {
+            result = this->inEdges[u];
+        } else {
+            result = this->outEdges[u];
+        }
+    } else {
+        result = this->outEdges[u];
+    }
+    // Filter out non-existent nodes
+    result.erase(
+        std::remove_if(result.begin(), result.end(), [this](node v) { return !this->hasNode(v); }),
+        result.end());
+    return result;
+}
+
+std::pair<std::vector<node>, std::vector<edgeweight>>
+GraphW::getNeighborsWithWeightsVector(node u, bool inEdges) const {
+    std::vector<node> nodes;
+    std::vector<edgeweight> weights;
+
+    if (inEdges) {
+        if (directed) {
+            nodes = this->inEdges[u];
+            if (weighted) {
+                weights = this->inEdgeWeights[u];
+            }
+        } else {
+            nodes = this->outEdges[u];
+            if (weighted) {
+                weights = this->outEdgeWeights[u];
+            }
+        }
+    } else {
+        nodes = this->outEdges[u];
+        if (weighted) {
+            weights = this->outEdgeWeights[u];
+        }
+    }
+
+    // Filter out non-existent nodes and corresponding weights
+    if (!weighted) {
+        // For unweighted graphs, fill with default weight
+        weights.resize(nodes.size(), defaultEdgeWeight);
+    }
+
+    std::vector<node> filteredNodes;
+    std::vector<edgeweight> filteredWeights;
+    for (size_t i = 0; i < nodes.size(); ++i) {
+        if (this->hasNode(nodes[i])) {
+            filteredNodes.push_back(nodes[i]);
+            filteredWeights.push_back(weights[i]);
+        }
+    }
+
+    return {std::move(filteredNodes), std::move(filteredWeights)};
+}
+
 } /* namespace NetworKit */

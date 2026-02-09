@@ -130,7 +130,7 @@ void DynamicHyperbolicGenerator::recomputeBands() {
     INFO("Filled Bands");
 }
 
-Graph DynamicHyperbolicGenerator::getGraph() const {
+GraphW DynamicHyperbolicGenerator::getGraph() const {
     /**
      * The next call is unnecessarily expensive, since it constructs a new QuadTree / bands.
      * Reduces code duplication, though.

@@ -68,10 +68,10 @@ void ConnectedComponentsImpl<WeaklyCC>::run() {
 }
 
 template <bool WeaklyCC>
-Graph ConnectedComponentsImpl<WeaklyCC>::extractLargestConnectedComponent(const Graph &G,
-                                                                          bool compactGraph) {
+GraphW ConnectedComponentsImpl<WeaklyCC>::extractLargestConnectedComponent(const Graph &G,
+                                                                           bool compactGraph) {
     if (G.isEmpty())
-        return G;
+        return GraphW(G);
 
     Partition component;
     ConnectedComponentsImpl<WeaklyCC> cc(G, component);
@@ -79,8 +79,8 @@ Graph ConnectedComponentsImpl<WeaklyCC>::extractLargestConnectedComponent(const 
     const auto compSizes = component.subsetSizeMap();
     if (compSizes.size() == 1) {
         if (compactGraph)
-            return GraphTools::getCompactedGraph(G, GraphTools::getContinuousNodeIds(G));
-        return G;
+            return GraphW(GraphTools::getCompactedGraph(G, GraphTools::getContinuousNodeIds(G)));
+        return GraphW(G);
     }
 
     const auto largestCCIndex =

@@ -448,7 +448,7 @@ void merge(GraphW &G, const Graph &G1) {
     });
 }
 
-Graph getCompactedGraph(const Graph &graph, const std::unordered_map<node, node> &nodeIdMap) {
+GraphW getCompactedGraph(const Graph &graph, const std::unordered_map<node, node> &nodeIdMap) {
     return getRemappedGraph(graph, nodeIdMap.size(), [&](node u) {
         const auto it = nodeIdMap.find(u);
         assert(it != nodeIdMap.cend());
@@ -519,7 +519,7 @@ node augmentGraph(GraphW &G) {
     return root;
 }
 
-std::pair<Graph, node> createAugmentedGraph(const Graph &G) {
+std::pair<GraphW, node> createAugmentedGraph(const Graph &G) {
     GraphW augmented(G);
     node root = augmentGraph(augmented);
     return {augmented, root};

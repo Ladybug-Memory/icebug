@@ -51,7 +51,7 @@ void ParallelAgglomerativeClusterer::run() {
         // contract graph according to matching, TODO: (and star-like structures)
         MatchingCoarsening matchingContracter(Gcopy, M);
         matchingContracter.run();
-        Graph Gcombined = matchingContracter.getCoarseGraph();
+        auto Gcombined = matchingContracter.getCoarseGraph();
 
         // determine if it makes sense to proceed
         count n = Gcopy.numberOfNodes();

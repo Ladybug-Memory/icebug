@@ -22,7 +22,7 @@ void ConnectedComponents::run() {
     hasRun = true;
 }
 
-Graph ConnectedComponents::extractLargestConnectedComponent(const Graph &G, bool compactGraph) {
+GraphW ConnectedComponents::extractLargestConnectedComponent(const Graph &G, bool compactGraph) {
     return ConnectedComponentsDetails::ConnectedComponentsImpl<
         false>::extractLargestConnectedComponent(G, compactGraph);
 }

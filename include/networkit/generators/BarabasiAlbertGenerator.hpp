@@ -17,7 +17,7 @@ namespace NetworKit {
  * Generates a scale-free graph using the Barabasi-Albert preferential attachment model.
  */
 class BarabasiAlbertGenerator final : public StaticGraphGenerator {
-    Graph initGraph;
+    GraphW initGraph;
     count k{0};      //!< Attachments made per node
     count nMax{0};   //!< The maximal number of nodes attached
     count n0{0};     //!< The number of initial connected nodes

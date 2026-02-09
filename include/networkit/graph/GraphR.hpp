@@ -87,6 +87,17 @@ public:
 
     /** Default destructor */
     ~GraphR() override = default;
+
+    // Implement pure virtual methods from Graph base class
+
+    count degree(node v) const override;
+    count degreeIn(node v) const override;
+    bool isIsolated(node v) const override;
+
+protected:
+    std::vector<node> getNeighborsVector(node u, bool inEdges = false) const override;
+    std::pair<std::vector<node>, std::vector<edgeweight>>
+    getNeighborsWithWeightsVector(node u, bool inEdges = false) const override;
 };
 
 } // namespace NetworKit

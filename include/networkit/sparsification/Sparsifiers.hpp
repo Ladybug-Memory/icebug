@@ -33,7 +33,7 @@ public:
      */
     virtual void run() = 0;
 
-    Graph getGraph();
+    GraphW getGraph();
 
 protected:
     const Graph &inputGraph;

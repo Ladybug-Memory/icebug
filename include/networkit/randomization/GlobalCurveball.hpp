@@ -56,7 +56,7 @@ public:
      * Returns a new graph instance with the same degree sequence as the input
      * graph, but with randomized neighbourhoods.
      */
-    Graph getGraph();
+    GraphW getGraph();
 
 private:
     std::unique_ptr<CurveballDetails::GlobalCurveballImpl> impl;

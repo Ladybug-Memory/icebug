@@ -10,6 +10,7 @@
 
 #include <networkit/base/Algorithm.hpp>
 #include <networkit/graph/Graph.hpp>
+#include <networkit/graph/GraphW.hpp>
 
 namespace NetworKit {
 
@@ -55,7 +56,7 @@ public:
      * Returns a shuffled copy of the input graph.
      * @warning Invoke run() before calling this function.
      */
-    Graph getGraph() const;
+    GraphW getGraph() const;
 
     /**
      * Returns a reference to the permutation used for shuffling,
@@ -65,7 +66,7 @@ public:
      */
     const std::vector<node> &getPermutation() const noexcept { return permutation; }
 
-    static Graph shuffleGraph(const Graph &input) {
+    static GraphW shuffleGraph(const Graph &input) {
         DegreePreservingShuffle algo(input);
         algo.run();
         return algo.getGraph();

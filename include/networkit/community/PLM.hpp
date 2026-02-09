@@ -53,7 +53,7 @@ public:
      * @param zeta Partition of the graph, which represents the desired state of the coarsened graph
      * @return pair of coarsened graph and node-mappings from fine to coarse graph
      */
-    static std::pair<Graph, std::vector<node>> coarsen(const Graph &G, const Partition &zeta);
+    static std::pair<GraphW, std::vector<node>> coarsen(const Graph &G, const Partition &zeta);
 
     /**
      * Calculates a partition containing the mapping of node-id from a fine graph

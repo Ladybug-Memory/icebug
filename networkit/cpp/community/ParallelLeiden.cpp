@@ -19,7 +19,7 @@ void ParallelLeiden::run() {
         numberOfIterations--;
         changed = false;
         const Graph *currentGraph = G;
-        Graph coarse;
+        GraphW coarse;
         Partition refined;
         calculateVolumes(*currentGraph);
         do {

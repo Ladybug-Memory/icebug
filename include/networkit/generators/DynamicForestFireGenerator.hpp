@@ -47,7 +47,7 @@ private:
     bool directed;
     double r;
     bool firstCall;
-    Graph G;
+    GraphW G;
 };
 
 } /* namespace NetworKit */

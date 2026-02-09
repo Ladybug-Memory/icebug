@@ -901,6 +901,18 @@ private:
      */
     bool hasEdgeImpl(node u, node v) const override;
 
+protected:
+    /**
+     * Get neighbors as a vector (vector-based implementation)
+     */
+    std::vector<node> getNeighborsVector(node u, bool inEdges = false) const override;
+
+    /**
+     * Get neighbors with weights as vectors (vector-based implementation)
+     */
+    std::pair<std::vector<node>, std::vector<edgeweight>>
+    getNeighborsWithWeightsVector(node u, bool inEdges = false) const override;
+
 public:
     /**
      * Wrapper class to iterate over a range of the neighbors of a node within
