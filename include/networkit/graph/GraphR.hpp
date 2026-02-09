@@ -94,6 +94,16 @@ public:
     count degreeIn(node v) const override;
     bool isIsolated(node v) const override;
 
+    /**
+     * Return edge weight of edge {@a u,@a v}. Returns 0 if edge does not
+     * exist. For CSR graphs, always returns 1.0 if edge exists (unweighted).
+     *
+     * @param u Endpoint of edge.
+     * @param v Endpoint of edge.
+     * @return Edge weight of edge {@a u,@a v} or 0 if edge does not exist.
+     */
+    edgeweight weight(node u, node v) const override;
+
 protected:
     std::vector<node> getNeighborsVector(node u, bool inEdges = false) const override;
     std::pair<std::vector<node>, std::vector<edgeweight>>

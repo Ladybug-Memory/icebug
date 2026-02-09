@@ -25,6 +25,14 @@ bool GraphR::isIsolated(node v) const {
     return degreeCSR(v, false) == 0 && (!directed || degreeCSR(v, true) == 0);
 }
 
+edgeweight GraphR::weight(node u, node v) const {
+    // For CSR-based graphs, return default weight of 1.0 if edge exists
+    if (hasEdge(u, v)) {
+        return defaultEdgeWeight;
+    }
+    return 0.0; // No edge
+}
+
 std::vector<node> GraphR::getNeighborsVector(node u, bool inEdges) const {
     std::pair<const node *, count> neighbors;
     if (inEdges) {
