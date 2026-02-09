@@ -1268,7 +1268,6 @@ inline void CSRGeneralMatrix<ValueType>::forNonZeroElementsInRowOrder(L handle) 
 template <typename ValueType>
 template <typename L>
 inline void CSRGeneralMatrix<ValueType>::parallelForNonZeroElementsInRowOrder(L handle) const {
-#pragma omp parallel for
     for (omp_index i = 0; i < static_cast<omp_index>(nRows); ++i)
         for (index k = rowIdx[i]; k < rowIdx[i + 1]; ++k)
             handle(i, columnIdx[k], nonZeros[k]);

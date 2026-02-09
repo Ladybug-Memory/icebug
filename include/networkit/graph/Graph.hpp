@@ -1071,7 +1071,7 @@ public:
      * @param v Endpoint of edge.
      * @return Edge weight of edge {@a u,@a v} or 0 if edge does not exist.
      */
-    edgeweight weight(node u, node v) const;
+    virtual edgeweight weight(node u, node v) const;
 
     /**
      * Set the weight to the i-th neighbour of u.

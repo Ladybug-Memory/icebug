@@ -591,6 +591,16 @@ public:
     void swapEdge(node s1, node t1, node s2, node t2);
 
     /**
+     * Return edge weight of edge {@a u,@a v}. Returns 0 if edge does not
+     * exist. BEWARE: Running time is \Theta(deg(u))!
+     *
+     * @param u Endpoint of edge.
+     * @param v Endpoint of edge.
+     * @return Edge weight of edge {@a u,@a v} or 0 if edge does not exist.
+     */
+    edgeweight weight(node u, node v) const override;
+
+    /**
      * Set edge weight of edge {@a u,@a v}. BEWARE: Running time is \Theta(deg(u))!
      *
      * @param u Endpoint of edge.

@@ -727,6 +727,22 @@ void GraphW::swapEdge(node s1, node t1, node s2, node t2) {
 
 /** EDGE ATTRIBUTES **/
 
+edgeweight GraphW::weight(node u, node v) const {
+    if (!hasNode(u) || !hasNode(v)) {
+        return 0.0;
+    }
+
+    index vi = indexInOutEdgeArray(u, v);
+    if (vi == none) {
+        return 0.0; // No edge
+    }
+
+    if (weighted) {
+        return outEdgeWeights[u][vi];
+    }
+    return defaultEdgeWeight;
+}
+
 void GraphW::setWeight(node u, node v, edgeweight ew) {
     if (!weighted) {
         throw std::runtime_error("Cannot set edge weight in unweighted graph.");
