@@ -75,4 +75,90 @@ GraphR::getNeighborsWithWeightsVector(node u, bool inEdges) const {
     return {std::move(nodeVec), std::move(weightVec)};
 }
 
+index GraphR::indexInInEdgeArray(node v, node u) const {
+    if (!directed) {
+        return indexInOutEdgeArray(v, u);
+    }
+
+    // For directed graphs, search in incoming edges CSR
+    if (!inEdgesCSRIndptr || !inEdgesCSRIndices) {
+        return none;
+    }
+
+    auto start_idx = inEdgesCSRIndptr->Value(v);
+    auto end_idx = inEdgesCSRIndptr->Value(v + 1);
+
+    for (auto idx = start_idx; idx < end_idx; ++idx) {
+        if (inEdgesCSRIndices->Value(idx) == u) {
+            return idx - start_idx;
+        }
+    }
+    return none;
+}
+
+index GraphR::indexInOutEdgeArray(node u, node v) const {
+    if (!outEdgesCSRIndptr || !outEdgesCSRIndices) {
+        return none;
+    }
+
+    auto start_idx = outEdgesCSRIndptr->Value(u);
+    auto end_idx = outEdgesCSRIndptr->Value(u + 1);
+
+    for (auto idx = start_idx; idx < end_idx; ++idx) {
+        if (outEdgesCSRIndices->Value(idx) == v) {
+            return idx - start_idx;
+        }
+    }
+    return none;
+}
+
+edgeid GraphR::edgeId(node u, node v) const {
+    throw std::runtime_error("edgeId not supported for CSR-based GraphR - use GraphW");
+}
+
+node GraphR::getIthNeighbor(Unsafe, node u, index i) const {
+    auto start_idx = outEdgesCSRIndptr->Value(u);
+    return outEdgesCSRIndices->Value(start_idx + i);
+}
+
+edgeweight GraphR::getIthNeighborWeight(node u, index i) const {
+    if (!hasNode(u) || i >= degree(u)) {
+        return nullWeight;
+    }
+    // CSR graphs have uniform weight
+    return defaultEdgeWeight;
+}
+
+node GraphR::getIthNeighbor(node u, index i) const {
+    if (!hasNode(u) || i >= degree(u)) {
+        return none;
+    }
+    auto start_idx = outEdgesCSRIndptr->Value(u);
+    return outEdgesCSRIndices->Value(start_idx + i);
+}
+
+node GraphR::getIthInNeighbor(node u, index i) const {
+    if (!hasNode(u) || i >= degreeIn(u)) {
+        return none;
+    }
+    if (!directed) {
+        return getIthNeighbor(u, i);
+    }
+    auto start_idx = inEdgesCSRIndptr->Value(u);
+    return inEdgesCSRIndices->Value(start_idx + i);
+}
+
+std::pair<node, edgeweight> GraphR::getIthNeighborWithWeight(node u, index i) const {
+    if (!hasNode(u) || i >= degree(u)) {
+        return {none, nullWeight};
+    }
+    auto start_idx = outEdgesCSRIndptr->Value(u);
+    return {outEdgesCSRIndices->Value(start_idx + i), defaultEdgeWeight};
+}
+
+std::pair<node, edgeid> GraphR::getIthNeighborWithId(node u, index i) const {
+    throw std::runtime_error(
+        "getIthNeighborWithId not supported for CSR-based GraphR - use GraphW");
+}
+
 } // namespace NetworKit

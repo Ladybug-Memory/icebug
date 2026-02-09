@@ -104,10 +104,22 @@ public:
      */
     edgeweight weight(node u, node v) const override;
 
+    edgeid edgeId(node u, node v) const override;
+
+    node getIthNeighbor(Unsafe, node u, index i) const override;
+    edgeweight getIthNeighborWeight(node u, index i) const override;
+    node getIthNeighbor(node u, index i) const override;
+    node getIthInNeighbor(node u, index i) const override;
+    std::pair<node, edgeweight> getIthNeighborWithWeight(node u, index i) const override;
+    std::pair<node, edgeid> getIthNeighborWithId(node u, index i) const override;
+
 protected:
     std::vector<node> getNeighborsVector(node u, bool inEdges = false) const override;
     std::pair<std::vector<node>, std::vector<edgeweight>>
     getNeighborsWithWeightsVector(node u, bool inEdges = false) const override;
+
+    index indexInInEdgeArray(node v, node u) const override;
+    index indexInOutEdgeArray(node u, node v) const override;
 };
 
 } // namespace NetworKit
