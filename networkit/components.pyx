@@ -1,5 +1,7 @@
 # distutils: language=c++
 
+from cython.operator import dereference, preincrement
+
 from libcpp cimport bool as bool_t
 from libcpp.vector cimport vector
 from libcpp.map cimport map
@@ -9,7 +11,7 @@ from .base cimport _Algorithm, Algorithm
 from .dynbase cimport _DynAlgorithm
 from .dynbase import DynAlgorithm
 from .dynamics cimport _GraphEvent, GraphEvent
-from .graph cimport _Graph, Graph
+from .graph cimport _Graph, _GraphW, Graph
 from .structures cimport _Partition, Partition, count, index, node
 
 cdef extern from "<networkit/components/ComponentDecomposition.hpp>":
@@ -104,7 +106,7 @@ cdef extern from "<networkit/components/ConnectedComponents.hpp>":
 	cdef cppclass _ConnectedComponents "NetworKit::ConnectedComponents"(_ComponentDecomposition):
 		_ConnectedComponents(_Graph G) except +
 		@staticmethod
-		_Graph extractLargestConnectedComponent(_Graph G, bool_t) except + nogil
+		_GraphW extractLargestConnectedComponent(const _Graph& G, bool_t) except + nogil
 
 cdef class ConnectedComponents(ComponentDecomposition):
 	"""
@@ -149,7 +151,7 @@ cdef class ConnectedComponents(ComponentDecomposition):
 			A graph that contains only the nodes inside the largest
 			connected component.
 		"""
-		return Graph().setThis(_ConnectedComponents.extractLargestConnectedComponent(dereference(graph._this), compactGraph))
+		return Graph().setThisFromGraphW(_ConnectedComponents.extractLargestConnectedComponent(dereference(graph._this), compactGraph))
 
 cdef extern from "<networkit/components/ParallelConnectedComponents.hpp>":
 

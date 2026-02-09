@@ -1,5 +1,7 @@
 # distutils: language=c++
 
+from cython.operator import dereference, preincrement
+
 from cython.operator cimport preincrement, dereference
 
 from libcpp.vector cimport vector

@@ -1,11 +1,12 @@
 # distutils: language=c++
 
+from cython.operator import dereference, preincrement
 from libcpp cimport bool as bool_t
 from libcpp.map cimport map
 from libcpp.vector cimport vector
 
 from .base cimport _Algorithm, Algorithm
-from .graph cimport _Graph, Graph
+from .graph cimport _Graph, Graph, _GraphW
 from .matching cimport _Matching, Matching
 from .structures cimport _Cover, Cover, _Partition, Partition, index, node
 
@@ -13,7 +14,7 @@ cdef extern from "<networkit/coarsening/GraphCoarsening.hpp>":
 
 	cdef cppclass _GraphCoarsening "NetworKit::GraphCoarsening"(_Algorithm):
 		_GraphCoarsening(_Graph) except +
-		_Graph getCoarseGraph() except +
+		_GraphW& getCoarseGraph() except +
 		vector[node] getFineToCoarseNodeMapping() except +
 		map[node, vector[node]] getCoarseToFineNodeMapping() except +
 
@@ -37,7 +38,7 @@ cdef class GraphCoarsening(Algorithm):
 		networkit.Graph
 			Coarse graph.
 		"""
-		return Graph(0).setThis((<_GraphCoarsening*>(self._this)).getCoarseGraph())
+		return Graph(0).setThisFromGraphW((<_GraphCoarsening*>(self._this)).getCoarseGraph())
 
 	def getFineToCoarseNodeMapping(self):
 		"""
@@ -88,7 +89,7 @@ cdef class ParallelPartitionCoarsening(GraphCoarsening):
 		If true, algorithm runs in parallel. Default: True
 	"""
 	def __cinit__(self, Graph G not None, Partition zeta not None, parallel = True):
-		self._this = new _ParallelPartitionCoarsening(dereference(G._this), dereference(zeta._this), parallel)
+		self._this = new _ParallelPartitionCoarsening(dereference(G._this), zeta._this, parallel)
 
 cdef extern from "<networkit/coarsening/MatchingCoarsening.hpp>":
 

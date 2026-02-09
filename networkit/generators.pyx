@@ -1,5 +1,7 @@
 # distutils: language=c++
 
+from cython.operator import dereference, preincrement
+
 import math
 import subprocess
 import os
@@ -14,7 +16,7 @@ from .base cimport _Algorithm, Algorithm
 from .centrality import DegreeCentrality, LocalPartitionCoverage
 from .community import PLM
 from .dynamics cimport _GraphEvent, GraphEvent
-from .graph cimport _Graph, Graph
+from .graph cimport _Graph, _GraphW, Graph
 from .graphtools import GraphTools
 from .structures cimport _Partition, Partition, count, index, node, coordinate
 
@@ -40,7 +42,7 @@ cdef extern from "<networkit/generators/StaticGraphGenerator.hpp>":
 
 	cdef cppclass _StaticGraphGenerator "NetworKit::StaticGraphGenerator":
 		_StaticGraphGenerator()
-		_Graph generate() except +
+		_GraphW generate() except +
 
 cdef class StaticGraphGenerator:
 	""" Abstract base class for static graph generators """
@@ -71,7 +73,7 @@ cdef class StaticGraphGenerator:
 		"""
 		if self._this == NULL:
 			raise RuntimeError("Error, object not properly initialized")
-		return Graph().setThis(self._this.generate())
+		return Graph().setThisFromGraphW(self._this.generate())
 
 cdef extern from "<networkit/generators/BarabasiAlbertGenerator.hpp>":
 
@@ -114,7 +116,7 @@ cdef class BarabasiAlbertGenerator(StaticGraphGenerator):
 
 	def __cinit__(self, count k, count nMax, n0=0, bool_t sequential=True):
 		if isinstance(n0, Graph):
-			self._this = new _BarabasiAlbertGenerator(k, nMax, (<Graph>n0)._this, sequential)
+			self._this = new _BarabasiAlbertGenerator(k, nMax, dereference((<Graph>n0)._this), sequential)
 		else:
 			self._this = new _BarabasiAlbertGenerator(k, nMax, <count>n0, sequential)
 
@@ -201,7 +203,7 @@ cdef extern from "<networkit/generators/DynamicPubWebGenerator.hpp>":
 		_DynamicPubWebGenerator(count numNodes, count numberOfDenseAreas,
 			float neighborhoodRadius, count maxNumberOfNeighbors) except +
 		vector[_GraphEvent] generate(count nSteps) except +
-		_Graph getGraph() except +
+		_GraphW getGraph() except +
 		vector[_Point2D] getCoordinates()
 		vector[pair[node, _Point2D]] getNewCoordinates()
 
@@ -260,7 +262,7 @@ cdef class DynamicPubWebGenerator:
 		networkit.Graph
 			The resulting graph.
 		"""
-		return Graph().setThis(self._this.getGraph())
+		return Graph().setThisFromGraphW(self._this.getGraph())
 
 	def getCoordinates(self):
 		"""
@@ -487,7 +489,7 @@ cdef extern from "<networkit/generators/HyperbolicGenerator.hpp>":
 		void setTheoreticalSplit(bool_t split) except +
 		void setBalance(double balance) except +
 		vector[double] getElapsedMilliseconds() except +
-		_Graph generate(vector[double] angles, vector[double] radii, double R, double T) except +
+		_GraphW generate(vector[double] angles, vector[double] radii, double R, double T) except +
 
 cdef class HyperbolicGenerator(StaticGraphGenerator):
 	"""
@@ -661,7 +663,7 @@ cdef class PowerlawDegreeSequence:
 
 	def __cinit__(self, minDeg, count maxDeg = 0, double gamma = -2):
 		if isinstance(minDeg, Graph):
-			self._this = new _PowerlawDegreeSequence((<Graph>minDeg)._this)
+			self._this = new _PowerlawDegreeSequence(dereference((<Graph>minDeg)._this))
 		else:
 			try:
 				self._this = new _PowerlawDegreeSequence(<vector[double]?>minDeg)
@@ -824,9 +826,9 @@ cdef extern from "<networkit/generators/LFRGenerator.hpp>":
 		void setMu(double mu) except + nogil
 		void setMu(const vector[double] & mu) except + nogil
 		void setMuWithBinomialDistribution(double mu) except + nogil
-		_Graph getGraph() except +
+		_GraphW getGraph() except +
 		_Partition getPartition() except +
-		_Graph generate() except +
+		_GraphW generate() except +
 
 cdef class LFRGenerator(Algorithm):
 	"""
@@ -917,7 +919,7 @@ cdef class LFRGenerator(Algorithm):
 			The partition to use.
 		"""
 		with nogil:
-			(<_LFRGenerator*>(self._this)).setPartition(dereference(zeta._this))
+			(<_LFRGenerator*>(self._this)).setPartition(zeta._this)
 		return self
 
 	def generatePowerlawCommunitySizeSequence(self, count minCommunitySize, count maxCommunitySize, double communitySizeExp):
@@ -986,7 +988,7 @@ cdef class LFRGenerator(Algorithm):
 		networkit.Graph
 			The generated graph.
 		"""
-		return Graph().setThis((<_LFRGenerator*>(self._this)).getGraph())
+		return Graph().setThisFromGraphW((<_LFRGenerator*>(self._this)).getGraph())
 
 	def generate(self, useReferenceImplementation=False):
 		"""
@@ -1008,7 +1010,7 @@ cdef class LFRGenerator(Algorithm):
 			from networkit import graphio
 			os.system("{0}/benchmark {1}".format(self.paths["refImplDir"], self.params["refImplParams"]))
 			return graphio.readGraph("network.dat", graphio.Format.EdgeListTabOne)
-		return Graph().setThis((<_LFRGenerator*>(self._this)).generate())
+		return Graph().setThisFromGraphW((<_LFRGenerator*>(self._this)).generate())
 
 	def getPartition(self):
 		"""
@@ -1306,7 +1308,7 @@ cdef extern from "<networkit/generators/DynamicHyperbolicGenerator.hpp>":
 	cdef cppclass _DynamicHyperbolicGenerator "NetworKit::DynamicHyperbolicGenerator":
 		_DynamicHyperbolicGenerator(count numNodes, double avgDegree, double gamma, double T, double moveEachStep, double moveDistance) except +
 		vector[_GraphEvent] generate(count nSteps) except +
-		_Graph getGraph() except +
+		_GraphW getGraph() except +
 		vector[_Point2D] getCoordinates() except +
 
 cdef class DynamicHyperbolicGenerator:
@@ -1369,7 +1371,7 @@ cdef class DynamicHyperbolicGenerator:
 		networkit.Graph
 			The current graph.
 		"""
-		return Graph().setThis(self._this.getGraph())
+		return Graph().setThisFromGraphW(self._this.getGraph())
 
 	def getCoordinates(self):
 		""" 
@@ -1547,7 +1549,7 @@ cdef extern from "<networkit/generators/DynamicForestFireGenerator.hpp>":
 	cdef cppclass _DynamicForestFireGenerator "NetworKit::DynamicForestFireGenerator":
 		_DynamicForestFireGenerator(double p, bool_t directed, double r) except +
 		vector[_GraphEvent] generate(count nSteps) except +
-		_Graph getGraph() except +
+		_GraphW getGraph() except +
 
 
 cdef class DynamicForestFireGenerator:
