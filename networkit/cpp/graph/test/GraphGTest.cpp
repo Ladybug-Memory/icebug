@@ -33,16 +33,16 @@ protected:
     count n_house;
     count m_house;
 
-    bool isGraph() const { return !isWeighted() && !isDirected(); }
-    bool isWeightedGraph() const { return isWeighted() && !isDirected(); }
-    bool isDirectedGraph() const { return !isWeighted() && isDirected(); }
-    bool isWeightedDirectedGraph() const { return isWeighted() && isDirected(); }
+    bool isGraphW() const { return !isWeighted() && !isDirected(); }
+    bool isWeightedGraphW() const { return isWeighted() && !isDirected(); }
+    bool isDirectedGraphW() const { return !isWeighted() && isDirected(); }
+    bool isWeightedDirectedGraphW() const { return isWeighted() && isDirected(); }
 
     bool isWeighted() const;
     bool isDirected() const;
-    Graph createGraph(count n = 0) const;
-    Graph createGraph(count n, count m) const;
-    count countSelfLoopsManually(const Graph &G);
+    GraphW createGraphW(count n = 0) const;
+    GraphW createGraphW(count n, count m) const;
+    count countSelfLoopsManually(const GraphW &G);
 };
 
 INSTANTIATE_TEST_SUITE_P(InstantiationName, GraphGTest,
@@ -57,15 +57,15 @@ bool GraphGTest::isDirected() const {
     return std::get<1>(GetParam());
 }
 
-Graph GraphGTest::createGraph(count n) const {
+GraphW GraphGTest::createGraphW(count n) const {
     bool weighted, directed;
     std::tie(weighted, directed) = GetParam();
-    Graph G(n, weighted, directed);
+    GraphW G(n, weighted, directed);
     return G;
 }
 
-Graph GraphGTest::createGraph(count n, count m) const {
-    GraphW G = createGraph(n);
+GraphW GraphGTest::createGraphW(count n, count m) const {
+    GraphW G = createGraphW(n);
     while (G.numberOfEdges() < m) {
         const auto u = Aux::Random::index(n);
         const auto v = Aux::Random::index(n);
@@ -80,7 +80,7 @@ Graph GraphGTest::createGraph(count n, count m) const {
     return G;
 }
 
-count GraphGTest::countSelfLoopsManually(const Graph &G) {
+count GraphGTest::countSelfLoopsManually(const GraphW &G) {
     count c = 0;
     G.forEdges([&](node u, node v) {
         if (u == v) {
@@ -109,7 +109,7 @@ void GraphGTest::SetUp() {
     n_house = 5;
     m_house = 8;
 
-    Ghouse = createGraph(5);
+    Ghouse = createGraphW(5);
     houseEdgesOut = {{3, 1}, {1, 0}, {0, 2}, {2, 1}, {1, 4}, {4, 3}, {3, 2}, {2, 4}};
     Ahouse = {n_house, std::vector<edgeweight>(n_house, 0.0)};
     edgeweight ew = 1.0;
@@ -153,7 +153,7 @@ TEST_P(GraphGTest, testCopyConstructorWithIndexedEdgeIds) {
     G.addEdge(1, 2);
     G.indexEdges(true);
 
-    Graph GCopy(G, isWeighted(), isDirected(), true);
+    GraphW GCopy(G, isWeighted(), isDirected(), true);
     EXPECT_TRUE(GCopy.hasEdgeIds());
     EXPECT_TRUE(GCopy.hasEdge(0, 1));
     EXPECT_TRUE(GCopy.hasEdge(1, 2));
@@ -285,7 +285,7 @@ TEST_P(GraphGTest, testCopyConstructor) {
 /** NODE MODIFIERS **/
 
 TEST_P(GraphGTest, testAddNode) {
-    GraphW G = createGraph();
+    GraphW G = createGraphW();
 
     ASSERT_FALSE(G.hasNode(0));
     ASSERT_FALSE(G.hasNode(1));
@@ -296,7 +296,7 @@ TEST_P(GraphGTest, testAddNode) {
     ASSERT_FALSE(G.hasNode(1));
     ASSERT_EQ(1u, G.numberOfNodes());
 
-    GraphW G2 = createGraph(2);
+    GraphW G2 = createGraphW(2);
     ASSERT_TRUE(G2.hasNode(0));
     ASSERT_TRUE(G2.hasNode(1));
     ASSERT_FALSE(G2.hasNode(2));
@@ -311,7 +311,7 @@ TEST_P(GraphGTest, testAddNode) {
 }
 
 TEST_P(GraphGTest, testAddNodes) {
-    GraphW G = createGraph(5);
+    GraphW G = createGraphW(5);
     G.addNodes(5);
 
     ASSERT_EQ(G.numberOfNodes(), 10);
@@ -324,7 +324,7 @@ TEST_P(GraphGTest, testAddNodes) {
 }
 
 TEST_P(GraphGTest, testRemoveNode) {
-    auto testGraph = [&](GraphW &G) {
+    auto testGraphW = [&](GraphW &G) {
         count n = G.numberOfNodes();
         count z = n;
         count m = G.numberOfEdges();
@@ -342,12 +342,12 @@ TEST_P(GraphGTest, testRemoveNode) {
 
     GraphW G1 = ErdosRenyiGenerator(200, 0.2, false).generate();
     GraphW G2 = ErdosRenyiGenerator(200, 0.2, true).generate();
-    testGraph(G1);
-    testGraph(G2);
+    testGraphW(G1);
+    testGraphW(G2);
 }
 
 TEST_P(GraphGTest, testHasNode) {
-    GraphW G = createGraph(5);
+    GraphW G = createGraphW(5);
 
     ASSERT_TRUE(G.hasNode(0));
     ASSERT_TRUE(G.hasNode(1));
@@ -371,7 +371,7 @@ TEST_P(GraphGTest, testHasNode) {
 }
 
 TEST_P(GraphGTest, testRestoreNode) {
-    GraphW G = createGraph(4);
+    GraphW G = createGraphW(4);
 
     ASSERT_EQ(4u, G.numberOfNodes());
     ASSERT_TRUE(G.hasNode(0));
@@ -470,7 +470,7 @@ TEST_P(GraphGTest, testWeightedDegree) {
     // add self-loop
     this->Ghouse.addEdge(2, 2, 0.75);
 
-    if (isGraph()) {
+    if (isGraphW()) {
         ASSERT_EQ(2 * defaultEdgeWeight, this->Ghouse.weightedDegree(0));
         ASSERT_EQ(4 * defaultEdgeWeight, this->Ghouse.weightedDegree(1));
         ASSERT_EQ(5 * defaultEdgeWeight, this->Ghouse.weightedDegree(2));
@@ -478,7 +478,7 @@ TEST_P(GraphGTest, testWeightedDegree) {
         ASSERT_EQ(3 * defaultEdgeWeight, this->Ghouse.weightedDegree(4));
     }
 
-    if (isWeightedGraph()) {
+    if (isWeightedGraphW()) {
         ASSERT_EQ(5.0, this->Ghouse.weightedDegree(0));
         ASSERT_EQ(12.0, this->Ghouse.weightedDegree(1));
         ASSERT_EQ(22.75, this->Ghouse.weightedDegree(2));
@@ -486,7 +486,7 @@ TEST_P(GraphGTest, testWeightedDegree) {
         ASSERT_EQ(19.0, this->Ghouse.weightedDegree(4));
     }
 
-    if (isDirectedGraph()) {
+    if (isDirectedGraphW()) {
         // only count outgoing edges
         ASSERT_EQ(1 * defaultEdgeWeight, this->Ghouse.weightedDegree(0));
         ASSERT_EQ(2 * defaultEdgeWeight, this->Ghouse.weightedDegree(1));
@@ -495,7 +495,7 @@ TEST_P(GraphGTest, testWeightedDegree) {
         ASSERT_EQ(1 * defaultEdgeWeight, this->Ghouse.weightedDegree(4));
     }
 
-    if (isWeightedDirectedGraph()) {
+    if (isWeightedDirectedGraphW()) {
         // only sum weight of outgoing edges
         ASSERT_EQ(3.0, this->Ghouse.weightedDegree(0));
         ASSERT_EQ(7.0, this->Ghouse.weightedDegree(1));
@@ -509,7 +509,7 @@ TEST_P(GraphGTest, testWeightedDegree2) {
     // add self-loop
     this->Ghouse.addEdge(2, 2, 0.75);
 
-    if (isGraph()) {
+    if (isGraphW()) {
         ASSERT_EQ(2 * defaultEdgeWeight, this->Ghouse.weightedDegree(0, true));
         ASSERT_EQ(4 * defaultEdgeWeight, this->Ghouse.weightedDegree(1, true));
         ASSERT_EQ(6 * defaultEdgeWeight, this->Ghouse.weightedDegree(2, true));
@@ -517,7 +517,7 @@ TEST_P(GraphGTest, testWeightedDegree2) {
         ASSERT_EQ(3 * defaultEdgeWeight, this->Ghouse.weightedDegree(4, true));
     }
 
-    if (isWeightedGraph()) {
+    if (isWeightedGraphW()) {
         ASSERT_EQ(5.0, this->Ghouse.weightedDegree(0, true));
         ASSERT_EQ(12.0, this->Ghouse.weightedDegree(1, true));
         ASSERT_EQ(23.5, this->Ghouse.weightedDegree(2, true));
@@ -525,7 +525,7 @@ TEST_P(GraphGTest, testWeightedDegree2) {
         ASSERT_EQ(19.0, this->Ghouse.weightedDegree(4, true));
     }
 
-    if (isDirectedGraph()) {
+    if (isDirectedGraphW()) {
         // only count outgoing edges
         ASSERT_EQ(1 * defaultEdgeWeight, this->Ghouse.weightedDegree(0, true));
         ASSERT_EQ(2 * defaultEdgeWeight, this->Ghouse.weightedDegree(1, true));
@@ -534,7 +534,7 @@ TEST_P(GraphGTest, testWeightedDegree2) {
         ASSERT_EQ(1 * defaultEdgeWeight, this->Ghouse.weightedDegree(4, true));
     }
 
-    if (isWeightedDirectedGraph()) {
+    if (isWeightedDirectedGraphW()) {
         // only sum weight of outgoing edges
         ASSERT_EQ(3.0, this->Ghouse.weightedDegree(0, true));
         ASSERT_EQ(7.0, this->Ghouse.weightedDegree(1, true));
@@ -579,9 +579,9 @@ TEST_P(GraphGTest, testWeightedDegree3) {
 /** EDGE MODIFIERS **/
 
 TEST_P(GraphGTest, testAddEdge) {
-    GraphW G = createGraph(3);
+    GraphW G = createGraphW(3);
 
-    // Graph without edges
+    // GraphW without edges
     ASSERT_EQ(0u, G.numberOfEdges());
     ASSERT_FALSE(G.hasEdge(0, 2));
     ASSERT_FALSE(G.hasEdge(0, 1));
@@ -592,7 +592,7 @@ TEST_P(GraphGTest, testAddEdge) {
     ASSERT_EQ(nullWeight, G.weight(1, 2));
     ASSERT_EQ(nullWeight, G.weight(2, 2));
 
-    // Graph with 2 normal edges
+    // GraphW with 2 normal edges
     G.addEdge(0, 1, 4.51);
     G.addEdge(1, 2, 2.39);
     ASSERT_EQ(2u, G.numberOfEdges());
@@ -649,7 +649,7 @@ TEST_P(GraphGTest, testAddEdge) {
 
 TEST_P(GraphGTest, testRemoveEdge) {
     double epsilon = 1e-6;
-    GraphW G = createGraph(3);
+    GraphW G = createGraphW(3);
 
     edgeweight ewBefore = G.totalEdgeWeight();
 
@@ -699,7 +699,7 @@ TEST_P(GraphGTest, testRemoveEdge) {
     ASSERT_TRUE(G.hasEdge(2, 1));
 
     // test from removeselfloops adapted for removeEdge
-    G = createGraph(2);
+    G = createGraphW(2);
 
     ewBefore = G.totalEdgeWeight();
 
@@ -748,7 +748,7 @@ TEST_P(GraphGTest, testRemoveAllEdges) {
         Aux::Random::setSeed(seed, false);
         auto g = ErdosRenyiGenerator(n, p, isDirected()).generate();
         if (isWeighted()) {
-            g = Graph(g, true, isDirected());
+            g = GraphW(g, true, isDirected());
         }
 
         g.removeAllEdges();
@@ -775,7 +775,7 @@ TEST_P(GraphGTest, testRemoveSelfLoops) {
         Aux::Random::setSeed(seed, false);
         auto g = ErdosRenyiGenerator(n, p, isDirected()).generate();
         if (isWeighted()) {
-            g = Graph(g, true, isDirected());
+            g = GraphW(g, true, isDirected());
         }
 
         for (count i = 0; i < nSelfLoops; ++i) {
@@ -799,7 +799,7 @@ TEST_P(GraphGTest, testRemoveMultiEdges) {
     constexpr count nMultiEdges = 10;
     constexpr count nMultiSelfLoops = 10;
 
-    auto getGraphEdges = [](const Graph &G) {
+    auto getGraphEdges = [](const GraphW &G) {
         std::vector<std::pair<node, node>> edges;
         edges.reserve(G.numberOfEdges());
 
@@ -812,7 +812,7 @@ TEST_P(GraphGTest, testRemoveMultiEdges) {
         Aux::Random::setSeed(seed, false);
         auto g = ErdosRenyiGenerator(n, p, isDirected()).generate();
         if (isWeighted()) {
-            g = Graph(g, true, isDirected());
+            g = GraphW(g, true, isDirected());
         }
 
         const auto edgeSet = getGraphEdges(g);
@@ -886,8 +886,8 @@ TEST_P(GraphGTest, testIsDirected) {
 }
 
 TEST_P(GraphGTest, testIsEmpty) {
-    GraphW G1 = createGraph(0);
-    GraphW G2 = createGraph(2);
+    GraphW G1 = createGraphW(0);
+    GraphW G2 = createGraphW(2);
 
     ASSERT_TRUE(G1.isEmpty());
     ASSERT_FALSE(G2.isEmpty());
@@ -906,7 +906,7 @@ TEST_P(GraphGTest, testIsEmpty) {
 TEST_P(GraphGTest, testNumberOfNodes) {
     ASSERT_EQ(this->n_house, this->Ghouse.numberOfNodes());
 
-    GraphW G1 = createGraph(0);
+    GraphW G1 = createGraphW(0);
     ASSERT_EQ(0u, G1.numberOfNodes());
     G1.addNode();
     ASSERT_EQ(1u, G1.numberOfNodes());
@@ -921,7 +921,7 @@ TEST_P(GraphGTest, testNumberOfNodes) {
 TEST_P(GraphGTest, testNumberOfEdges) {
     ASSERT_EQ(this->m_house, this->Ghouse.numberOfEdges());
 
-    GraphW G1 = createGraph(5);
+    GraphW G1 = createGraphW(5);
     ASSERT_EQ(0u, G1.numberOfEdges());
     G1.addEdge(0, 1);
     ASSERT_EQ(1u, G1.numberOfEdges());
@@ -934,7 +934,7 @@ TEST_P(GraphGTest, testNumberOfEdges) {
 }
 
 TEST_P(GraphGTest, testNumberOfSelfLoops) {
-    GraphW G = createGraph(3);
+    GraphW G = createGraphW(3);
     G.addEdge(0, 1);
     ASSERT_EQ(0u, G.numberOfSelfLoops());
     G.addEdge(0, 0);
@@ -968,7 +968,7 @@ TEST_P(GraphGTest, testSelfLoopConversion) {
         });
         count measuredSelfLoops = countSelfLoopsManually(G);
         EXPECT_EQ(G.numberOfSelfLoops(), measuredSelfLoops);
-        Graph G_converted(G, false, !directed);
+        GraphW G_converted(G, false, !directed);
         EXPECT_EQ(G_converted.numberOfSelfLoops(), measuredSelfLoops);
     }
 }
@@ -976,7 +976,7 @@ TEST_P(GraphGTest, testSelfLoopConversion) {
 TEST_P(GraphGTest, testUpperNodeIdBound) {
     ASSERT_EQ(5u, this->Ghouse.upperNodeIdBound());
 
-    GraphW G1 = createGraph(0);
+    GraphW G1 = createGraphW(0);
     ASSERT_EQ(0u, G1.upperNodeIdBound());
     G1.addNode();
     ASSERT_EQ(1u, G1.upperNodeIdBound());
@@ -989,7 +989,7 @@ TEST_P(GraphGTest, testUpperNodeIdBound) {
 }
 
 TEST_P(GraphGTest, testCheckConsistency_MultiEdgeDetection) {
-    GraphW G = createGraph(3);
+    GraphW G = createGraphW(3);
     ASSERT_TRUE(G.checkConsistency());
     G.addEdge(0, 1);
     ASSERT_TRUE(G.checkConsistency());
@@ -1012,7 +1012,7 @@ TEST_P(GraphGTest, testWeight) {
 }
 
 TEST_P(GraphGTest, testSetWeight) {
-    GraphW G = createGraph(10);
+    GraphW G = createGraphW(10);
     G.addEdge(0, 1);
     G.addEdge(1, 2);
 
@@ -1059,7 +1059,7 @@ TEST_P(GraphGTest, testSetWeight) {
 }
 
 TEST_P(GraphGTest, increaseWeight) {
-    GraphW G = createGraph(5);
+    GraphW G = createGraphW(5);
     G.addEdge(0, 1);
     G.addEdge(1, 2);
     G.addEdge(3, 4, 3.14);
@@ -1091,8 +1091,8 @@ TEST_P(GraphGTest, increaseWeight) {
 /** SUMS **/
 
 TEST_P(GraphGTest, testTotalEdgeWeight) {
-    GraphW G1 = createGraph(5);
-    GraphW G2 = createGraph(5);
+    GraphW G1 = createGraphW(5);
+    GraphW G2 = createGraphW(5);
     G2.addEdge(0, 1, 3.14);
 
     if (this->Ghouse.isWeighted()) {
@@ -1111,7 +1111,7 @@ TEST_P(GraphGTest, testTotalEdgeWeight) {
 TEST_P(GraphGTest, testNodeIterator) {
     Aux::Random::setSeed(42, false);
 
-    auto testForward = [](const Graph &G) {
+    auto testForward = [](const GraphW &G) {
         auto preIter = G.nodeRange().begin();
         auto postIter = G.nodeRange().begin();
 
@@ -1135,7 +1135,7 @@ TEST_P(GraphGTest, testNodeIterator) {
         ASSERT_EQ(G1.numberOfNodes(), 0);
     };
 
-    auto testBackward = [](const Graph &G) {
+    auto testBackward = [](const GraphW &G) {
         const std::vector<node> nodes(Graph::NodeRange(G).begin(), Graph::NodeRange(G).end());
         std::vector<node> v;
         G.forNodes([&](node u) { v.push_back(u); });
@@ -1180,9 +1180,9 @@ TEST_P(GraphGTest, testNodeIterator) {
 }
 
 TEST_P(GraphGTest, testEdgeIterator) {
-    Graph G(this->Ghouse);
+    GraphW G(this->Ghouse);
 
-    auto testForward = [&](const Graph &G) {
+    auto testForward = [&](const GraphW &G) {
         GraphW G1(G);
         auto preIter = G.edgeRange().begin();
         auto postIter = G.edgeRange().begin();
@@ -1209,7 +1209,7 @@ TEST_P(GraphGTest, testEdgeIterator) {
         ASSERT_EQ(G1.numberOfEdges(), 0);
     };
 
-    auto testForwardWeighted = [&](const Graph &G) {
+    auto testForwardWeighted = [&](const GraphW &G) {
         GraphW G1(G);
         auto preIter = G.edgeWeightRange().begin();
         auto postIter = preIter;
@@ -1239,7 +1239,7 @@ TEST_P(GraphGTest, testEdgeIterator) {
         ASSERT_EQ(G1.numberOfEdges(), 0);
     };
 
-    auto testBackward = [&](const Graph &G) {
+    auto testBackward = [&](const GraphW &G) {
         GraphW G1(G);
         auto preIter = G.edgeRange().begin();
         auto postIter = preIter;
@@ -1263,7 +1263,7 @@ TEST_P(GraphGTest, testEdgeIterator) {
         ASSERT_EQ(G1.numberOfEdges(), 0);
     };
 
-    auto testBackwardWeighted = [&](const Graph &G) {
+    auto testBackwardWeighted = [&](const GraphW &G) {
         GraphW G1(G);
         auto preIter = G.edgeWeightRange().begin();
         auto postIter = preIter;
@@ -1286,7 +1286,7 @@ TEST_P(GraphGTest, testEdgeIterator) {
         ASSERT_EQ(G1.numberOfEdges(), 0);
     };
 
-    auto doTests = [&](const Graph &G) {
+    auto doTests = [&](const GraphW &G) {
         testForward(G);
         testBackward(G);
         testForwardWeighted(G);
@@ -1348,7 +1348,7 @@ TEST_P(GraphGTest, testNeighborsIterators) {
 /** NODE ITERATORS **/
 
 TEST_P(GraphGTest, testForNodes) {
-    GraphW G = createGraph(3);
+    GraphW G = createGraphW(3);
     std::vector<bool> visited(4, false);
     G.forNodes([&](node v) {
         ASSERT_FALSE(visited[v]);
@@ -1376,7 +1376,7 @@ TEST_P(GraphGTest, testParallelForNodes) {
 
 TEST_P(GraphGTest, forNodesWhile) {
     count n = 100;
-    GraphW G = createGraph(n);
+    GraphW G = createGraphW(n);
     count stopAfter = 10;
     count nodesSeen = 0;
 
@@ -1389,7 +1389,7 @@ TEST_P(GraphGTest, testForNodesInRandomOrder) {
     count n = 1000;
     count samples = 100;
     double maxAbsoluteError = 0.005;
-    GraphW G = createGraph(n);
+    GraphW G = createGraphW(n);
 
     node lastNode = n / 2;
     count greaterLastNode = 0;
@@ -1419,7 +1419,7 @@ TEST_P(GraphGTest, testForNodesInRandomOrder) {
 TEST_P(GraphGTest, testForNodePairs) {
     count n = 10;
     count m = n * (n - 1) / 2;
-    GraphW G = createGraph(n);
+    GraphW G = createGraphW(n);
 
     // add all edges
     G.forNodePairs([&](node u, node v) {
@@ -1443,7 +1443,7 @@ TEST_P(GraphGTest, testForNodePairs) {
 /** EDGE ITERATORS **/
 
 TEST_P(GraphGTest, testForEdges) {
-    GraphW G = createGraph(4);
+    GraphW G = createGraphW(4);
     G.addEdge(0, 1); // 0 * 1 = 0
     G.addEdge(1, 2); // 1 * 2 = 2
     G.addEdge(3, 2); // 3 * 2 = 1 (mod 5)
@@ -1466,7 +1466,7 @@ TEST_P(GraphGTest, testForEdges) {
 TEST_P(GraphGTest, testForWeightedEdges) {
     double epsilon = 1e-6;
 
-    GraphW G = createGraph(4);
+    GraphW G = createGraphW(4);
     G.addEdge(0, 1, 0.1); // 0 * 1 = 0
     G.addEdge(3, 2, 0.2); // 3 * 2 = 1 (mod 5)
     G.addEdge(1, 2, 0.3); // 1 * 2 = 2
@@ -1502,7 +1502,7 @@ TEST_P(GraphGTest, testForWeightedEdges) {
 
 TEST_P(GraphGTest, testParallelForWeightedEdges) {
     count n = 4;
-    GraphW G = createGraph(n);
+    GraphW G = createGraphW(n);
     G.forNodePairs([&](node u, node v) { G.addEdge(u, v, 1.0); });
 
     edgeweight weightSum = 0.0;
@@ -1516,7 +1516,7 @@ TEST_P(GraphGTest, testParallelForWeightedEdges) {
 
 TEST_P(GraphGTest, testParallelForEdges) {
     count n = 4;
-    GraphW G = createGraph(n);
+    GraphW G = createGraphW(n);
     G.forNodePairs([&](node u, node v) { G.addEdge(u, v); });
 
     edgeweight weightSum = 0.0;
@@ -1556,7 +1556,7 @@ TEST_P(GraphGTest, testForWeightedNeighborsOf) {
     // should sort after the first element
     Aux::Parallel::sort(visited.begin(), visited.end());
 
-    if (isGraph()) {
+    if (isGraphW()) {
         ASSERT_EQ(3u, visited.size());
         ASSERT_EQ(1u, visited[0].first);
         ASSERT_EQ(2u, visited[1].first);
@@ -1566,7 +1566,7 @@ TEST_P(GraphGTest, testForWeightedNeighborsOf) {
         ASSERT_EQ(defaultEdgeWeight, visited[2].second);
     }
 
-    if (isWeightedGraph()) {
+    if (isWeightedGraphW()) {
         ASSERT_EQ(3u, visited.size());
         ASSERT_EQ(1u, visited[0].first);
         ASSERT_EQ(2u, visited[1].first);
@@ -1576,7 +1576,7 @@ TEST_P(GraphGTest, testForWeightedNeighborsOf) {
         ASSERT_EQ(6.0, visited[2].second);
     }
 
-    if (isDirectedGraph()) {
+    if (isDirectedGraphW()) {
         ASSERT_EQ(2u, visited.size());
         ASSERT_EQ(1u, visited[0].first);
         ASSERT_EQ(2u, visited[1].first);
@@ -1584,7 +1584,7 @@ TEST_P(GraphGTest, testForWeightedNeighborsOf) {
         ASSERT_EQ(defaultEdgeWeight, visited[1].second);
     }
 
-    if (isWeightedDirectedGraph()) {
+    if (isWeightedDirectedGraphW()) {
         ASSERT_EQ(2u, visited.size());
         ASSERT_EQ(1u, visited[0].first);
         ASSERT_EQ(2u, visited[1].first);
@@ -1673,7 +1673,7 @@ TEST_P(GraphGTest, testForWeightedEdgesOf) {
         });
     });
 
-    if (isGraph()) {
+    if (isGraphW()) {
         EXPECT_EQ(sumOfWeights, m);
         EXPECT_EQ(2 * this->m_house, m);
         for (auto c : visited) {
@@ -1681,7 +1681,7 @@ TEST_P(GraphGTest, testForWeightedEdgesOf) {
         }
     }
 
-    if (isWeightedGraph()) {
+    if (isWeightedGraphW()) {
         // we iterated over all edges in both directions
         EXPECT_EQ(2 * this->m_house, m);
         EXPECT_EQ(sumOfWeights, 72);
@@ -1690,7 +1690,7 @@ TEST_P(GraphGTest, testForWeightedEdgesOf) {
         }
     }
 
-    if (isDirectedGraph()) {
+    if (isDirectedGraphW()) {
         // we iterated over all outgoing edges once
         EXPECT_EQ(this->m_house, m);
         EXPECT_EQ(sumOfWeights, m);
@@ -1699,7 +1699,7 @@ TEST_P(GraphGTest, testForWeightedEdgesOf) {
         }
     }
 
-    if (isWeightedDirectedGraph()) {
+    if (isWeightedDirectedGraphW()) {
         EXPECT_EQ(sumOfWeights, 36);
         EXPECT_EQ(this->m_house, m);
         for (auto c : visited) {
@@ -1731,7 +1731,7 @@ TEST_P(GraphGTest, testForWeightedInNeighborsOf) {
     this->Ghouse.forInNeighborsOf(3, [&](node v, edgeweight ew) { visited.push_back({v, ew}); });
     Aux::Parallel::sort(visited.begin(), visited.end());
 
-    if (isGraph()) {
+    if (isGraphW()) {
         ASSERT_EQ(3u, visited.size());
         ASSERT_EQ(1u, visited[0].first);
         ASSERT_EQ(2u, visited[1].first);
@@ -1741,7 +1741,7 @@ TEST_P(GraphGTest, testForWeightedInNeighborsOf) {
         ASSERT_EQ(defaultEdgeWeight, visited[2].second);
     }
 
-    if (isWeightedGraph()) {
+    if (isWeightedGraphW()) {
         ASSERT_EQ(3u, visited.size());
         ASSERT_EQ(1u, visited[0].first);
         ASSERT_EQ(2u, visited[1].first);
@@ -1751,13 +1751,13 @@ TEST_P(GraphGTest, testForWeightedInNeighborsOf) {
         ASSERT_EQ(6.0, visited[2].second);
     }
 
-    if (isDirectedGraph()) {
+    if (isDirectedGraphW()) {
         ASSERT_EQ(1u, visited.size());
         ASSERT_EQ(4u, visited[0].first);
         ASSERT_EQ(defaultEdgeWeight, visited[0].second);
     }
 
-    if (isWeightedDirectedGraph()) {
+    if (isWeightedDirectedGraphW()) {
         ASSERT_EQ(1u, visited.size());
         ASSERT_EQ(4u, visited[0].first);
         ASSERT_EQ(6.0, visited[0].second);
@@ -1802,7 +1802,7 @@ TEST_P(GraphGTest, testForWeightedInEdgesOf) {
         visited[u] = ew;
     });
 
-    if (isGraph()) {
+    if (isGraphW()) {
         ASSERT_EQ(-1.0, visited[0]);
         ASSERT_EQ(defaultEdgeWeight, visited[1]);
         ASSERT_EQ(defaultEdgeWeight, visited[2]);
@@ -1810,7 +1810,7 @@ TEST_P(GraphGTest, testForWeightedInEdgesOf) {
         ASSERT_EQ(defaultEdgeWeight, visited[4]);
     }
 
-    if (isWeightedGraph()) {
+    if (isWeightedGraphW()) {
         ASSERT_EQ(-1.0, visited[0]);
         ASSERT_EQ(this->Ahouse[3][1], visited[1]);
         ASSERT_EQ(this->Ahouse[3][2], visited[2]);
@@ -1818,7 +1818,7 @@ TEST_P(GraphGTest, testForWeightedInEdgesOf) {
         ASSERT_EQ(this->Ahouse[3][4], visited[4]);
     }
 
-    if (isDirectedGraph()) {
+    if (isDirectedGraphW()) {
         ASSERT_EQ(-1.0, visited[0]);
         ASSERT_EQ(-1.0, visited[1]);
         ASSERT_EQ(-1.0, visited[2]);
@@ -1826,7 +1826,7 @@ TEST_P(GraphGTest, testForWeightedInEdgesOf) {
         ASSERT_EQ(defaultEdgeWeight, visited[4]);
     }
 
-    if (isWeightedDirectedGraph()) {
+    if (isWeightedDirectedGraphW()) {
         ASSERT_EQ(-1.0, visited[0]);
         ASSERT_EQ(-1.0, visited[1]);
         ASSERT_EQ(-1.0, visited[2]);
@@ -1839,7 +1839,7 @@ TEST_P(GraphGTest, testForWeightedInEdgesOf) {
 
 TEST_P(GraphGTest, testParallelSumForNodes) {
     count n = 10;
-    GraphW G = createGraph(n);
+    GraphW G = createGraphW(n);
     double sum = G.parallelSumForNodes([](node v) { return 2 * v + 0.5; });
 
     double expected_sum = n * (n - 1) + n * 0.5;
@@ -1857,7 +1857,7 @@ TEST_P(GraphGTest, testParallelSumForWeightedEdges) {
 /** GRAPH SEARCHES **/
 
 TEST_P(GraphGTest, testEdgeIndexGenerationDirected) {
-    GraphW G = Graph(10, false, true);
+    GraphW G = GraphW(10, false, true);
     G.addEdge(2, 0);
     G.addEdge(2, 1);
     G.addEdge(2, 2);
@@ -1886,7 +1886,7 @@ TEST_P(GraphGTest, testEdgeIndexGenerationDirected) {
 }
 
 TEST_P(GraphGTest, testEdgeIndexGenerationUndirected) {
-    GraphW G = Graph(10, false, false);
+    GraphW G = GraphW(10, false, false);
 
     G.addEdge(0, 0);
     G.addEdge(2, 0);
@@ -1922,7 +1922,7 @@ TEST_P(GraphGTest, testEdgeIndexGenerationUndirected) {
 }
 
 TEST_P(GraphGTest, testEdgeIndexResolver) {
-    GraphW G = createGraph(10);
+    GraphW G = createGraphW(10);
     G.indexEdges();
 
     G.addEdge(0, 0);
@@ -2249,7 +2249,7 @@ TEST_P(GraphGTest, testEdgeIdsSortingAfterRemove) {
     constexpr node n = 100;
 
     Aux::Random::setSeed(42, true);
-    GraphW G = createGraph(n, 10 * n);
+    GraphW G = createGraphW(n, 10 * n);
     G.sortEdges();
     G.indexEdges();
     auto original = G;
@@ -2307,7 +2307,7 @@ TEST_P(GraphGTest, testEdgeIdsConsistencyAfterRemove) {
     constexpr node n = 100;
 
     Aux::Random::setSeed(42, true);
-    GraphW G = createGraph(n, 10 * n);
+    GraphW G = createGraphW(n, 10 * n);
     G.sortEdges();
     G.indexEdges();
     auto original = G;
@@ -2348,7 +2348,7 @@ TEST_P(GraphGTest, testEdgeIdsAfterRemoveWithoutSortingOrIDs) {
     constexpr node n = 100;
 
     Aux::Random::setSeed(42, true);
-    GraphW G = createGraph(n, 10 * n);
+    GraphW G = createGraphW(n, 10 * n);
     G.indexEdges();
     auto original = G;
 

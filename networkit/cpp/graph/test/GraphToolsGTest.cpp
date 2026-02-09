@@ -41,7 +41,7 @@ TEST_P(GraphToolsGTest, testSize) {
     constexpr double p = 0.1;
     constexpr count updates = 10;
 
-    auto doTest = [](const Graph &G) {
+    auto doTest = [](const GraphW &G) {
         const auto size = GraphTools::size(G);
         EXPECT_EQ(size.first, G.numberOfNodes());
         EXPECT_EQ(size.second, G.numberOfEdges());
@@ -72,7 +72,7 @@ TEST_P(GraphToolsGTest, testDensity) {
     constexpr count n = 100;
     constexpr double p = 0.1;
 
-    auto doTest = [](const Graph &G) {
+    auto doTest = [](const GraphW &G) {
         const auto density = GraphTools::density(G);
         EXPECT_TRUE(density >= 0);
         EXPECT_EQ(density > 0, G.numberOfNodes() > 1 && G.numberOfEdges() - G.numberOfSelfLoops());
@@ -98,7 +98,7 @@ TEST_P(GraphToolsGTest, testVolume) {
     constexpr count n = 100;
     constexpr double p = 0.1;
 
-    auto doTest = [&](const Graph &G) {
+    auto doTest = [&](const GraphW &G) {
         // Volume for graph G
         const auto volume = GraphTools::volume(G);
 
@@ -139,7 +139,7 @@ TEST_P(GraphToolsGTest, testMaxDegree) {
     constexpr double p = 0.1;
     constexpr count edgeUpdates = 10;
 
-    auto computeMaxDeg = [&](const Graph &G, bool inDegree) {
+    auto computeMaxDeg = [&](const GraphW &G, bool inDegree) {
         count maxDeg = 0;
         G.forNodes([&](const node u) {
             maxDeg = std::max(maxDeg, inDegree ? G.degreeIn(u) : G.degreeOut(u));
@@ -148,7 +148,7 @@ TEST_P(GraphToolsGTest, testMaxDegree) {
         return maxDeg;
     };
 
-    auto computeMaxWeightedDeg = [&](const Graph &G, bool inDegree) {
+    auto computeMaxWeightedDeg = [&](const GraphW &G, bool inDegree) {
         edgeweight maxDeg = std::numeric_limits<edgeweight>::min();
         G.forNodes([&](const node u) {
             maxDeg = std::max(maxDeg, inDegree ? G.weightedDegreeIn(u) : G.weightedDegree(u));
@@ -157,7 +157,7 @@ TEST_P(GraphToolsGTest, testMaxDegree) {
         return maxDeg;
     };
 
-    auto doTest = [&](const Graph &G) {
+    auto doTest = [&](const GraphW &G) {
         EXPECT_EQ(GraphTools::maxDegree(G), computeMaxDeg(G, false));
         EXPECT_EQ(GraphTools::maxInDegree(G), computeMaxDeg(G, true));
         EXPECT_DOUBLE_EQ(GraphTools::maxWeightedDegree(G), computeMaxWeightedDeg(G, false));
@@ -201,7 +201,7 @@ TEST_P(GraphToolsGTest, testRandomNode) {
 
     auto G = ErdosRenyiGenerator(n, p, directed()).generate();
     if (weighted()) {
-        G = Graph(G, true, G.isDirected());
+        G = GraphW(G, true, G.isDirected());
     }
 
     std::vector<count> drawCounts(n, 0);
@@ -223,7 +223,7 @@ TEST_P(GraphToolsGTest, testRandomNodes) {
 
     auto G = ErdosRenyiGenerator(n, p, directed()).generate();
     if (weighted()) {
-        G = Graph(G, true, G.isDirected());
+        G = GraphW(G, true, G.isDirected());
     }
 
     count sampleAll = G.numberOfNodes();
@@ -642,7 +642,7 @@ TEST_P(GraphToolsGTest, testCopyNodes) {
     constexpr double p = 0.01;
     constexpr count nodesToDelete = 50;
 
-    auto checkNodes = [&](const Graph &G, const Graph &GCopy) {
+    auto checkNodes = [&](const GraphW &G, const GraphW &GCopy) {
         EXPECT_EQ(G.isDirected(), GCopy.isDirected());
         EXPECT_EQ(G.isWeighted(), GCopy.isWeighted());
         EXPECT_EQ(G.numberOfNodes(), GCopy.numberOfNodes());
@@ -848,7 +848,7 @@ TEST_P(GraphToolsGTest, testToUndirected) {
     constexpr count n = 200;
     constexpr double p = 0.2;
 
-    auto testGraphs = [&](const Graph &G, const Graph &G1) {
+    auto testGraphs = [&](const GraphW &G, const GraphW &G1) {
         // we need this because we lose edges due to some nodes having both an in edge and an out
         // edge to the same node.
         count edgesLost = 0;
@@ -886,7 +886,7 @@ TEST_P(GraphToolsGTest, testToUnWeighted) {
     constexpr count n = 200;
     constexpr double p = 0.2;
 
-    auto testGraphs = [&](const Graph &G, const Graph &G1) {
+    auto testGraphs = [&](const GraphW &G, const GraphW &G1) {
         EXPECT_EQ(G.numberOfNodes(), G1.numberOfNodes());
         EXPECT_EQ(G.upperNodeIdBound(), G1.upperNodeIdBound());
         EXPECT_EQ(G.numberOfEdges(), G1.numberOfEdges());
@@ -919,7 +919,7 @@ TEST_P(GraphToolsGTest, testAppend) {
     constexpr double p1 = 0.01, p2 = 0.05;
     constexpr count nodesToDelete = 20;
 
-    auto testGraphs = [&](const Graph &G, const Graph &G1, const Graph &G2) {
+    auto testGraphs = [&](const GraphW &G, const GraphW &G1, const GraphW &G2) {
         EXPECT_EQ(G.numberOfNodes(), G1.numberOfNodes() + G2.numberOfNodes());
         EXPECT_EQ(G.numberOfEdges(), G1.numberOfEdges() + G2.numberOfEdges());
         EXPECT_EQ(G.isDirected(), G1.isDirected());
@@ -969,7 +969,7 @@ TEST_P(GraphToolsGTest, testMerge) {
     constexpr count n1 = 100, n2 = 150;
     constexpr double p1 = 0.01, p2 = 0.05;
 
-    auto testGraphs = [&](const Graph &Gorig, const Graph &Gmerge, const Graph &G1) {
+    auto testGraphs = [&](const GraphW &Gorig, const GraphW &Gmerge, const GraphW &G1) {
         for (node u = 0; u < std::max(Gorig.upperNodeIdBound(), G1.upperNodeIdBound()); ++u) {
             EXPECT_EQ(Gmerge.hasNode(u), Gorig.hasNode(u) || G1.hasNode(u));
         }
@@ -1002,7 +1002,7 @@ TEST_P(GraphToolsGTest, testMerge) {
 }
 
 TEST_P(GraphToolsGTest, testEdgesSortedByWeight) {
-    const auto hasEdgesSortedByWeight = [](const Graph &G, bool decreasing) -> bool {
+    const auto hasEdgesSortedByWeight = [](const GraphW &G, bool decreasing) -> bool {
         for (node u : G.nodeRange()) {
             node prevNode = decreasing ? none : 0;
             edgeweight prevWeight =
@@ -1058,7 +1058,7 @@ TEST_P(GraphToolsGTest, testEdgesRandomizer) {
         return;
     Aux::Random::setSeed(1, true);
     GraphW G1 = ErdosRenyiGenerator{2000, 0.3, directed()}.generate();
-    Graph G(G1, true, directed());
+    GraphW G(G1, true, directed());
     GraphTools::randomizeWeights(G);
     edgeweight sum = G.parallelSumForEdges([&](node, node, edgeweight ew) { return ew; });
     edgeweight average = sum / G.numberOfEdges();
@@ -1081,8 +1081,8 @@ TEST_P(GraphToolsGTest, testEdgesRandomizerDeterminism) {
         return;
     Aux::Random::setSeed(1, true);
     GraphW G1 = ErdosRenyiGenerator{2000, 0.3, directed()}.generate();
-    Graph Ga(G1, true, directed());
-    Graph Gb(G1, true, directed());
+    GraphW Ga(G1, true, directed());
+    GraphW Gb(G1, true, directed());
     Aux::Random::setSeed(1, true);
     GraphTools::randomizeWeights(Ga);
     Aux::Random::setSeed(1, true);
@@ -1138,7 +1138,7 @@ TEST_F(GraphToolsGTest, testIsBipartiteBinaryTreeGraphs) {
 }
 
 TEST_F(GraphToolsGTest, testIsBipartiteCompleteGraphs) {
-    auto completeGraph = [&](count numNodes) {
+    auto completeGraphW = [&](count numNodes) {
         GraphW graph(numNodes, true);
         for (count i = 0; i < numNodes; ++i) {
             for (count j = i + 1; j < numNodes; ++j) {
@@ -1149,7 +1149,7 @@ TEST_F(GraphToolsGTest, testIsBipartiteCompleteGraphs) {
     };
 
     for (count numberOfNodes = 3; numberOfNodes <= 10; ++numberOfNodes) {
-        GraphW graph = completeGraph(numberOfNodes);
+        GraphW graph = completeGraphW(numberOfNodes);
         EXPECT_FALSE(GraphTools::isBipartite(graph));
     }
 }

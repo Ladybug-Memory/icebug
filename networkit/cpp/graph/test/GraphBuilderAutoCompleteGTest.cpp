@@ -38,7 +38,7 @@ protected:
     bool isDirected() const;
 
     GraphBuilder createGraphBuilder(count n = 0) const;
-    Graph toGraph(GraphBuilder &b) const;
+    GraphW toGraph(GraphBuilder &b) const;
 };
 
 INSTANTIATE_TEST_SUITE_P(InstantiationName, GraphBuilderAutoCompleteGTest,
@@ -56,7 +56,7 @@ GraphBuilder GraphBuilderAutoCompleteGTest::createGraphBuilder(count n) const {
     return GraphBuilder(n, isWeighted(), isDirected());
 }
 
-Graph GraphBuilderAutoCompleteGTest::toGraph(GraphBuilder &b) const {
+GraphW GraphBuilderAutoCompleteGTest::toGraph(GraphBuilder &b) const {
     return b.completeGraph();
 }
 
@@ -189,7 +189,7 @@ TEST_P(GraphBuilderAutoCompleteGTest, testDegreeOut) {
 TEST_P(GraphBuilderAutoCompleteGTest, testAddHalfEdge) {
     auto b = createGraphBuilder(3);
 
-    // Graph with 2 normal edges
+    // GraphW with 2 normal edges
     b.addHalfEdge(0, 1, 4.51);
     b.addHalfEdge(1, 2, 2.39);
 
@@ -323,7 +323,7 @@ TEST_P(GraphBuilderAutoCompleteGTest, testSetWeight) {
     }
 }
 
-/** toGraph **/
+/** toGraphW **/
 
 TEST_P(GraphBuilderAutoCompleteGTest, testSameAsGraph) {
     Aux::Random::setSeed(1, false);
@@ -332,7 +332,7 @@ TEST_P(GraphBuilderAutoCompleteGTest, testSameAsGraph) {
     const count n_max = 100;
 
     // in each loop run we will create a random graph (using a GraphBuilder and a Graph)
-    // we will only use methods that both GraphBuilder and Graph support and
+    // we will only use methods that both GraphBuilder and GraphW support and
     for (index i = 0; i < runs; i++) {
         count n = Aux::Random::integer(n_max);
         auto b = createGraphBuilder(n);

@@ -178,8 +178,8 @@ TEST_F(CentralityGTest, runApproxBetweennessSmallGraph) {
 
 TEST_F(CentralityGTest, runApproxBetweenness) {
     DorogovtsevMendesGenerator generator(100);
-    Graph G1 = generator.generate();
-    Graph G(G1, true, false);
+    GraphW G1 = generator.generate();
+    GraphW G(G1, true, false);
     ApproxBetweenness bc(G, 0.1, 0.1);
     bc.run();
     ApproxBetweenness bc1(G1, 0.1, 0.1);
@@ -321,7 +321,7 @@ TEST_F(CentralityGTest, testKatzDynamicDeletion) {
 }
 
 TEST_F(CentralityGTest, testKatzDynamicBuilding) {
-    Graph GIn = METISGraphReader{}.read("input/hep-th.graph");
+    GraphW GIn = METISGraphReader{}.read("input/hep-th.graph");
 
     // Find a single max-degree node and add its edges to G.
     // (This guarantees that alpha is correct.)
@@ -649,7 +649,7 @@ TEST_F(CentralityGTest, testPageRankCentrality) {
 
 TEST_F(CentralityGTest, benchSequentialBetweennessCentralityOnRealGraph) {
     METISGraphReader reader;
-    Graph G = reader.read("input/celegans_metabolic.graph");
+    GraphW G = reader.read("input/celegans_metabolic.graph");
     Betweenness bc(G);
     bc.run();
     std::vector<std::pair<node, double>> ranking = bc.ranking();
@@ -658,7 +658,7 @@ TEST_F(CentralityGTest, benchSequentialBetweennessCentralityOnRealGraph) {
 
 TEST_F(CentralityGTest, benchParallelBetweennessCentralityOnRealGraph) {
     METISGraphReader reader;
-    Graph G = reader.read("input/celegans_metabolic.graph");
+    GraphW G = reader.read("input/celegans_metabolic.graph");
     Betweenness bc(G);
     bc.run();
     std::vector<std::pair<node, double>> ranking = bc.ranking();
@@ -667,7 +667,7 @@ TEST_F(CentralityGTest, benchParallelBetweennessCentralityOnRealGraph) {
 
 TEST_F(CentralityGTest, benchEigenvectorCentralityOnRealGraph) {
     METISGraphReader reader;
-    Graph G = reader.read("input/celegans_metabolic.graph");
+    GraphW G = reader.read("input/celegans_metabolic.graph");
     EigenvectorCentrality cen(G);
     cen.run();
     std::vector<std::pair<node, double>> ranking = cen.ranking();
@@ -676,7 +676,7 @@ TEST_F(CentralityGTest, benchEigenvectorCentralityOnRealGraph) {
 
 TEST_F(CentralityGTest, benchPageRankCentralityOnRealGraph) {
     METISGraphReader reader;
-    Graph G = reader.read("input/celegans_metabolic.graph");
+    GraphW G = reader.read("input/celegans_metabolic.graph");
     double damp = 0.85;
     PageRank cen(G, damp);
     cen.run();
@@ -686,7 +686,7 @@ TEST_F(CentralityGTest, benchPageRankCentralityOnRealGraph) {
 
 TEST_F(CentralityGTest, benchNormalizedPageRankCentralityOnRealGraph) {
     METISGraphReader reader;
-    Graph G = reader.read("input/celegans_metabolic.graph");
+    GraphW G = reader.read("input/celegans_metabolic.graph");
     double damp = 0.85;
     PageRank cen(G, damp, 1e-8, true);
     cen.run();
@@ -696,7 +696,7 @@ TEST_F(CentralityGTest, benchNormalizedPageRankCentralityOnRealGraph) {
 
 TEST_F(CentralityGTest, runEstimateBetweenness) {
     METISGraphReader reader;
-    Graph G = reader.read("input/celegans_metabolic.graph");
+    GraphW G = reader.read("input/celegans_metabolic.graph");
 
     EstimateBetweenness abc2(G, 100);
     abc2.run();
@@ -707,7 +707,7 @@ TEST_F(CentralityGTest, runEstimateBetweenness) {
 // FIXME look out for tolerance limit in paper sample nodes
 TEST_F(CentralityGTest, testApproxClosenessCentralityOnRealGraph) {
     METISGraphReader reader;
-    Graph G = reader.read("input/celegans_metabolic.graph");
+    GraphW G = reader.read("input/celegans_metabolic.graph");
 
     ApproxCloseness acc(G, 453, 0, true);
     acc.run();
@@ -1061,7 +1061,7 @@ TEST_F(CentralityGTest, testHarmonicClosenessCentrality) {
 
 TEST_F(CentralityGTest, runKPathCentrality) {
     METISGraphReader reader;
-    Graph G = reader.read("input/lesmis.graph");
+    GraphW G = reader.read("input/lesmis.graph");
 
     KPathCentrality centrality(G);
     centrality.run();
@@ -1164,7 +1164,7 @@ TEST_F(CentralityGTest, benchCoreDecompositionLocal) {
     for (auto f : filenames) {
         std::string filename("input/" + f + ".graph");
         DEBUG("about to read file ", filename);
-        Graph G_tmp = reader.read(filename);
+        GraphW G_tmp = reader.read(filename);
         GraphW G(G_tmp);
         G.removeSelfLoops();
         CoreDecomposition coreDec(G, false);
@@ -1484,7 +1484,7 @@ TEST_P(CentralityGTest, testGroupDegree) {
     constexpr count k = 5;
     auto g = ErdosRenyiGenerator(nodes, 0.3, isDirected()).generate();
 
-    auto computeGroupDegree = [&](const std::vector<bool> &curGroup, const Graph &g) {
+    auto computeGroupDegree = [&](const std::vector<bool> &curGroup, const GraphW &g) {
         count result = 0;
         g.forNodes([&](node u) {
             if (!curGroup[u]) {
@@ -1964,14 +1964,14 @@ TEST_F(CentralityGTest, testApproxElectricalCloseness) {
 
 TEST_F(CentralityGTest, testGroupClosenessDirected) {
     // directed graphs are not supported
-    Graph G(10, false, true);
+    GraphW G(10, false, true);
     std::array<node, 1> group = {{0}};
     EXPECT_THROW(GroupClosenessGrowShrink(G, group.begin(), group.end()), std::runtime_error);
 }
 
 TEST_F(CentralityGTest, testGroupClosenessEmptyGroups) {
     // Empty input groups are not supported
-    Graph G(10);
+    GraphW G(10);
     std::vector<node> emptyGroup;
     EXPECT_THROW(GroupClosenessGrowShrink(G, emptyGroup.begin(), emptyGroup.end()),
                  std::runtime_error);
@@ -1987,7 +1987,7 @@ TEST_P(CentralityGTest, testGroupClosenessGrowShrink) {
         GraphTools::randomizeWeights(G);
     }
 
-    auto farnessOfGroup = [&](const Graph &G, const std::unordered_set<node> &group) -> edgeweight {
+    auto farnessOfGroup = [&](const GraphW &G, const std::unordered_set<node> &group) -> edgeweight {
         edgeweight farness = 0;
         if (G.isWeighted()) {
             Traversal::DijkstraFrom(
@@ -2124,14 +2124,14 @@ TEST_P(CentralityGTest, testDegreeCentralityIgnoreSelfLoops) {
 
 TEST_P(CentralityGTest, testGroupClosenessLocalSwaps) {
     if (isDirected()) { // directed graphs are not supported
-        Graph G(10, isWeighted(), true);
+        GraphW G(10, isWeighted(), true);
         std::array<node, 1> group = {{0}};
         EXPECT_THROW(GroupClosenessLocalSwaps(G, group.begin(), group.end()), std::runtime_error);
         return;
     }
 
     { // Empty input groups are not supported
-        Graph G(10, isWeighted(), false);
+        GraphW G(10, isWeighted(), false);
         std::vector<node> emptyGroup;
         EXPECT_THROW(GroupClosenessLocalSwaps(G, emptyGroup.begin(), emptyGroup.end()),
                      std::runtime_error);
@@ -2145,7 +2145,7 @@ TEST_P(CentralityGTest, testGroupClosenessLocalSwaps) {
         GraphTools::randomizeWeights(G);
     }
 
-    auto farnessOfGroup = [&](const Graph &G, const std::unordered_set<node> &group) -> count {
+    auto farnessOfGroup = [&](const GraphW &G, const std::unordered_set<node> &group) -> count {
         count farness = 0;
         Traversal::BFSfrom(G, group.begin(), group.end(),
                            [&farness](node, count distance) { farness += distance; });
@@ -2187,7 +2187,7 @@ TEST_P(CentralityGTest, testGroupClosenessLocalSwaps) {
 
 TEST_P(CentralityGTest, testGroupHarmonicCloseness) {
 
-    const auto computeOpt = [&](const Graph &G, count k) -> double {
+    const auto computeOpt = [&](const GraphW &G, count k) -> double {
         std::vector<bool> inGroup(G.upperNodeIdBound());
         std::fill(inGroup.begin(), inGroup.begin() + k, true);
         double opt = -std::numeric_limits<double>::max();
@@ -2253,12 +2253,12 @@ TEST_P(CentralityGTest, testGroupHarmonicCloseness) {
 TEST_P(CentralityGTest, testGroupClosenessLocalSearch) {
     { // Empty groups are not allowed
         std::vector<node> emptyVector;
-        Graph G(10, isWeighted(), isDirected());
+        GraphW G(10, isWeighted(), isDirected());
         EXPECT_THROW(GroupClosenessLocalSearch(G, emptyVector.begin(), emptyVector.end()),
                      std::runtime_error);
     }
 
-    const auto groupCloseness = [&](const Graph &G, const std::vector<node> &group) -> edgeweight {
+    const auto groupCloseness = [&](const GraphW &G, const std::vector<node> &group) -> edgeweight {
         edgeweight groupFarness = 0;
         Traversal::DijkstraFrom(G, group.begin(), group.end(),
                                 [&groupFarness](node, edgeweight dist) { groupFarness += dist; });

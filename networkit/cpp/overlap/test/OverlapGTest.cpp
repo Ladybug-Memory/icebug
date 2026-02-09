@@ -74,7 +74,7 @@ TEST_F(OverlapGTest, testHashingOverlapperOnOneClusterings) {
 
 TEST_F(OverlapGTest, testHashingOverlapperForCorrectness) {
     count n = 4;
-    Graph G(n);
+    GraphW G(n);
 
     Partition zeta(n);
     Partition eta(n);
@@ -103,7 +103,7 @@ TEST_F(OverlapGTest, testHashingOverlapperForCorrectness) {
 
 TEST_F(OverlapGTest, debugHashingOverlapperCorrectness) {
     count n = 2;
-    Graph G(n);
+    GraphW G(n);
 
     std::vector<Partition> clusterings;
     clusterings.emplace_back(n);
@@ -130,7 +130,7 @@ TEST_F(OverlapGTest, debugHashingOverlapperCorrectness) {
 TEST_F(OverlapGTest, debugHashingOverlapperCorrectness2) {
     count n = 10000;
     count k = 1000;
-    Graph G(n);
+    GraphW G(n);
     ClusteringGenerator generator;
 
     std::vector<Partition> clusterings;

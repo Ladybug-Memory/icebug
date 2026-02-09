@@ -46,7 +46,7 @@ TEST_F(GeneratorsBenchmark, benchmarkBarabasiAlbertGenerator) {
     count n0 = 2;
 
     BarabasiAlbertGenerator BarabasiAlbert(k, nMax, n0, false);
-    Graph G(0);
+    GraphW G(0);
     EXPECT_TRUE(G.isEmpty());
 
     G = BarabasiAlbert.generate();
@@ -181,7 +181,7 @@ TEST_F(GeneratorsBenchmark, benchmarkChungLuGenerator) {
         vec.push_back(grad);
     }
     ChungLuGenerator generator(vec);
-    Graph G = generator.generate();
+    GraphW G = generator.generate();
     EXPECT_EQ(G.numberOfNodes(), n);
 }
 
@@ -191,7 +191,7 @@ TEST_F(GeneratorsBenchmark, benchmarkMocnikGenerator) {
     double k = 2.6;
 
     MocnikGenerator Mocnik(dim, n, k);
-    Graph G(0);
+    GraphW G(0);
     EXPECT_TRUE(G.isEmpty());
     G = Mocnik.generate();
     EXPECT_FALSE(G.isEmpty());
@@ -205,7 +205,7 @@ TEST_F(GeneratorsBenchmark, benchmarkMocnikGeneratorBasic) {
     double k = 2.6;
 
     MocnikGenerator Mocnik(dim, n, k);
-    Graph G(0);
+    GraphW G(0);
     EXPECT_TRUE(G.isEmpty());
     G = Mocnik.generate();
     EXPECT_FALSE(G.isEmpty());

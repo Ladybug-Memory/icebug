@@ -28,7 +28,7 @@ class SolverLamgGTest : public testing::Test {
 protected:
     const std::vector<std::string> GRAPH_INSTANCES = {"input/jazz.graph", "input/power.graph"};
 
-    Vector randZeroSum(const Graph &graph, size_t seed) const;
+    Vector randZeroSum(const GraphW &graph, size_t seed) const;
     Vector randVector(count dimension) const;
 };
 
@@ -94,7 +94,7 @@ Vector SolverLamgGTest::randVector(count dimension) const {
     return randVector;
 }
 
-Vector SolverLamgGTest::randZeroSum(const Graph &G, size_t seed) const {
+Vector SolverLamgGTest::randZeroSum(const GraphW &G, size_t seed) const {
     std::mt19937 rand(seed);
     auto rand_value = std::uniform_real_distribution<double>(-1.0, 1.0);
     ConnectedComponents con(G);

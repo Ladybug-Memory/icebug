@@ -31,7 +31,7 @@ public:
      * @return Forest computed by run method.
      * Note: So far no explicit check if run method has been invoked before.
      */
-    const Graph &getForest() {
+    const GraphW &getForest() {
         assureFinished();
         return forest;
     }

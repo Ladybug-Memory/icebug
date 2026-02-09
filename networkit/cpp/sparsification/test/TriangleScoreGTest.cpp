@@ -15,7 +15,7 @@ namespace NetworKit {
 
 class TriangleScoreGTest : public testing::Test {};
 
-Graph initGraph() {
+GraphW initGraph() {
     GraphW G(5);
     G.addEdge(0, 1); // 0     G:  0 - 1
     G.addEdge(0, 2); // 1         | / |

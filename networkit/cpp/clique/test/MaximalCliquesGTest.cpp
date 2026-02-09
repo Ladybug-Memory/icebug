@@ -13,7 +13,7 @@ namespace NetworKit {
 class MaximalCliquesGTest : public testing::Test {};
 
 TEST_F(MaximalCliquesGTest, testGetCliquesThrowsWithCallback) {
-    Graph graph(0, false, true, false);
+    GraphW graph(0, false, true, false);
     MaximalCliques maxClique(graph, [&](const std::vector<node> &) {});
     EXPECT_THROW(maxClique.getCliques(), std::runtime_error);
 }
@@ -41,10 +41,10 @@ TEST_F(MaximalCliquesGTest, testMaximalCliques) {
     // check results (are they cliques?)
     for (auto cliq : result) {
         auto cli = std::unordered_set<node>(cliq.begin(), cliq.end());
-        const auto cliqueGraph = GraphTools::subgraphFromNodes(G, cli);
+        const auto cliqueGraphW = GraphTools::subgraphFromNodes(G, cli);
 
-        EXPECT_EQ(cliqueGraph.numberOfEdges(),
-                  (cliqueGraph.numberOfNodes() * (cliqueGraph.numberOfNodes() - 1) / 2));
+        EXPECT_EQ(cliqueGraphW.numberOfEdges(),
+                  (cliqueGraphW.numberOfNodes() * (cliqueGraphW.numberOfNodes() - 1) / 2));
         EXPECT_EQ(cli.count(seed), 1u);
     }
 }

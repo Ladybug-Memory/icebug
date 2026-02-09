@@ -24,7 +24,7 @@ protected:
      * Cluster 1: contains nodes [numberOfSats1+1, numberOfSats1+numberOfSats2+2], where node
      * numberOfSats1+1 is the hub
      */
-    Graph createDualStarGraph(count numberOfSats1, count numberOfSats2) {
+    GraphW createDualStarGraph(count numberOfSats1, count numberOfSats2) {
         GraphW G(numberOfSats1 + numberOfSats2 + 2, false, isDirected());
 
         const node hub1 = 0;
@@ -42,7 +42,7 @@ protected:
     /**
      * Create a circle graph with edges (i, i+1) and (n-1, 0).
      */
-    Graph createCircle(count numberOfNodes) {
+    GraphW createCircle(count numberOfNodes) {
         GraphW G(numberOfNodes, false, isDirected());
 
         G.addEdge(numberOfNodes - 1, 0);
@@ -118,7 +118,7 @@ TEST_P(EdgeSwitchingGTest, testCircle) {
             ASSERT_TRUE(Ginput.hasEdge((u + kNumNodes - 1) % kNumNodes, u));
         });
 
-        const auto &resultGraph = algo.getGraph();
+        const auto &resultGraphW = algo.getGraph();
 
         // For any edge there are exactly 2 illegal partners, so we expect an success rate of
         const auto expectedSuccessRate = static_cast<double>(kNumNodes - 2) / kNumNodes;
@@ -128,7 +128,7 @@ TEST_P(EdgeSwitchingGTest, testCircle) {
         // In a truely random graph, the edge (u, u+1) exists with probability at most
         // 2.0 / kNumNodes, so we expect at most 2 such edges.
         count numContigousEdges = 0;
-        resultGraph.forEdges([&](node u, node v) {
+        resultGraphW.forEdges([&](node u, node v) {
             if (u > v)
                 std::swap(u, v);
             if (!u) {
@@ -138,12 +138,12 @@ TEST_P(EdgeSwitchingGTest, testCircle) {
             }
         });
 
-        resultGraph.forNodes([&](node u) {
+        resultGraphW.forNodes([&](node u) {
             if (isDirected()) {
-                ASSERT_EQ(resultGraph.degreeOut(u), 1);
-                ASSERT_EQ(resultGraph.degreeIn(u), 1);
+                ASSERT_EQ(resultGraphW.degreeOut(u), 1);
+                ASSERT_EQ(resultGraphW.degreeIn(u), 1);
             } else {
-                ASSERT_EQ(resultGraph.degree(u), 2);
+                ASSERT_EQ(resultGraphW.degree(u), 2);
             }
         });
 

@@ -79,7 +79,7 @@ void AlgebraicMatchingCoarsening<Matrix>::run() {
         P.transpose() * A
         * P; // Matrix::mTmMultiply performs worse due to high sparsity of P (nnz = n)
 
-    Gcoarsened = Graph(coarseAdj.numberOfRows(), true);
+    Gcoarsened = GraphW(coarseAdj.numberOfRows(), true);
     coarseAdj.forNonZeroElementsInRowOrder([&](node u, node v, edgeweight weight) {
         if (u == v && !noSelfLoops) {
             Gcoarsened.addEdge(u, v, weight / 2.0);

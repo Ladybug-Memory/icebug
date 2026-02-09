@@ -27,7 +27,7 @@ protected:
     const int64_t n{250};
 
 public:
-    Graph makeCompleteGraph(count n) {
+    GraphW makeCompleteGraph(count n) {
         GraphW G(n);
         G.forNodePairs([&](node u, node v) { G.addEdge(u, v); });
         G.shrinkToFit();

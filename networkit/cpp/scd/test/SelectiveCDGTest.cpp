@@ -59,9 +59,9 @@ TEST_F(SelectiveCDGTest, testRandomBFS) {
     EXPECT_EQ(community.size(), 21);
 
     // The community must be connected
-    GraphW subGraph = GraphTools::subgraphFromNodes(
+    GraphW subGraphW = GraphTools::subgraphFromNodes(
         g, std::unordered_set<node>{community.begin(), community.end()});
-    ConnectedComponents components(subGraph);
+    ConnectedComponents components(subGraphW);
     components.run();
     EXPECT_EQ(components.numberOfComponents(), 1);
 }
@@ -359,9 +359,9 @@ TEST_F(SelectiveCDGTest, testSetConductance) {
         ParallelPartitionCoarsening coarsening(G, P);
         coarsening.run();
 
-        GraphW coarseGraph = coarsening.getCoarseGraph();
+        GraphW coarseGraphW = coarsening.getCoarseGraph();
         std::set<node> nodes{0};
-        SetConductance sc(coarseGraph, nodes);
+        SetConductance sc(coarseGraphW, nodes);
         sc.run();
         EXPECT_EQ(sc.getConductance(), 0.2);
     }

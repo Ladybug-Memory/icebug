@@ -35,7 +35,7 @@ TEST_P(TraversalGTest, testBFSfrom) {
     sequence.reserve(n);
     std::vector<std::pair<node, node>> edgeSequence;
 
-    auto doBFS = [&](const Graph &G, const std::vector<node> &sources) {
+    auto doBFS = [&](const GraphW &G, const std::vector<node> &sources) {
         std::fill(visited.begin(), visited.end(), 0);
         sequence.clear();
         edgeSequence.clear();
@@ -95,7 +95,7 @@ TEST_P(TraversalGTest, testDFSfrom) {
     sequence.reserve(n);
     std::vector<std::pair<node, node>> edgeSequence;
 
-    auto doDFS = [&](const Graph &G, node source) {
+    auto doDFS = [&](const GraphW &G, node source) {
         sequence.clear();
         edgeSequence.clear();
         std::fill(visited.begin(), visited.end(), 0);
@@ -142,7 +142,7 @@ TEST_P(TraversalGTest, testDijkstraFrom) {
         nodes.push_back(u);
     }
 
-    auto dijkstra = [&](const Graph &G, const std::vector<node> &sources) {
+    auto dijkstra = [&](const GraphW &G, const std::vector<node> &sources) {
         std::vector<edgeweight> distance(G.upperNodeIdBound(),
                                          std::numeric_limits<edgeweight>::max());
         tlx::d_ary_addressable_int_heap<node, 2, Aux::LessInVector<edgeweight>> heap{distance};

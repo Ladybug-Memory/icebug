@@ -53,13 +53,13 @@ TEST_F(SSSPGTest, testDijkstra) {
 }
 
 TEST_F(SSSPGTest, testSSSPThrowsInvalidSource) {
-    Graph G(5, true);
+    GraphW G(5, true);
     BFS bfs(G, /*source*/ 1);
     EXPECT_THROW(bfs.setSource(/*invalid_source*/ 6), std::runtime_error);
 }
 
 TEST_F(SSSPGTest, testSSSPThrowsInvalidTarget) {
-    Graph G(5, true);
+    GraphW G(5, true);
     BFS bfs(G, /*source*/ 1);
     EXPECT_THROW(bfs.setTarget(/*invalid_target*/ 6), std::runtime_error);
 }

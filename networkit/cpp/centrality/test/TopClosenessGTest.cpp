@@ -59,7 +59,7 @@ TEST_P(TopClosenessGTest, testTopCloseness) {
     for (bool isDirected : {false, true}) {
         Aux::Random::setSeed(42, false);
         const auto G1 = DorogovtsevMendesGenerator(size).generate();
-        Graph G(G1, false, isDirected);
+        GraphW G(G1, false, isDirected);
 
         Closeness cc(G1, true, ClosenessVariant::GENERALIZED);
         cc.run();
@@ -77,7 +77,7 @@ TEST_P(TopClosenessGTest, testTopCloseness) {
 
 TEST_P(TopClosenessGTest, testTopClosenessWithNodeList) {
     METISGraphReader reader;
-    Graph G = reader.read("input/lesmis.graph");
+    GraphW G = reader.read("input/lesmis.graph");
     constexpr count k = 10;
     const std::vector<node> nodeList{0, 1, 2, 3, 4, 5, 11, 26, 48, 64};
 
@@ -140,7 +140,7 @@ TEST_P(TopHarmonicClosenessGTest, testTopHarmonicCloseness) {
 
 TEST_P(TopHarmonicClosenessGTest, testTopHarmonicClosenessWithNodeList) {
     METISGraphReader reader;
-    Graph G = reader.read("input/lesmis.graph");
+    GraphW G = reader.read("input/lesmis.graph");
     constexpr count k = 10;
     const std::vector<node> nodeList{0, 1, 2, 3, 4, 5, 6, 11, 27, 48};
 

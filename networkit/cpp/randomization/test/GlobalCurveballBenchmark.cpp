@@ -18,10 +18,10 @@ namespace NetworKit {
 
 class GlobalCurveballBenchmark : public ::testing::Test {
 protected:
-    void checkWithGraph(Graph &);
+    void checkWithGraph(GraphW &);
 };
 
-void GlobalCurveballBenchmark::checkWithGraph(Graph &G) {
+void GlobalCurveballBenchmark::checkWithGraph(GraphW &G) {
     node numNodes = G.numberOfNodes();
     const count numTrades = 2;
     std::vector<node> degrees(numNodes + 1);

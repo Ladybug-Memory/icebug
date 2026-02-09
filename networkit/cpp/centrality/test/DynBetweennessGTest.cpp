@@ -30,7 +30,7 @@ protected:
 
     static constexpr double epsilon = 0.1, delta = 0.1;
 
-    void compareAgainstBaseline(const Graph &G, const std::vector<double> &apxScores,
+    void compareAgainstBaseline(const GraphW &G, const std::vector<double> &apxScores,
                                 const std::vector<double> &exactScores, double normalized = false,
                                 double err = epsilon) const {
         const auto n = static_cast<double>(G.numberOfNodes());
@@ -38,7 +38,7 @@ protected:
         G.forNodes([&](node u) { EXPECT_NEAR(apxScores[u], exactScores[u] / normFactor, err); });
     }
 
-    std::pair<node, node> getNonAdjacentNodes(const Graph &G) const {
+    std::pair<node, node> getNonAdjacentNodes(const GraphW &G) const {
         node u, v;
         do {
             u = GraphTools::randomNode(G), v = GraphTools::randomNode(G);

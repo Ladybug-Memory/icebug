@@ -63,7 +63,7 @@ TEST_F(ConnectedComponentsGTest, testConnectedComponentsTiny) {
 }
 
 TEST_F(ConnectedComponentsGTest, testConnectedComponentsDirected) {
-    Graph G(5, false, true);
+    GraphW G(5, false, true);
     EXPECT_THROW(ConnectedComponents{G}, std::runtime_error);
 }
 
@@ -78,7 +78,7 @@ TEST_F(ConnectedComponentsGTest, testConnectedComponents) {
 }
 
 TEST_F(ConnectedComponentsGTest, testParallelConnectedComponentsThowsForDirectedGraph) {
-    Graph G(2, false, true);
+    GraphW G(2, false, true);
     EXPECT_THROW(ParallelConnectedComponents test(G), std::runtime_error);
 }
 
@@ -202,7 +202,7 @@ TEST_F(ConnectedComponentsGTest, testStronglyConnectedComponentsTiny) {
 
 TEST_F(ConnectedComponentsGTest, testStronglyConnectedComponents) {
 
-    auto testComponent = [](const Graph &G, const std::vector<node> &cmp) {
+    auto testComponent = [](const GraphW &G, const std::vector<node> &cmp) {
         std::vector<bool> inComponent(G.upperNodeIdBound());
         std::vector<bool> reachableFromComponent(G.upperNodeIdBound());
         for (const auto u : cmp) {
@@ -405,7 +405,7 @@ TEST_F(ConnectedComponentsGTest, testWeaklyConnectedComponentsTiny) {
 }
 
 TEST_F(ConnectedComponentsGTest, testConnectedComponentsUndirected) {
-    Graph G(5); // Undirected
+    GraphW G(5); // Undirected
     EXPECT_THROW(WeaklyConnectedComponents{G}, std::runtime_error);
 }
 
@@ -545,7 +545,7 @@ TEST_F(ConnectedComponentsGTest, testExtractLargestConnectedComponent) {
     G.addEdge(4, 1);
 
     G.addEdge(5, 6);
-    Graph G1(G);
+    GraphW G1(G);
 
     auto lcc = ConnectedComponents::extractLargestConnectedComponent(G, true);
     EXPECT_EQ(lcc.numberOfNodes(), 5);

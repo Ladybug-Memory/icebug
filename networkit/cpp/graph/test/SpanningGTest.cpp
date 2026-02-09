@@ -20,7 +20,7 @@ namespace NetworKit {
 class SpanningGTest : public testing::Test {};
 
 // check that each node has an edge in the spanning tree (if it had one before)
-inline void isValidForest(const Graph &g, const Graph &t) {
+inline void isValidForest(const GraphW &g, const GraphW &t) {
     t.forNodes([&](node u) { EXPECT_TRUE(t.degree(u) > 0 || g.degree(u) == 0); });
 }
 

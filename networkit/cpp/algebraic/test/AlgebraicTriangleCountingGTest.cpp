@@ -131,7 +131,7 @@ TEST(AlgebraicTriangleCountingGTest, testDirectedToyGraphThree) {
 
 TEST(AlgebraicTriangleCountingGTest, testLocalClusteringCoefficient) {
     METISGraphReader reader;
-    Graph graph = reader.read("input/celegans_metabolic.graph");
+    GraphW graph = reader.read("input/celegans_metabolic.graph");
     INFO("graph has ", graph.numberOfNodes(), " nodes and ", graph.numberOfEdges(),
          " edges and directed? ", graph.isDirected());
 
@@ -159,7 +159,7 @@ TEST(AlgebraicTriangleCountingGTest, testLocalClusteringCoefficient) {
     std::vector<double> lccValues = lcc.scores();
     timer.stop();
 
-    INFO("Graph theoretic local clustering coefficient took ", timer.elapsedTag());
+    INFO("GraphW theoretic local clustering coefficient took ", timer.elapsedTag());
 
     graph.forNodes([&](node u) { EXPECT_EQ(lccValues[u], lccAlgebraic[u]); });
 }

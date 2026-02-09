@@ -25,7 +25,7 @@ public:
     virtual ~AlgebraicBellmanFordGTest() = default;
 
 protected:
-    std::vector<double> classicBF(const Graph &graph, node s) const;
+    std::vector<double> classicBF(const GraphW &graph, node s) const;
 };
 
 TEST_F(AlgebraicBellmanFordGTest, testOnToyGraph) {
@@ -56,7 +56,7 @@ TEST_F(AlgebraicBellmanFordGTest, testOnToyGraph) {
 
 TEST_F(AlgebraicBellmanFordGTest, benchmark) {
     METISGraphReader reader;
-    Graph graph = reader.read("input/PGPgiantcompo.graph");
+    GraphW graph = reader.read("input/PGPgiantcompo.graph");
 
     AlgebraicBellmanFord<CSRMatrix> bf(graph, 0);
 
@@ -87,7 +87,7 @@ TEST_F(AlgebraicBellmanFordGTest, benchmark) {
     }
 }
 
-std::vector<double> AlgebraicBellmanFordGTest::classicBF(const Graph &graph, node s) const {
+std::vector<double> AlgebraicBellmanFordGTest::classicBF(const GraphW &graph, node s) const {
     std::vector<double> dist(graph.numberOfNodes(), std::numeric_limits<double>::infinity());
     dist[s] = 0;
 
