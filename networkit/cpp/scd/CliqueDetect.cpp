@@ -19,7 +19,8 @@ std::set<node> CliqueDetect::expandOneCommunity(node s) {
     std::set<node> result;
     result.insert(s);
 
-    std::vector<node> sn(g->neighborRange(s).begin(), g->neighborRange(s).end());
+    auto neighborRangeS = g->neighborRange(s);
+    std::vector<node> sn(neighborRangeS.begin(), neighborRangeS.end());
     std::vector<edgeweight> neighborWeights;
     if (g->isWeighted()) {
         neighborWeights.reserve(sn.size());

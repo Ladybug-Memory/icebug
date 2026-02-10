@@ -37,8 +37,9 @@ BiasedRandomWalk::BiasedRandomWalk(const Graph *graph)
         if (graph->isDirected()) {
             // local numbering of neighbors by index in index2node[v]:
             index2node[v].reserve(graph->degree(v));
-            index2node[v].insert(index2node[v].begin(), graph->neighborRange(v).begin(),
-                                 graph->neighborRange(v).end());
+            auto neighborRangeV = graph->neighborRange(v);
+            index2node[v].insert(index2node[v].begin(), neighborRangeV.begin(),
+                                 neighborRangeV.end());
 
             if (graph->degreeIn(v) == 0) {
                 graphData->data[v][none] = AliasSampler(degv);
