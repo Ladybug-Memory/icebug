@@ -149,8 +149,8 @@ jobs:
     runs-on: macos-${{ matrix.os }}
     strategy:
       matrix:
-        os: ['latest'] # llvm and gcc are only tested on arm based machines
-        compiler: ['llvm-20', 'gcc-14']
+        os: ['latest'] # llvm is only tested on arm based machines
+        compiler: ['llvm-20']  # gcc-14 removed due to ABI incompatibility with Homebrew Arrow (built with libc++)
     steps:
       - name: Install prerequisites
         run: |
