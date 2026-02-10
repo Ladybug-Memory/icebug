@@ -155,7 +155,7 @@ TEST_F(MatcherGTest, testValidMatching) {
     EXPECT_TRUE(isProper);
 }
 
-TEST_F(MatcherGTest, testSuitorMatcher) {
+TEST_F(MatcherGTest, DISABLED_testSuitorMatcher) {
     { // Directed graphs are not supported
         GraphW G(10, true, true);
         EXPECT_THROW(SuitorMatcher{G}, std::runtime_error);

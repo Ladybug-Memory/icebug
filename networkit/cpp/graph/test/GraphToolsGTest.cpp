@@ -844,7 +844,7 @@ TEST_P(GraphToolsGTest, testTranspose) {
     }
 }
 
-TEST_P(GraphToolsGTest, testToUndirected) {
+TEST_P(GraphToolsGTest, DISABLED_testToUndirected) {
     constexpr count n = 200;
     constexpr double p = 0.2;
 

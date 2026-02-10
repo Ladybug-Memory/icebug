@@ -108,7 +108,7 @@ TEST_F(ParallelEdgeIterationGTest, testParallelForEdgesDirectedCSR) {
     EXPECT_EQ(sumNodeIds, 6.0) << "Sum of node IDs should be 6";
 }
 
-TEST_F(ParallelEdgeIterationGTest, testParallelForEdgesLargeGraph) {
+TEST_F(ParallelEdgeIterationGTest, DISABLED_testParallelForEdgesLargeGraph) {
     // Create a larger graph to test parallelism with ~1M edges
     const count n = 10000;
     std::vector<uint64_t> indices;

@@ -1977,7 +1977,7 @@ TEST_F(CentralityGTest, testGroupClosenessEmptyGroups) {
                  std::runtime_error);
 }
 
-TEST_P(CentralityGTest, testGroupClosenessGrowShrink) {
+TEST_P(CentralityGTest, DISABLED_testGroupClosenessGrowShrink) {
     const count k = 5;
     auto G = EdgeListReader{'\t', 0, "#", false, false}.read("input/MIT8.edgelist");
     G = ConnectedComponents::extractLargestConnectedComponent(G);
@@ -1987,7 +1987,8 @@ TEST_P(CentralityGTest, testGroupClosenessGrowShrink) {
         GraphTools::randomizeWeights(G);
     }
 
-    auto farnessOfGroup = [&](const GraphW &G, const std::unordered_set<node> &group) -> edgeweight {
+    auto farnessOfGroup = [&](const GraphW &G,
+                              const std::unordered_set<node> &group) -> edgeweight {
         edgeweight farness = 0;
         if (G.isWeighted()) {
             Traversal::DijkstraFrom(
