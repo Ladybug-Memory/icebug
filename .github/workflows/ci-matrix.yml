@@ -92,11 +92,10 @@ jobs:
       - name: Install prerequisites (macOS)
         if: matrix.os == 'macos'
         run: |
-          brew install ninja apache-arrow
+          brew install apache-arrow
           if [[ "${{ matrix.compiler }}" == "llvm-20" ]]; then
             brew install libomp
             brew reinstall llvm@20
-            brew link --overwrite llvm
           fi
 
       - name: Create vcpkg manifest (Windows)
