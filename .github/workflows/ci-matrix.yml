@@ -42,8 +42,8 @@ jobs:
           - os: macos
             compiler: llvm-20
             runner: macos-latest
-            cc: /opt/homebrew/opt/llvm/bin/clang
-            cxx: /opt/homebrew/opt/llvm/bin/clang++
+            cc: /opt/homebrew/opt/llvm@20/bin/clang
+            cxx: /opt/homebrew/opt/llvm@20/bin/clang++
           - os: windows
             compiler: msvc
             runner: windows-2022
@@ -95,7 +95,7 @@ jobs:
           brew install ninja apache-arrow
           if [[ "${{ matrix.compiler }}" == "llvm-20" ]]; then
             brew install libomp
-            brew reinstall llvm
+            brew reinstall llvm@20
             brew link --overwrite llvm
           fi
 
