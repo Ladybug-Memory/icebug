@@ -56,7 +56,9 @@ jobs:
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: ccache-${{ matrix.os }}-${{ matrix.compiler }}-main
+          key: ${{ matrix.os }}-${{ matrix.compiler }}-${{ github.ref_name }}
+          restore-keys: |
+            ${{ matrix.os }}-${{ matrix.compiler }}-
           max-size: 4G
 
       - name: Checkout networkit
@@ -70,6 +72,12 @@ jobs:
         with:
           repository: tlx/tlx
           path: tlx
+
+      - name: Configure ccache
+        run: |
+          ccache --set-config=compiler_check=content
+          ccache --set-config=sloppiness=include_file_mtime
+          ccache -p
 
       - name: Install prerequisites (Linux)
         if: matrix.os == 'linux' && matrix.compiler == 'llvm-20'
