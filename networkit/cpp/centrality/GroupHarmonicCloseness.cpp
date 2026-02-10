@@ -202,15 +202,19 @@ double GroupHarmonicClosenessImpl<edgeweight>::harmonicClosenessUBDirected(node 
     if (reachableFromU <= 1)
         return 0;
 
+    const count degU = G->degree(u);
+    if (degU == 0)
+        return 0;
+
+    auto weightRange = G->weightNeighborRange(u);
     const edgeweight smallestWeight =
         (*std::min_element(
-             G->weightNeighborRange(u).begin(), G->weightNeighborRange(u).end(),
+             weightRange.begin(), weightRange.end(),
              [](const auto &e1, const auto &e2) -> bool { return e1.second < e2.second; }))
             .second;
 
-    return static_cast<double>(G->degree(u)) / smallestWeight
-           + static_cast<double>(reachableFromU - G->degree(u) - 1)
-                 / (smallestWeight + minEdgeWeight);
+    return static_cast<double>(degU) / smallestWeight
+           + static_cast<double>(reachableFromU - degU - 1) / (smallestWeight + minEdgeWeight);
 }
 
 template <class WeightType>
