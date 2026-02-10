@@ -90,7 +90,7 @@ Vector DenseMatrix::column(const index j) const {
 }
 
 Vector DenseMatrix::diagonal() const {
-    Vector diagonal(std::min(numberOfRows(), numberOfColumns()), zero);
+    Vector diagonal(static_cast<count>(std::min(numberOfRows(), numberOfColumns())), zero);
 #pragma omp parallel for
     for (omp_index i = 0; i < static_cast<omp_index>(diagonal.getDimension()); ++i) {
         diagonal[i] = (*this)(i, i);

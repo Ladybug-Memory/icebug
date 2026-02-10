@@ -15,7 +15,8 @@ DynamicMatrix::DynamicMatrix(const count dimension, const double zero)
     : graph(dimension, true, true), nRows(dimension), nCols(dimension), zero(zero) {}
 
 DynamicMatrix::DynamicMatrix(const count nRows, const count nCols, const double zero)
-    : graph(std::max(nRows, nCols), true, true), nRows(nRows), nCols(nCols), zero(zero) {}
+    : graph(static_cast<count>(std::max(nRows, nCols)), true, true), nRows(nRows), nCols(nCols),
+      zero(zero) {}
 
 DynamicMatrix::DynamicMatrix(const count dimension, const std::vector<Triplet> &triplets,
                              const double zero)
@@ -23,7 +24,8 @@ DynamicMatrix::DynamicMatrix(const count dimension, const std::vector<Triplet> &
 
 DynamicMatrix::DynamicMatrix(const count nRows, const count nCols,
                              const std::vector<Triplet> &triplets, const double zero)
-    : graph(std::max(nRows, nCols), true, true), nRows(nRows), nCols(nCols), zero(zero) {
+    : graph(static_cast<count>(std::max(nRows, nCols)), true, true), nRows(nRows), nCols(nCols),
+      zero(zero) {
     for (size_t k = 0; k < triplets.size(); ++k) {
         assert(triplets[k].row < nRows && triplets[k].column < nCols);
         graph.addEdge(triplets[k].row, triplets[k].column, triplets[k].value);
@@ -88,7 +90,7 @@ Vector DynamicMatrix::column(const index j) const {
 }
 
 Vector DynamicMatrix::diagonal() const {
-    Vector diag(std::min(nRows, nCols), zero);
+    Vector diag(static_cast<count>(std::min(nRows, nCols)), zero);
     for (index i = 0; i < diag.getDimension(); ++i) {
         diag[i] = (*this)(i, i);
     }

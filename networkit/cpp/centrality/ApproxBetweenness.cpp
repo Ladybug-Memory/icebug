@@ -43,7 +43,8 @@ void ApproxBetweenness::run() {
     }
 
     INFO("estimated diameter: ", vd);
-    r = ceil((universalConstant / (epsilon * epsilon)) * (floor(log2(vd - 2)) + 1 - log(delta)));
+    r = static_cast<count>(
+        ceil((universalConstant / (epsilon * epsilon)) * (floor(log2(vd - 2)) + 1 - log(delta))));
 
     INFO("taking ", r, " path samples");
     handler.assureRunning();
