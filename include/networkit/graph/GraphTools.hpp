@@ -452,8 +452,16 @@ std::vector<node> topologicalSort(const Graph &G,
 template <class Distribution = std::uniform_real_distribution<edgeweight>>
 void randomizeWeights(Graph &G, Distribution distr = std::uniform_real_distribution<edgeweight>{
                                     0, std::nexttoward(1.0, 2.0)}) {
-    if (!G.isWeighted())
-        G = toWeighted(G);
+    if (!G.isWeighted()) {
+        // Try to convert in-place if G is actually a GraphW
+        GraphW *GW = dynamic_cast<GraphW *>(&G);
+        if (GW) {
+            *GW = toWeighted(*GW);
+        } else {
+            throw std::runtime_error(
+                "Graph must be weighted or of type GraphW to randomize weights");
+        }
+    }
 #pragma omp parallel
     {
         std::mt19937 gen;
