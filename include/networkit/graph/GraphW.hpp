@@ -89,7 +89,15 @@ public:
     GraphW(const GraphW &other)
         : Graph(other, true), inEdges(other.inEdges), outEdges(other.outEdges),
           inEdgeWeights(other.inEdgeWeights), outEdgeWeights(other.outEdgeWeights),
-          inEdgeIds(other.inEdgeIds), outEdgeIds(other.outEdgeIds) {}
+          inEdgeIds(other.inEdgeIds), outEdgeIds(other.outEdgeIds) {
+        // GraphW uses vector-based storage, not CSR
+        // Clear any CSR pointers that may have been copied from base class
+        outEdgesCSRIndices.reset();
+        outEdgesCSRIndptr.reset();
+        inEdgesCSRIndices.reset();
+        inEdgesCSRIndptr.reset();
+        usingCSR = false;
+    }
 
     /**
      * Create a graph as copy of @a other.
