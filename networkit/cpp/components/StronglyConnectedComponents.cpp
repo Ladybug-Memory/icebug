@@ -43,7 +43,8 @@ void StronglyConnectedComponents::run() {
     count curDepth = 0, visitedNodes = 0;
     index nComponents = 0;
 
-    std::stack<std::pair<node, Graph::NeighborIterator>> dfsStack;
+    std::stack<std::pair<node, std::pair<Graph::NeighborRange<>, Graph::NeighborIterator>>>
+        dfsStack;
 
     // Set the depth of node v and push it onto the stacks.
     auto visit = [&](const node v) -> void {
@@ -52,7 +53,8 @@ void StronglyConnectedComponents::run() {
         ++curDepth;
         stack.emplace_back(v);
         onStack[v] = 1;
-        dfsStack.emplace(v, G->neighborRange(v).begin());
+        auto neighborRange = G->neighborRange(v);
+        dfsStack.emplace(v, std::make_pair(neighborRange, neighborRange.begin()));
     };
 
     auto strongConnect = [&](const node u) -> void {
@@ -66,10 +68,11 @@ void StronglyConnectedComponents::run() {
             }
 
             // Iter points to the first neighbor of v, or to the last visited dfs child of v.
-            auto &iter = dfsStack.top().second;
+            auto &neighborRange = dfsStack.top().second.first;
+            auto &iter = dfsStack.top().second.second;
 
             // Iterate over the neighbors of v from either the first, or the last visited one.
-            for (; iter != G->neighborRange(v).end(); ++iter) {
+            for (; iter != neighborRange.end(); ++iter) {
                 const auto w = *iter;
 
                 // w not visited yet, visit it and continue the exploration from w.
@@ -85,7 +88,7 @@ void StronglyConnectedComponents::run() {
             }
 
             // Check if all neighbors of v have been visited.
-            if (iter == G->neighborRange(v).end()) {
+            if (iter == neighborRange.end()) {
                 // All neighbors of v have been visited, pop v.
                 dfsStack.pop();
 

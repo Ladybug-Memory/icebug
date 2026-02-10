@@ -1102,7 +1102,7 @@ public:
      * @param[in]	i	index of the nexight
      * @param[in]	ew	edge weight
      */
-    void setWeightAtIthNeighbor(Unsafe, node u, index i, edgeweight ew);
+    virtual void setWeightAtIthNeighbor(Unsafe, node u, index i, edgeweight ew);
 
     /**
      * Set the weight to the i-th incoming neighbour of u.
@@ -1111,7 +1111,7 @@ public:
      * @param[in]	i	index of the nexight
      * @param[in]	ew	edge weight
      */
-    void setWeightAtIthInNeighbor(Unsafe, node u, index i, edgeweight ew);
+    virtual void setWeightAtIthInNeighbor(Unsafe, node u, index i, edgeweight ew);
 
     /* SUMS */
 

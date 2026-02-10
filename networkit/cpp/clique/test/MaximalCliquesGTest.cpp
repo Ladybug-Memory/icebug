@@ -24,7 +24,8 @@ TEST_F(MaximalCliquesGTest, testMaximalCliques) {
     GraphW G = reader.read("input/hep-th.graph");
 
     node seed = 2;
-    std::vector<node> sn(G.neighborRange(seed).begin(), G.neighborRange(seed).end());
+    auto neighborRangeSeed = G.neighborRange(seed);
+    std::vector<node> sn(neighborRangeSeed.begin(), neighborRangeSeed.end());
     auto sneighbors = std::unordered_set<node>(sn.begin(), sn.end());
     sneighbors.insert(seed);
     const auto subG = GraphTools::subgraphFromNodes(G, sneighbors);

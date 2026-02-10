@@ -161,12 +161,17 @@ void LeftRightPlanarityCheck::removeBackEdges(const Edge &edge) {
 bool LeftRightPlanarityCheck::dfsTesting(node startNode) {
     std::stack<node> dfsStack;
     dfsStack.push(startNode);
-    std::unordered_map<node, decltype(dfsGraph.neighborRange(startNode).begin())> neighborIterators;
+    // Store both the range and iterator to avoid comparing iterators from different ranges
+    using NeighborRangeType = decltype(dfsGraph.neighborRange(startNode));
+    std::unordered_map<
+        node, std::pair<NeighborRangeType, decltype(dfsGraph.neighborRange(startNode).begin())>>
+        neighborIterators;
     std::unordered_set<Edge> preprocessedEdges;
 
     auto processNeighborEdges = [&](node currentNode, bool &callRemoveBackEdges) -> bool {
-        auto &neighborIterator = neighborIterators[currentNode];
-        while (neighborIterator != dfsGraph.neighborRange(currentNode).end()) {
+        auto &neighborRange = neighborIterators[currentNode].first;
+        auto &neighborIterator = neighborIterators[currentNode].second;
+        while (neighborIterator != neighborRange.end()) {
             const node neighbor = *neighborIterator;
             const Edge currentEdge(currentNode, neighbor);
 
@@ -188,7 +193,7 @@ bool LeftRightPlanarityCheck::dfsTesting(node startNode) {
                 currentEdgeIterator != lowestPoint.end()
                 && currentEdgeIterator->second < heights[currentNode]) {
 
-                if (neighbor == *dfsGraph.neighborRange(currentNode).begin()) {
+                if (neighbor == *neighborRange.begin()) {
                     lowestPointEdge[parentEdges[currentNode]] = lowestPointEdge[currentEdge];
                 } else if (!applyConstraints(currentEdge, parentEdges[currentNode])) {
                     return false;
@@ -207,7 +212,8 @@ bool LeftRightPlanarityCheck::dfsTesting(node startNode) {
         bool callRemoveBackEdges{true};
 
         if (auto it = neighborIterators.find(currentNode); it == neighborIterators.end()) {
-            neighborIterators[currentNode] = dfsGraph.neighborRange(currentNode).begin();
+            auto range = dfsGraph.neighborRange(currentNode);
+            neighborIterators[currentNode] = std::make_pair(range, range.begin());
         }
 
         if (!processNeighborEdges(currentNode, callRemoveBackEdges)) {

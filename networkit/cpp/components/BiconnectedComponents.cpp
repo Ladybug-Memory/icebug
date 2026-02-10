@@ -43,7 +43,7 @@ void BiconnectedComponents::run() {
         visited[u] = true;
     };
 
-    std::stack<std::pair<node, Graph::NeighborIterator>> stack;
+    std::stack<std::pair<node, std::pair<Graph::NeighborRange<>, Graph::NeighborIterator>>> stack;
     std::vector<std::pair<node, node>> edgeStack;
     G->forNodes([&](node currentNode) {
         if (visited[currentNode]) {
@@ -51,21 +51,25 @@ void BiconnectedComponents::run() {
         }
 
         isRoot[currentNode] = true;
-        stack.emplace(currentNode, G->neighborRange(currentNode).begin());
+        auto currentRange = G->neighborRange(currentNode);
+        stack.emplace(currentNode, std::make_pair(currentRange, currentRange.begin()));
 
         do {
             node u = stack.top().first;
-            auto &iter = stack.top().second;
+            auto &neighborRange = stack.top().second.first;
+            auto &iter = stack.top().second.second;
             if (!visited[u]) {
                 visitNode(u);
             }
 
-            for (; iter != G->neighborRange(u).end(); ++iter) {
+            for (; iter != neighborRange.end(); ++iter) {
                 node neighbor = *iter;
                 if (!visited[neighbor]) {
                     visitNode(neighbor);
                     parent[neighbor] = u;
-                    stack.emplace(neighbor, G->neighborRange(neighbor).begin());
+                    auto neighborNeighborRange = G->neighborRange(neighbor);
+                    stack.emplace(neighbor, std::make_pair(neighborNeighborRange,
+                                                           neighborNeighborRange.begin()));
                     edgeStack.emplace_back(u, neighbor);
                     break;
                 } else if (neighbor != parent[u] && level[neighbor] < level[u]) {
@@ -74,7 +78,7 @@ void BiconnectedComponents::run() {
                 }
             }
 
-            if (iter == G->neighborRange(u).end()) {
+            if (iter == neighborRange.end()) {
                 stack.pop();
 
                 if (isRoot[u]) {

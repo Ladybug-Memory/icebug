@@ -95,10 +95,8 @@ public:
      * Create a graph as copy of @a other.
      * @param other The graph to copy.
      */
-    GraphW(const Graph &other) : Graph(other) {
-        // Initialize vector structures for writable graph
-        initializeVectorStructures();
-    }
+    GraphW(const Graph &other)
+        : GraphW(other, other.isWeighted(), other.isDirected(), other.hasEdgeIds()) {}
 
     /**
      * Create a graph as copy of @a other with modified properties.
@@ -623,7 +621,7 @@ public:
      * @param i Index of the outgoing edge.
      * @param ew New edge weight.
      */
-    void setWeightAtIthNeighbor(Unsafe, node u, index i, edgeweight ew);
+    void setWeightAtIthNeighbor(Unsafe, node u, index i, edgeweight ew) override;
 
     /**
      * Set edge weight of the @a i-th incoming edge of node @a u. BEWARE: Running time is constant.
@@ -632,7 +630,7 @@ public:
      * @param i Index of the incoming edge.
      * @param ew New edge weight.
      */
-    void setWeightAtIthInNeighbor(Unsafe, node u, index i, edgeweight ew);
+    void setWeightAtIthInNeighbor(Unsafe, node u, index i, edgeweight ew) override;
 
     /**
      * Increase edge weight of edge {@a u,@a v} by @a ew. BEWARE: Running time is \Theta(deg(u))!
