@@ -3,6 +3,7 @@
 
 #include <networkit/auxiliary/Log.hpp>
 #include <networkit/auxiliary/Random.hpp>
+#include <networkit/graph/Attributes.hpp>
 #include <networkit/graph/Graph.hpp>
 #include <networkit/graph/GraphTools.hpp>
 #include <networkit/graph/TopologicalSort.hpp>
@@ -337,7 +338,10 @@ GraphW toUnweighted(const Graph &G) {
         WARN("The graph is already unweighted");
     }
 
-    GraphW newG(G.upperNodeIdBound(), false, G.isDirected());
+    // Preserve edge indexing status
+    bool edgesIndexed = G.hasEdgeIds();
+    GraphW newG(G.upperNodeIdBound(), false, G.isDirected(), edgesIndexed);
+
     G.forNodes([&](node u) {
         if (!G.hasNode(u)) {
             newG.removeNode(u);
@@ -345,6 +349,9 @@ GraphW toUnweighted(const Graph &G) {
     });
 
     G.forEdges([&](node u, node v, edgeweight) { newG.addEdge(u, v, 1.0); });
+
+    // Copy attributes from the original graph
+    newG.copyAttributesFrom(G);
 
     return newG;
 }
@@ -354,7 +361,10 @@ GraphW toWeighted(const Graph &G) {
         WARN("The graph is already weighted");
     }
 
-    GraphW newG(G.upperNodeIdBound(), true, G.isDirected());
+    // Preserve edge indexing status
+    bool edgesIndexed = G.hasEdgeIds();
+    GraphW newG(G.upperNodeIdBound(), true, G.isDirected(), edgesIndexed);
+
     G.forNodes([&](node u) {
         if (!G.hasNode(u)) {
             newG.removeNode(u);
@@ -362,6 +372,9 @@ GraphW toWeighted(const Graph &G) {
     });
 
     G.forEdges([&](node u, node v, edgeweight w) { newG.addEdge(u, v, w); });
+
+    // Copy attributes from the original graph
+    newG.copyAttributesFrom(G);
 
     return newG;
 }

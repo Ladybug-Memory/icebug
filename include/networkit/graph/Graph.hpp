@@ -251,6 +251,20 @@ public:
     using EdgeDoubleAttribute = Attribute<PerEdge, Graph, double, false>;
     using EdgeStringAttribute = Attribute<PerEdge, Graph, std::string, false>;
 
+    /**
+     * Copy all attributes from another graph. This is useful when creating
+     * a new graph with different properties (weighted/unweighted) but wanting
+     * to preserve attributes.
+     * @param other The source graph to copy attributes from.
+     */
+    void copyAttributesFrom(const Graph &other) {
+        nodeAttributeMap = AttributeMap<PerNode, Graph>(other.nodeAttributes(), this);
+        // Only copy edge attributes if both graphs have indexed edges
+        if (other.hasEdgeIds() && this->hasEdgeIds()) {
+            edgeAttributeMap = AttributeMap<PerEdge, Graph>(other.edgeAttributes(), this);
+        }
+    }
+
 protected:
     /**
      * Returns the index of node u in the array of incoming edges of node v.
