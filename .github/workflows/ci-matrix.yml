@@ -40,11 +40,6 @@ jobs:
             cc: clang-20
             cxx: clang++-20
           - os: macos
-            compiler: gcc-14
-            runner: macos-latest
-            cc: gcc-14
-            cxx: g++-14
-          - os: macos
             compiler: llvm-20
             runner: macos-latest
             cc: /opt/homebrew/opt/llvm/bin/clang
