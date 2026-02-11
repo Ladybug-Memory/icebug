@@ -183,7 +183,7 @@ jobs:
           CIBW_ENVIRONMENT: >
             CXX='c++'
             ${{ matrix.buildplat[2] }}
-            MACOSX_DEPLOYMENT_TARGET='14.0'
+            MACOSX_DEPLOYMENT_TARGET='15.0'
             CCACHE_DIR=$HOME/.ccache
             CCACHE_MAXSIZE=2G
             CMAKE_C_COMPILER_LAUNCHER=ccache
@@ -276,7 +276,7 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.23.0
         env:
-          CIBW_BEFORE_BUILD: pip install cython ipython
+          CIBW_BEFORE_BUILD: pip install cython ipython delvewheel
           CIBW_ARCHS: "AMD64"
           CIBW_BUILD: ${{ github.ref == 'refs/heads/main' && 'cp310-* cp311-* cp312-* cp313-*' || 'cp313-*' }}
           CIBW_ENVIRONMENT: >
@@ -286,6 +286,7 @@ jobs:
             CMAKE_CXX_COMPILER_LAUNCHER=ccache
             CMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
           CIBW_SKIP: pp*
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair --add-path $VCPKG_INSTALLATION_ROOT/installed/x64-windows/bin -w {dest_dir} {wheel}"
           VCPKG_BINARY_SOURCES: 'clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite'
           CIBW_TEST_COMMAND: python -c "import networkit"
       - uses: actions/upload-artifact@v4
