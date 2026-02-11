@@ -17,7 +17,7 @@ jobs:
     strategy:
       matrix:
         cibw_archs: ["x86_64"]
-        manylinux_image: ["manylinux2014"]
+        manylinux_image: ["manylinux_2_28"]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -82,7 +82,7 @@ jobs:
     strategy:
       matrix:
         cibw_archs: ["aarch64"]
-        manylinux_image: ["manylinux2014"]
+        manylinux_image: ["manylinux_2_28"]
     steps:
       - uses: actions/checkout@v4
         with:
