@@ -36,7 +36,8 @@ classifiers = [
 
 dependencies = [
   "scipy",
-  "numpy"
+  "numpy",
+  "pyarrow"
 ]
 
 [project.urls]
@@ -45,6 +46,10 @@ documentation = "https://networkit.github.io/dev-docs/index.html"
 repository = "https://github.com/Ladybug-Memory/icebug"
 changelog = "https://github.com/Ladybug-Memory/icebug/blob/master/CHANGES.md"
 
+
+[tool.pytest.ini_options]
+testpaths = ["networkit/test"]
+addopts = ["--ignore=extlibs"]
 
 [build-system]
 requires = [
