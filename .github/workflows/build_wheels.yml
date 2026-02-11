@@ -1,16 +1,14 @@
 name: Build wheels
 
 on:
-  pull_request:
-    branches:
-      - master
   push:
     branches:
-      - master
+      - main
+  workflow_dispatch:
 
 # Default parameters for all builds
 env:
-  ARTIFACT_RETENTION: ${{ github.ref == 'refs/heads/master' && '30' || '7' }}
+  ARTIFACT_RETENTION: ${{ github.ref == 'refs/heads/main' && '30' || '7' }}
 
 jobs:
   cpython-linux-x86_64:
@@ -49,23 +47,23 @@ jobs:
             CMAKE_CXX_COMPILER_LAUNCHER=ccache
           CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.manylinux_image }}
           CIBW_ARCHS_LINUX: ${{ matrix.cibw_archs }}
-          CIBW_BUILD: ${{ github.ref == 'refs/heads/master' && 'cp310-* cp311-* cp312-* cp313-*' || 'cp313-*' }}
+          CIBW_BUILD: ${{ github.ref == 'refs/heads/main' && 'cp310-* cp311-* cp312-* cp313-*' || 'cp313-*' }}
           CIBW_SKIP: "pp* *-musllinux_*"
           CIBW_TEST_COMMAND: python3 -c 'import networkit'
       - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         with:
           name: 'linux-${{ matrix.cibw_archs }}-cp310-${{ github.run_id }}'
           path: ./wheelhouse/*cp310*.whl
           retention-days: ${{ env.ARTIFACT_RETENTION }}
       - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         with:
           name: 'linux-${{ matrix.cibw_archs }}-cp311-${{ github.run_id }}'
           path: ./wheelhouse/*cp311*.whl
           retention-days: ${{ env.ARTIFACT_RETENTION }}
       - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         with:
           name: 'linux-${{ matrix.cibw_archs }}-cp312-${{ github.run_id }}'
           path: ./wheelhouse/*cp312*.whl
@@ -105,7 +103,7 @@ jobs:
   #         CIBW_BEFORE_BUILD: pip install cython
   #         CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.manylinux_image }}
   #         CIBW_ARCHS_LINUX: ${{ matrix.cibw_archs }}
-  #         CIBW_BUILD: ${{ github.ref == 'refs/heads/master' && 'cp312-* cp313-*' || 'cp312-*' }}
+  #         CIBW_BUILD: ${{ github.ref == 'refs/heads/main' && 'cp312-* cp313-*' || 'cp312-*' }}
   #         CIBW_SKIP: "pp* *-musllinux_*"
   #     - uses: actions/upload-artifact@v4
   #       with:
@@ -113,7 +111,7 @@ jobs:
   #         path: ./wheelhouse/*cp312*.whl
   #         retention-days: ${{ env.ARTIFACT_RETENTION }}
   #     - uses: actions/upload-artifact@v4
-  #       if: github.ref == 'refs/heads/master'
+  #       if: github.ref == 'refs/heads/main'
   #       with:
   #         name: 'linux-${{ matrix.cibw_archs }}-cp313-${{ github.run_id }}'
   #         path: ./wheelhouse/*cp313*.whl
@@ -150,7 +148,7 @@ jobs:
             pip install cython &&
             brew install libomp ninja ccache
           CIBW_ARCHS_MACOS: ${{ matrix.buildplat[1] }}
-          CIBW_BUILD: ${{ github.ref == 'refs/heads/master' && 'cp310-* cp311-* cp312-* cp313-*' || 'cp313-*' }}
+          CIBW_BUILD: ${{ github.ref == 'refs/heads/main' && 'cp310-* cp311-* cp312-* cp313-*' || 'cp313-*' }}
           CIBW_ENVIRONMENT: >
             CXX='c++'
             ${{ matrix.buildplat[2] }}
@@ -163,19 +161,19 @@ jobs:
           CIBW_TEST_COMMAND: python3 -c 'import networkit'
           CIBW_TEST_SKIP: "*-macosx_x86_64 *-macosx_universal2:x86_64"
       - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         with:
           name: 'macos-${{ matrix.buildplat[1] }}-cp310-${{ github.run_id }}'
           path: ./wheelhouse/*cp310*.whl
           retention-days: ${{ env.ARTIFACT_RETENTION }}
       - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         with:
           name: 'macos-${{matrix.buildplat[1] }}-cp311-${{ github.run_id }}'
           path: ./wheelhouse/*cp311*.whl
           retention-days: ${{ env.ARTIFACT_RETENTION }}
       - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         with:
           name: 'macos-${{ matrix.buildplat[1] }}-cp312-${{ github.run_id }}'
           path: ./wheelhouse/*cp312*.whl
@@ -216,7 +214,7 @@ jobs:
         env:
           CIBW_BEFORE_BUILD: pip install cython ipython
           CIBW_ARCHS: "AMD64"
-          CIBW_BUILD: ${{ github.ref == 'refs/heads/master' && 'cp310-* cp311-* cp312-* cp313-*' || 'cp313-*' }}
+          CIBW_BUILD: ${{ github.ref == 'refs/heads/main' && 'cp310-* cp311-* cp312-* cp313-*' || 'cp313-*' }}
           CIBW_ENVIRONMENT: >
             CCACHE_DIR=$HOME/.ccache
             CCACHE_MAXSIZE=2G
@@ -225,19 +223,19 @@ jobs:
           CIBW_SKIP: pp*
           CIBW_TEST_COMMAND: python -c "import networkit"
       - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         with:
           name: 'win-${{ matrix.cibw_archs }}-cp310-${{ github.run_id }}'
           path: ./wheelhouse/*cp310*.whl
           retention-days: ${{ env.ARTIFACT_RETENTION }}
       - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         with:
           name: 'win-${{ matrix.cibw_archs }}-cp311-${{ github.run_id }}'
           path: ./wheelhouse/*cp311*.whl
           retention-days: ${{ env.ARTIFACT_RETENTION }}
       - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         with:
           name: 'win-${{ matrix.cibw_archs }}-cp312-${{ github.run_id }}'
           path: ./wheelhouse/*cp312*.whl
