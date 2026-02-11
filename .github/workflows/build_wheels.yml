@@ -78,16 +78,12 @@ jobs:
 
   cpython-linux-aarch64:
     name: 'Linux CPython (${{ matrix.cibw_archs }}, ${{ matrix.manylinux_image }})'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         cibw_archs: ["aarch64"]
         manylinux_image: ["manylinux2014"]
     steps:
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: all
       - uses: actions/checkout@v4
         with:
           submodules: true
