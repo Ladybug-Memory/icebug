@@ -357,24 +357,64 @@ jobs:
           fi
 
   upload-packages:
-    if: needs.check-release-tag.outputs.is-release == 'true' && github.repository == 'networkit/networkit'
+    if: needs.check-release-tag.outputs.is-release == 'true' && github.repository == 'Ladybug-memory/icebug'
     name: 'PyPi release upload'
     runs-on: ubuntu-22.04
     needs: [cpython-macos, cpython-linux-x86_64, cpython-linux-aarch64, cpython-windows, source-distribution, check-release-tag]
     steps:
       - uses: actions/download-artifact@v4
         with:
-          path: ./dist
-      - uses: actions/setup-python@v5
-        name: Install Python
+          name: macos-wheels-arm64
+          path: dist
+
+      - uses: actions/download-artifact@v4
         with:
-          python-version: '3.12'
-      - name: Upload to TestPyPI
-        run: |
-          unzip "./dist/artifact/*.zip"
-          pip install twine 
-          python3 -m twine upload --verbose --skip-existing ./dist/artifact/*
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.TWINE_TOKEN }}
+          name: macos-wheels-x86_64
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: manylinux_2_28-wheels-x86_64
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: manylinux_2_28-wheels-aarch64
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-wheels-amd64
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-wheels-arm64
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-sdist
+          path: dist
+
+      - name: List wheels
+        run: ls -l
+        working-directory: dist
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: icebug-deploy-wheels
+          path: dist/*
+
+      - name: Deploy to PyPI test
+        if: ${{ github.event_name != 'workflow_dispatch' && github.event.inputs.isDeploy != 'true' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+      - name: Deploy to PyPI
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.isDeploy == 'true' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
 
