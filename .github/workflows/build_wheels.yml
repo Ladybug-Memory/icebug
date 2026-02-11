@@ -41,7 +41,7 @@ jobs:
             pip install cython auditwheel --upgrade
             yum install -y epel-release || yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1).noarch.rpm
             yum install -y https://apache.jfrog.io/artifactory/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe)/apache-arrow-release-latest.rpm
-            yum install -y --enablerepo=epel arrow-devel ccache
+            yum install -y --enablerepo=epel arrow-devel arrow-compute-devel ccache
           CIBW_ENVIRONMENT_LINUX: >
             CCACHE_DIR=/root/.ccache
             CCACHE_MAXSIZE=2G
@@ -300,11 +300,10 @@ jobs:
           sudo apt-get install -y ./apache-arrow-apt-source-latest-jammy.deb
           sudo apt-get update
           sudo apt-get install -y libarrow-dev
-      - name: Create sdist source
+      - name: Create sdist
         run: |
-          pip install cython==3.0.9 numpy setuptools
-          python3 setup.py build_ext
-          python3 setup.py sdist
+          pip install build cython==3.0.9 numpy
+          python -m build --sdist
       - uses: actions/upload-artifact@v4
         with:
           name: 'sdist-${{ github.run_id }}.tar.gz'
