@@ -38,6 +38,30 @@ import os
 import logging
 import sys
 
+# Keep Windows DLL directory handles alive for process lifetime.
+_windows_dll_dirs = []
+
+if os.name == "nt" and hasattr(os, "add_dll_directory"):
+	try:
+		import pyarrow as _pyarrow
+	except ImportError:
+		# Let regular imports raise the dependency error later.
+		pass
+	else:
+		_pyarrow_dir = os.path.dirname(_pyarrow.__file__)
+		_candidates = [
+			_pyarrow_dir,
+			os.path.join(os.path.dirname(_pyarrow_dir), "pyarrow.libs"),
+			os.path.join(_pyarrow_dir, ".libs"),
+		]
+		for _dll_dir in _candidates:
+			if os.path.isdir(_dll_dir):
+				try:
+					_windows_dll_dirs.append(os.add_dll_directory(_dll_dir))
+				except OSError:
+					# Ignore invalid/inaccessible paths and continue with others.
+					pass
+
 # pyplot might not be available in non-interactive environments.
 try:
 	import matplotlib.pyplot as _pyplot
