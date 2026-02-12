@@ -53,14 +53,6 @@ jobs:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
     steps:
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          key: ${{ matrix.os }}-${{ matrix.compiler }}-${{ github.ref_name }}
-          restore-keys: |
-            ${{ matrix.os }}-${{ matrix.compiler }}-
-          max-size: 4G
-
       - name: Checkout networkit
         uses: actions/checkout@v4
         with:
@@ -72,6 +64,14 @@ jobs:
         with:
           repository: tlx/tlx
           path: tlx
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ matrix.os }}-${{ matrix.compiler }}-${{ github.ref_name }}
+          restore-keys: |
+            ${{ matrix.os }}-${{ matrix.compiler }}-
+          max-size: 4G
 
       - name: Configure ccache
         run: |
