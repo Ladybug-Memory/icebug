@@ -345,7 +345,7 @@ jobs:
           retention-days: ${{ env.ARTIFACT_RETENTION }}
 
   upload-packages:
-    if: github.ref_type == 'tag' && github.repository == 'Ladybug-memory/icebug'
+    if: github.ref_type == 'tag' && github.repository == 'Ladybug-Memory/icebug'
     name: 'PyPi release upload'
     runs-on: ubuntu-22.04
     needs: [cpython-macos, cpython-linux-x86_64, cpython-linux-aarch64, cpython-windows, source-distribution]
