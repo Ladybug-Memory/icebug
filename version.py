@@ -1,6 +1,6 @@
 name='networkit'
 
-version='11.1.post1'
+version='12.0'
 
 url='https://networkit.github.io/'
 
