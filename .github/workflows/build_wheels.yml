@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+'
   workflow_dispatch:
 
 # Default parameters for all builds
@@ -341,28 +344,11 @@ jobs:
           path: ./dist/*networkit*.tar.gz
           retention-days: ${{ env.ARTIFACT_RETENTION }}
 
-  # This job checks whether the current workflow is triggered by a new tag with the following form: INT.INT or INT.INT.INT (for example: 1.0, 1.0.1, ...)
-  # The result is saved in a variable and used as a conditional variable when uploading packages.
-  check-release-tag:
-    name: "Check for new release"
-    runs-on: ubuntu-latest
-    outputs:
-      is-release: ${{ steps.do-check.outputs.is-release }}
-    steps:
-      - name: Check release tag ${{ github.ref }}
-        id: do-check
-        run: |
-          if [[ ${{ github.ref }} =~ ^refs\/tags\/[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
-            echo "::set-output name=is-release::true"
-          else
-            echo "::set-output name=is-release::false"
-          fi
-
   upload-packages:
-    if: needs.check-release-tag.outputs.is-release == 'true' && github.repository == 'Ladybug-memory/icebug'
+    if: github.ref_type == 'tag' && github.repository == 'Ladybug-memory/icebug'
     name: 'PyPi release upload'
     runs-on: ubuntu-22.04
-    needs: [cpython-macos, cpython-linux-x86_64, cpython-linux-aarch64, cpython-windows, source-distribution, check-release-tag]
+    needs: [cpython-macos, cpython-linux-x86_64, cpython-linux-aarch64, cpython-windows, source-distribution]
     steps:
       - uses: actions/download-artifact@v4
         with:
