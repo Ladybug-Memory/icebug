@@ -2,15 +2,15 @@ name='networkit'
 
 version='12.0'
 
-url='https://networkit.github.io/'
+url='https://github.com/Ladybug-Memory/icebug'
 
-download_url='https://pypi.python.org/pypi/networkit'
+download_url='https://pypi.python.org/pypi/icebug'
 
 license='MIT'
 
-author='Christian L. Staudt, Henning Meyerhenke'
+author='Christian L. Staudt, Henning Meyerhenke, Arun Sharma'
 
-author_email = 'christian.staudt@kit.edu, meyerhenke@kit.edu'
+author_email = 'christian.staudt@kit.edu, meyerhenke@kit.edu, arun@ladybugmem.ai'
 
 description = 'NetworKit is a toolbox for high-performance network analysis'
 

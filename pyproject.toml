@@ -41,7 +41,7 @@ dependencies = [
 ]
 
 [project.urls]
-homepage = "https://networkit.github.io/"
+homepage = "https://github.com/Ladybug-Memory/icebug"
 documentation = "https://networkit.github.io/dev-docs/index.html"
 repository = "https://github.com/Ladybug-Memory/icebug"
 changelog = "https://github.com/Ladybug-Memory/icebug/blob/master/CHANGES.md"
