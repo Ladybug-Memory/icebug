@@ -352,38 +352,39 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: macos-wheels-arm64
+          pattern: macos-*-arm64-*
           path: dist
+          merge-multiple: true
 
       - uses: actions/download-artifact@v4
         with:
-          name: macos-wheels-x86_64
+          pattern: macos-*-x86_64-*
           path: dist
+          merge-multiple: true
 
       - uses: actions/download-artifact@v4
         with:
-          name: manylinux_2_28-wheels-x86_64
+          pattern: linux-*-x86_64-*
           path: dist
+          merge-multiple: true
 
       - uses: actions/download-artifact@v4
         with:
-          name: manylinux_2_28-wheels-aarch64
+          pattern: linux-*-aarch64-*
           path: dist
+          merge-multiple: true
 
       - uses: actions/download-artifact@v4
         with:
-          name: windows-wheels-amd64
+          pattern: win-*-amd64-*
           path: dist
+          merge-multiple: true
 
       - uses: actions/download-artifact@v4
         with:
-          name: windows-wheels-arm64
+          pattern: sdist-*
           path: dist
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: python-sdist
-          path: dist
+          merge-multiple: true
 
       - name: List wheels
         run: ls -l
