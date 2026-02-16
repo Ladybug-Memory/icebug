@@ -40,6 +40,9 @@ dependencies = [
   "pyarrow"
 ]
 
+[project.optional-dependencies]
+test = ["pytest"]
+
 [project.urls]
 homepage = "https://github.com/Ladybug-Memory/icebug"
 documentation = "https://networkit.github.io/dev-docs/index.html"

@@ -13,8 +13,18 @@ Icebug is a high-performance graph analytics library written in C++ with Python 
 ```bash
 git clone https://github.com/Ladybug-Memory/icebug icebug
 cd icebug
-python3 setup.py build_ext [-jX]   # X = number of parallel jobs
-pip3 install -e .
+uv pip install -e ".[test]"         # Install with test dependencies
+```
+
+### Running Tests
+
+**Python tests (pytest):**
+```bash
+uv run pytest networkit/test/                           # Run all tests
+uv run pytest networkit/test/test_graph.py              # Run specific test file
+uv run pytest networkit/test/test_graph.py::TestGraph   # Run specific test class
+uv run pytest networkit/test/test_graph.py::TestGraph::testAddNodes  # Run single test
+uv run pytest -k "testAddNodes"                         # Run tests matching pattern
 ```
 
 ### Building with CMake (C++ core only)
@@ -23,17 +33,6 @@ pip3 install -e .
 mkdir build && cd build
 cmake -DNETWORKIT_BUILD_TESTS=ON ..
 make -jX
-```
-
-### Running Tests
-
-**Python tests (pytest):**
-```bash
-pytest networkit/test/                           # Run all tests
-pytest networkit/test/test_graph.py              # Run specific test file
-pytest networkit/test/test_graph.py::TestGraph   # Run specific test class
-pytest networkit/test/test_graph.py::TestGraph::testAddNodes  # Run single test
-pytest -k "testAddNodes"                         # Run tests matching pattern
 ```
 
 **C++ unit tests:**
