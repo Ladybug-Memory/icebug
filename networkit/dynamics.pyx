@@ -1,14 +1,18 @@
 # distutils: language=c++
 
 from cython.operator import dereference, preincrement
+from libcpp.memory cimport shared_ptr
 
 from .base cimport _Algorithm
 from .base cimport Algorithm
 from .graph cimport _Graph, Graph, _GraphW, GraphW
 from .helpers import stdstring
 
+cdef extern from "<memory>" namespace "std":
+	shared_ptr[T] make_shared[T](...) nogil
+
 def graphFromStream(stream, weighted, directed):
-	""" 
+	"""
 	graphFromStream(stream, weighted, directed)
 
 	Convenience function for creating a new graph from a stream of graph events
@@ -43,8 +47,8 @@ cdef class GraphEvent:
 
 	Representation of a graph event.
 
-	Parameter :code:`type` is one of the following: 
-	
+	Parameter :code:`type` is one of the following:
+
 	- networkit.dynamics.GraphEventType.NODE_ADDITION
 	- networkit.dynamics.GraphEventType.NODE_REMOVAL
 	- networkit.dynamics.GraphEventType.NODE_RESTORATION
@@ -79,11 +83,11 @@ cdef class GraphEvent:
 	def type(self):
 		"""
 		Property of networkit.dynamics.GraphEvent
-		
+
 		Type of graph event.
 		"""
 		return self._this.type
-	
+
 	@type.setter
 	def type(self, t):
 		self._this.type = t
@@ -92,11 +96,11 @@ cdef class GraphEvent:
 	def u(self):
 		"""
 		Property of networkit.dynamics.GraphEvent
-		
+
 		Node u involved in graph event.
 		"""
 		return self._this.u
-	
+
 	@u.setter
 	def u(self, u):
 		self._this.u = u
@@ -105,11 +109,11 @@ cdef class GraphEvent:
 	def v(self):
 		"""
 		Property of networkit.dynamics.GraphEvent
-		
+
 		Node v involved in graph event.
 		"""
 		return self._this.v
-	
+
 	@v.setter
 	def v(self, v):
 		self._this.v = v
@@ -118,11 +122,11 @@ cdef class GraphEvent:
 	def w(self):
 		"""
 		Property of networkit.dynamics.GraphEvent
-		
+
 		Edgeweight w involved in graph event.
 		"""
 		return self._this.w
-	
+
 	@w.setter
 	def w(self, w):
 		self._this.w = w
@@ -274,13 +278,28 @@ cdef class GraphDifference(Algorithm):
 	"""
 	cdef Graph _G1, _G2
 
-	def __cinit__(self, Graph G1, Graph G2):
-		self._this = new _GraphDifference(dereference(G1._this), dereference(G2._this))
-		self._G1 = G1
-		self._G2 = G2
+	def __cinit__(self, G1, G2):
+		# Handle both Graph and GraphW types
+		if isinstance(G1, GraphW):
+			self._G1 = Graph(0)
+			self._G1._this = make_shared[_GraphW]((<GraphW>G1)._this)
+		elif isinstance(G1, Graph):
+			self._G1 = G1
+		else:
+			raise TypeError("GraphDifference expects Graph or GraphW instances")
+
+		if isinstance(G2, GraphW):
+			self._G2 = Graph(0)
+			self._G2._this = make_shared[_GraphW]((<GraphW>G2)._this)
+		elif isinstance(G2, Graph):
+			self._G2 = G2
+		else:
+			raise TypeError("GraphDifference expects Graph or GraphW instances")
+
+		self._this = new _GraphDifference(dereference(self._G1._this), dereference(self._G2._this))
 
 	def getEdits(self):
-		""" 
+		"""
 		getEdits()
 
 		Get the required edits.
@@ -294,9 +313,9 @@ cdef class GraphDifference(Algorithm):
 		return [GraphEvent(ev.type, ev.u, ev.v, ev.w) for ev in (<_GraphDifference*>(self._this)).getEdits()]
 
 	def getNumberOfEdits(self):
-		""" 
+		"""
 		getNumberOfEdits()
-		
+
 		Get the required number of edits.
 
 		Returns
@@ -307,7 +326,7 @@ cdef class GraphDifference(Algorithm):
 		return (<_GraphDifference*>(self._this)).getNumberOfEdits()
 
 	def getNumberOfNodeAdditions(self):
-		""" 
+		"""
 		getNumberOfNodeAdditions()
 
 		Get the required number of node additions.
@@ -320,7 +339,7 @@ cdef class GraphDifference(Algorithm):
 		return (<_GraphDifference*>(self._this)).getNumberOfNodeAdditions()
 
 	def getNumberOfNodeRemovals(self):
-		""" 
+		"""
 		getNumberOfNodeRemovals()
 
 		Get the required number of node removals.
@@ -333,7 +352,7 @@ cdef class GraphDifference(Algorithm):
 		return (<_GraphDifference*>(self._this)).getNumberOfNodeRemovals()
 
 	def getNumberOfNodeRestorations(self):
-		""" 
+		"""
 		getNumberOfNodeRestorations()
 
 		Get the required number of node restorations.
@@ -346,9 +365,9 @@ cdef class GraphDifference(Algorithm):
 		return (<_GraphDifference*>(self._this)).getNumberOfNodeRestorations()
 
 	def getNumberOfEdgeAdditions(self):
-		""" 
+		"""
 		getNumberOfEdgeAdditions()
-		
+
 		Get the required number of edge additions.
 
 		Returns
@@ -359,9 +378,9 @@ cdef class GraphDifference(Algorithm):
 		return (<_GraphDifference*>(self._this)).getNumberOfEdgeAdditions()
 
 	def getNumberOfEdgeRemovals(self):
-		""" 
+		"""
 		getNumberOfEdgeRemovals()
-		
+
 		Get the required number of edge removals.
 
 		Returns
@@ -372,9 +391,9 @@ cdef class GraphDifference(Algorithm):
 		return (<_GraphDifference*>(self._this)).getNumberOfEdgeRemovals()
 
 	def getNumberOfEdgeWeightUpdates(self):
-		""" 
+		"""
 		getNumberOfEdgeWeightUpdates()
-		
+
 		Get the required number of edge weight updates.
 
 		Returns
@@ -393,9 +412,9 @@ cdef extern from "<networkit/dynamics/GraphUpdater.hpp>":
 		vector[pair[count, count]] &getSizeTimeline() except +
 
 cdef class GraphUpdater:
-	""" 
+	"""
 	GraphUpdater(G)
-	
+
 	Updates a graph according to a stream of graph events.
 
 	Parameters
@@ -406,12 +425,19 @@ cdef class GraphUpdater:
 	cdef _GraphUpdater* _this
 	cdef Graph _G
 
-	def __cinit__(self, Graph G):
+	def __cinit__(self, G):
 		cdef _GraphW gw
-		self._G = G
-		gw = _GraphW(dereference(G._this))
+		if isinstance(G, GraphW):
+			# If passed a GraphW, we need to convert it to a Graph
+			self._G = Graph(0)
+			self._G._this = make_shared[_GraphW]((<GraphW>G)._this)
+		elif isinstance(G, Graph):
+			self._G = G
+		else:
+			raise TypeError("GraphUpdater expects a Graph or GraphW instance")
+		gw = _GraphW(dereference(self._G._this))
 		self._this = new _GraphUpdater(gw)
-		G.setThisFromGraphW(gw)
+		self._G.setThisFromGraphW(gw)
 
 	def __dealloc__(self):
 		del self._this
