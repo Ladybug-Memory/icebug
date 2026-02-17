@@ -118,7 +118,14 @@ public:
     template <class EdgeMerger = std::plus<edgeweight>>
     GraphW(const Graph &other, bool weighted, bool directed, bool edgesIndexed = false,
            EdgeMerger edgeMerger = std::plus<edgeweight>())
-        : GraphW(other.numberOfNodes(), weighted, directed, edgesIndexed) {
+        : GraphW(other.upperNodeIdBound(), weighted, directed, edgesIndexed) {
+
+        // Remove nodes that don't exist in the source graph
+        for (node v = 0; v < other.upperNodeIdBound(); ++v) {
+            if (!other.hasNode(v)) {
+                removeNode(v);
+            }
+        }
 
         // Copy all edges using the public API
         if (other.isDirected() == directed) {
