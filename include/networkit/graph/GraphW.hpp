@@ -96,6 +96,8 @@ public:
         outEdgesCSRIndptr.reset();
         inEdgesCSRIndices.reset();
         inEdgesCSRIndptr.reset();
+        outEdgesCSRWeights.reset();
+        inEdgesCSRWeights.reset();
         usingCSR = false;
     }
 

@@ -26,11 +26,20 @@ bool GraphR::isIsolated(node v) const {
 }
 
 edgeweight GraphR::weight(node u, node v) const {
-    // For CSR-based graphs, return default weight of 1.0 if edge exists
-    if (hasEdge(u, v)) {
-        return defaultEdgeWeight;
+    if (!hasEdge(u, v)) {
+        return 0.0; // No edge
     }
-    return 0.0; // No edge
+    if (weighted && outEdgesCSRWeights) {
+        // Find the index of edge (u, v) in CSR arrays
+        auto start_idx = outEdgesCSRIndptr->Value(u);
+        auto end_idx = outEdgesCSRIndptr->Value(u + 1);
+        for (auto idx = start_idx; idx < end_idx; ++idx) {
+            if (outEdgesCSRIndices->Value(idx) == v) {
+                return outEdgesCSRWeights->Value(idx);
+            }
+        }
+    }
+    return defaultEdgeWeight;
 }
 
 std::vector<node> GraphR::getNeighborsVector(node u, bool inEdges) const {
@@ -65,11 +74,26 @@ GraphR::getNeighborsWithWeightsVector(node u, bool inEdges) const {
     nodeVec.reserve(neighbors.second);
     weightVec.reserve(neighbors.second);
 
+    // Get the starting index for this node
+    index startIdx;
+    std::shared_ptr<arrow::DoubleArray> weightsArr;
+    if (inEdges && directed) {
+        startIdx = inEdgesCSRIndptr->Value(u);
+        weightsArr = inEdgesCSRWeights;
+    } else {
+        startIdx = outEdgesCSRIndptr->Value(u);
+        weightsArr = outEdgesCSRWeights;
+    }
+
     for (count i = 0; i < neighbors.second; ++i) {
         if (exists[neighbors.first[i]]) {
             nodeVec.push_back(neighbors.first[i]);
-            // CSR graphs in GraphR don't store weights, all edges have default weight
-            weightVec.push_back(defaultEdgeWeight);
+            // Use actual weight if available, otherwise use default
+            if (weighted && weightsArr) {
+                weightVec.push_back(weightsArr->Value(startIdx + i));
+            } else {
+                weightVec.push_back(defaultEdgeWeight);
+            }
         }
     }
     return {std::move(nodeVec), std::move(weightVec)};
@@ -125,7 +149,10 @@ edgeweight GraphR::getIthNeighborWeight(node u, index i) const {
     if (!hasNode(u) || i >= degree(u)) {
         return nullWeight;
     }
-    // CSR graphs have uniform weight
+    if (weighted && outEdgesCSRWeights) {
+        auto start_idx = outEdgesCSRIndptr->Value(u);
+        return outEdgesCSRWeights->Value(start_idx + i);
+    }
     return defaultEdgeWeight;
 }
 
@@ -153,7 +180,10 @@ std::pair<node, edgeweight> GraphR::getIthNeighborWithWeight(node u, index i) co
         return {none, nullWeight};
     }
     auto start_idx = outEdgesCSRIndptr->Value(u);
-    return {outEdgesCSRIndices->Value(start_idx + i), defaultEdgeWeight};
+    node v = outEdgesCSRIndices->Value(start_idx + i);
+    edgeweight w = (weighted && outEdgesCSRWeights) ? outEdgesCSRWeights->Value(start_idx + i)
+                                                    : defaultEdgeWeight;
+    return {v, w};
 }
 
 std::pair<node, edgeid> GraphR::getIthNeighborWithId(node u, index i) const {

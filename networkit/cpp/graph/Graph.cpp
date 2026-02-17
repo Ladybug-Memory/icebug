@@ -35,13 +35,16 @@ Graph::Graph(count n, bool weighted, bool directed, bool edgesIndexed)
 Graph::Graph(count n, bool directed, std::shared_ptr<arrow::UInt64Array> outIndices,
              std::shared_ptr<arrow::UInt64Array> outIndptr,
              std::shared_ptr<arrow::UInt64Array> inIndices,
-             std::shared_ptr<arrow::UInt64Array> inIndptr)
+             std::shared_ptr<arrow::UInt64Array> inIndptr,
+             std::shared_ptr<arrow::DoubleArray> outWeights,
+             std::shared_ptr<arrow::DoubleArray> inWeights)
     : n(n), m(0), storedNumberOfSelfLoops(0), z(n), omega(0), t(0),
-      weighted(false),                         // CSR graphs are unweighted for now
+      weighted(outWeights != nullptr),         // CSR graphs are weighted if weights are provided
       directed(directed), edgesIndexed(false), // CSR graphs don't use edge IDs
       deletedID(none), exists(n, true), outEdgesCSRIndices(outIndices),
       outEdgesCSRIndptr(outIndptr), inEdgesCSRIndices(inIndices), inEdgesCSRIndptr(inIndptr),
-      usingCSR(true), nodeAttributeMap(this), edgeAttributeMap(this) {
+      outEdgesCSRWeights(outWeights), inEdgesCSRWeights(inWeights), usingCSR(true),
+      nodeAttributeMap(this), edgeAttributeMap(this) {
 
     // Calculate number of edges from CSR data
     if (outIndices) {
@@ -60,6 +63,14 @@ Graph::Graph(count n, bool directed, std::shared_ptr<arrow::UInt64Array> outIndi
     }
     if (directed && inIndptr && static_cast<size_t>(inIndptr->length()) != n + 1) {
         throw std::invalid_argument("inIndptr must have length n+1");
+    }
+
+    // Validate weight arrays if provided
+    if (outWeights && outIndices && outWeights->length() != outIndices->length()) {
+        throw std::invalid_argument("outWeights must have same length as outIndices");
+    }
+    if (directed && inWeights && inIndices && inWeights->length() != inIndices->length()) {
+        throw std::invalid_argument("inWeights must have same length as inIndices");
     }
 }
 

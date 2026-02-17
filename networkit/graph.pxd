@@ -15,6 +15,8 @@ from .structures cimport edgeid, index, count, node, edgeweight
 cdef extern from "arrow/api.h" namespace "arrow":
 	cdef cppclass UInt64Array:
 		pass
+	cdef cppclass DoubleArray:
+		pass
 	cdef cppclass CArray "arrow::Array":
 		pass
 
@@ -155,7 +157,7 @@ cdef extern from "<networkit/graph/GraphW.hpp>":
 cdef extern from "<networkit/graph/GraphR.hpp>":
 	cdef cppclass _GraphR "NetworKit::GraphR" (_Graph):
 		_GraphR(count n, bool_t directed, vector[node] outIndices, vector[index] outIndptr, vector[node] inIndices, vector[index] inIndptr) except +
-		_GraphR(count n, bool_t directed, shared_ptr[UInt64Array] outIndices, shared_ptr[UInt64Array] outIndptr, shared_ptr[UInt64Array] inIndices, shared_ptr[UInt64Array] inIndptr) except +
+		_GraphR(count n, bool_t directed, shared_ptr[UInt64Array] outIndices, shared_ptr[UInt64Array] outIndptr, shared_ptr[UInt64Array] inIndices, shared_ptr[UInt64Array] inIndptr, shared_ptr[DoubleArray] outWeights, shared_ptr[DoubleArray] inWeights) except +
 		_GraphR(const _GraphR& other) except +
 
 cdef extern from "<networkit/graph/Graph.hpp>":
