@@ -22,7 +22,13 @@ void ParallelLeiden::run() {
         GraphW coarse;
         Partition refined;
         calculateVolumes(*currentGraph);
+        int innerIterations = 0;
+        const int maxInnerIterations = 100; // Safety limit to prevent infinite loops
         do {
+            innerIterations++;
+            if (innerIterations > maxInnerIterations) {
+                break;
+            }
             handler.assureRunning();
             parallelMove(*currentGraph);
             // If each community consists of exactly one node we're done, i.e. when |V(G)| = |P|
@@ -124,6 +130,9 @@ void ParallelLeiden::parallelMove(const Graph &graph) {
 
     // Only insert nodes to the queue when they're not already in it.
     std::vector<std::atomic_bool> inQueue(graph.upperNodeIdBound());
+    for (auto &val : inQueue) {
+        val.store(false);
+    }
     std::queue<std::vector<node>> queue;
     std::mutex qlock;                      // queue lock
     std::condition_variable workAvailable; // waiting/notifying for new Nodes
