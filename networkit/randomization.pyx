@@ -6,7 +6,7 @@ from libcpp.vector cimport vector
 from libcpp.utility cimport pair
 
 from .base cimport _Algorithm, Algorithm
-from .graph cimport _Graph, Graph, _GraphW
+from .graph cimport _Graph, Graph, _GraphW, GraphW
 from .structures cimport count, index, node
 
 cdef extern from "<networkit/randomization/EdgeSwitching.hpp>":
@@ -113,16 +113,23 @@ cdef class EdgeSwitchingInPlace(Algorithm):
 		The graph to be randomized.
 	numberOfSwitchesPerEdge : int, optional
 		The average number of switches to be carried out per edge.
-		Has to be non-negative. Default: 10
+	Has to be non-negative. Default: 10
 	"""
-	cdef Graph _localReference # keep reference counter up to prevent GC of graph
+	cdef object _localReference
+	cdef _GraphW _gw
 
 	def __cinit__(self, G, numberOfSwitchesPerEdge = 10.0):
-		cdef _GraphW gw
-		if isinstance(G, Graph):
-			gw = _GraphW(dereference((<Graph>G)._this))
-			self._this = new _EdgeSwitchingInPlace(gw, numberOfSwitchesPerEdge)
-			(<Graph>G).setThisFromGraphW(gw)
+		cdef GraphW gw_wrapper
+		if isinstance(G, GraphW):
+			gw_wrapper = <GraphW>G
+			self._gw = _GraphW(gw_wrapper._this)
+			self._this = new _EdgeSwitchingInPlace(self._gw, numberOfSwitchesPerEdge)
+			gw_wrapper._this = self._gw
+			self._localReference = gw_wrapper
+		elif isinstance(G, Graph):
+			self._gw = _GraphW(dereference((<Graph>G)._this))
+			self._this = new _EdgeSwitchingInPlace(self._gw, numberOfSwitchesPerEdge)
+			(<Graph>G).setThisFromGraphW(self._gw)
 			self._localReference = G
 		else:
 			raise RuntimeError("Parameter G has to be a graph")
