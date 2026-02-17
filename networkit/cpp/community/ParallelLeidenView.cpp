@@ -48,7 +48,13 @@ void ParallelLeidenView::run() {
             calculateVolumes(*currentGraph);
         }
 
+        int innerIterations = 0;
+        const int maxInnerIterations = 100; // Safety limit to prevent infinite loops
         do {
+            innerIterations++;
+            if (innerIterations > maxInnerIterations) {
+                break;
+            }
             handler.assureRunning();
 
             // Parallel move phase
@@ -222,6 +228,9 @@ void ParallelLeidenView::parallelMove(const GraphType &graph) {
 
     // Only insert nodes to the queue when they're not already in it.
     std::vector<std::atomic_bool> inQueue(graph.upperNodeIdBound());
+    for (auto &val : inQueue) {
+        val.store(false);
+    }
     std::queue<std::vector<node>> queue;
     std::mutex qlock;                      // queue lock
     std::condition_variable workAvailable; // waiting/notifying for new Nodes
