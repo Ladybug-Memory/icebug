@@ -1033,6 +1033,22 @@ cdef class Graph:
 		dereference(self._this).detachEdgeAttribute(stdstring(name))
 
 	# Mutable operations (require underlying _GraphW)
+	def indexEdges(self, bool_t force = False):
+		"""
+		indexEdges(force = False)
+
+		Assign integer ids to edges.
+
+		Parameters
+		----------
+		force : bool, optional
+			Force re-indexing of edges. Default: False
+		"""
+		cdef _GraphW* gw = <_GraphW*>(self._this.get())
+		if gw == NULL:
+			raise RuntimeError("Graph is read-only (GraphR), cannot index edges")
+		gw.indexEdges(force)
+
 	def addNode(self):
 		"""
 		addNode()
@@ -1048,6 +1064,29 @@ cdef class Graph:
 		if gw == NULL:
 			raise RuntimeError("Graph is read-only (GraphR), cannot add nodes")
 		return gw.addNode()
+
+	def addNodes(self, numberOfNewNodes):
+		"""
+		addNodes(numberOfNewNodes)
+
+		Add numberOfNewNodes many new nodes to the graph and return
+		the id of the last node added.
+
+		Parameters
+		----------
+		numberOfNewNodes : int
+			Number of nodes to be added.
+
+		Returns
+		-------
+		int
+			The id of the last node added.
+		"""
+		cdef _GraphW* gw = <_GraphW*>(self._this.get())
+		if gw == NULL:
+			raise RuntimeError("Graph is read-only (GraphR), cannot add nodes")
+		assert(numberOfNewNodes >= 0)
+		return gw.addNodes(numberOfNewNodes)
 
 	def addEdge(self, u, v, w=1.0, addMissing=False, checkMultiEdge=False):
 		"""
@@ -1102,6 +1141,99 @@ cdef class Graph:
 
 		return gw.addEdge(u, v, w, checkMultiEdge)
 
+	def addEdges(self, inputData, addMissing = False, checkMultiEdge = False):
+		"""
+		addEdges(inputData)
+
+		Inserts edges from several sources based on the type of :code:`inputData`.
+
+		If the graph is undirected, each pair (i,j) in :code:`inputData` is inserted twice twice: once as (i,j) and once as (j,i).
+
+		Parameter :code:`inputData` can be one of the following:
+
+		- scipy.sparse.coo_matrix
+		- (data, (i,j)) where data, i and j are of type np.ndarray
+		- (i,j) where i and j are of type np.ndarray
+
+		Note
+		----
+		If only pairs of row and column indices (i,j) are given, each edge is given weight 1.0 (even in case of a weighted graph).
+
+		Parameters
+		----------
+		inputData : several
+			Input data encoded as one of the supported formats.
+		addMissing : bool, optional
+			Add missing endpoints if necessary (i.e., increase numberOfNodes). Default: False
+		checkMultiEdge : bool, optional
+			Check if edge is already present in the graph. If detected, do not insert the edge. Default: False
+		"""
+		cdef _GraphW* gw = <_GraphW*>(self._this.get())
+		if gw == NULL:
+			raise RuntimeError("Graph is read-only (GraphR), cannot add edges")
+
+		cdef cnp.ndarray[cnp.npy_ulong, ndim = 1, mode = 'c'] row, col
+		cdef cnp.ndarray[cnp.npy_double, ndim = 1, mode = 'c'] data
+
+		if isinstance(inputData, coo_matrix):
+			try:
+				row = inputData.row.astype(np.ulong)
+				col = inputData.col.astype(np.ulong)
+				data = inputData.data.view(np.double)
+			except (TypeError, ValueError) as e:
+				raise TypeError('invalid input format') from e
+		elif isinstance(inputData, tuple) and len(inputData) == 2:
+			if isinstance(inputData[1], tuple):
+				try:
+					row = inputData[1][0].astype(np.ulong)
+					col = inputData[1][1].astype(np.ulong)
+					data = inputData[0].view(dtype = np.double)
+				except (TypeError, ValueError) as e:
+					raise TypeError('invalid input format') from e
+			else:
+				try:
+					row = inputData[0].astype(np.ulong)
+					col = inputData[1].astype(np.ulong)
+					data = np.ones(len(row), dtype = np.double)
+				except (TypeError, ValueError) as e:
+					raise TypeError('invalid input format') from e
+		else:
+			raise TypeError('invalid input format')
+
+		cdef int numEdges = len(row)
+
+		if addMissing:
+			for i in range(numEdges):
+				# Calling Python interface of addEdge due to addMissing support.
+				self.addEdge(row[i], col[i], data[i], addMissing, checkMultiEdge)
+		else:
+			for i in range(numEdges):
+				# Calling Cython interface of addEdge directly for higher performance.
+				gw.addEdge(row[i], col[i], data[i], checkMultiEdge)
+
+		return self
+
+	def increaseWeight(self, u, v, w):
+		"""
+		increaseWeight(u, v, w)
+
+		Increase the weight of an edge. If the edge does not exist, it will be inserted.
+
+		Parameters
+		----------
+		u : int
+			Endpoint of edge.
+		v : int
+			Endpoint of edge.
+		w : float
+			Edge weight.
+		"""
+		cdef _GraphW* gw = <_GraphW*>(self._this.get())
+		if gw == NULL:
+			raise RuntimeError("Graph is read-only (GraphR), cannot increase weight")
+		gw.increaseWeight(u, v, w)
+		return self
+
 	def removeNode(self, u):
 		"""
 		removeNode(u)
@@ -1117,6 +1249,22 @@ cdef class Graph:
 		if gw == NULL:
 			raise RuntimeError("Graph is read-only (GraphR), cannot remove nodes")
 		gw.removeNode(u)
+
+	def restoreNode(self, u):
+		"""
+		restoreNode(u)
+
+		Restores a previously deleted node `u` with its previous id in the graph.
+
+		Parameters
+		----------
+		u : int
+			The input node.
+		"""
+		cdef _GraphW* gw = <_GraphW*>(self._this.get())
+		if gw == NULL:
+			raise RuntimeError("Graph is read-only (GraphR), cannot restore nodes")
+		gw.restoreNode(u)
 
 	def removeEdge(self, u, v):
 		"""
@@ -1135,6 +1283,92 @@ cdef class Graph:
 		if gw == NULL:
 			raise RuntimeError("Graph is read-only (GraphR), cannot remove edges")
 		gw.removeEdge(u, v)
+
+	def removeAllEdges(self):
+		"""
+		removeAllEdges()
+
+		Removes all the edges in the graph.
+		"""
+		cdef _GraphW* gw = <_GraphW*>(self._this.get())
+		if gw == NULL:
+			raise RuntimeError("Graph is read-only (GraphR), cannot remove edges")
+		gw.removeAllEdges()
+
+	def removeSelfLoops(self):
+		"""
+		removeSelfLoops()
+
+		Removes all self-loops from the graph.
+		"""
+		cdef _GraphW* gw = <_GraphW*>(self._this.get())
+		if gw == NULL:
+			raise RuntimeError("Graph is read-only (GraphR), cannot remove edges")
+		gw.removeSelfLoops()
+
+	def removeMultiEdges(self):
+		"""
+		removeMultiEdges()
+
+		Removes all multi-edges from the graph.
+		"""
+		cdef _GraphW* gw = <_GraphW*>(self._this.get())
+		if gw == NULL:
+			raise RuntimeError("Graph is read-only (GraphR), cannot remove edges")
+		gw.removeMultiEdges()
+
+	def swapEdge(self, node s1, node t1, node s2, node t2):
+		"""
+		swapEdge(s1, t1, s2, t2)
+
+		Changes the edge (s1, t1) into (s1, t2) and the edge (s2, t2) into (s2, t1).
+
+		If there are edge weights or edge ids, they are preserved.
+
+		Note
+		----
+		No check is performed if the swap is actually possible, i.e. does not generate duplicate edges.
+
+		Parameters
+		----------
+		s1 : int
+			Source node of the first edge.
+		t1 : int
+			Target node of the first edge.
+		s2 : int
+			Source node of the second edge.
+		t2 : int
+			Target node of the second edge.
+		"""
+		cdef _GraphW* gw = <_GraphW*>(self._this.get())
+		if gw == NULL:
+			raise RuntimeError("Graph is read-only (GraphR), cannot swap edges")
+		gw.swapEdge(s1, t1, s2, t2)
+		return self
+
+	def sortEdges(self):
+		"""
+		sortEdges()
+
+		Sorts the adjacency arrays by node id. While the running time is linear this
+		temporarily duplicates the memory.
+		"""
+		cdef _GraphW* gw = <_GraphW*>(self._this.get())
+		if gw == NULL:
+			raise RuntimeError("Graph is read-only (GraphR), cannot sort edges")
+		gw.sortEdges()
+
+	def compactEdges(self):
+		"""
+		compactEdges()
+
+		Compacts the adjacency arrays by re-using no longer needed slots from
+		deleted edges. This is a deprecated operation.
+		"""
+		cdef _GraphW* gw = <_GraphW*>(self._this.get())
+		if gw == NULL:
+			raise RuntimeError("Graph is read-only (GraphR), cannot compact edges")
+		gw.compactEdges()
 
 cdef class GraphW:
 	"""
@@ -1549,6 +1783,15 @@ cdef class GraphW:
 		temporarily duplicates the memory.
 		"""
 		self._this.sortEdges()
+
+	def compactEdges(self):
+		"""
+		compactEdges()
+
+		Compacts the adjacency arrays by re-using no longer needed slots from
+		deleted edges. This is a deprecated operation.
+		"""
+		self._this.compactEdges()
 
 	# Iterator and callback methods
 	def forNodes(self, object callback):
