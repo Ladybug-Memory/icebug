@@ -707,8 +707,10 @@ cdef class Graph:
 
 		Iterates over the nodes of the graph.
 		"""
-		it = dereference(self._this).nodeRange().begin()
-		while it != dereference(self._this).nodeRange().end():
+		cdef _NodeRange node_range = dereference(self._this).nodeRange()
+		cdef _NodeIterator it = node_range.begin()
+		cdef _NodeIterator end_it = node_range.end()
+		while it != end_it:
 			yield dereference(it)
 			preincrement(it)
 
@@ -724,8 +726,10 @@ cdef class Graph:
 
 		It does not follow the order of edge ids (if present).
 		"""
-		it = dereference(self._this).edgeRange().begin()
-		while it != dereference(self._this).edgeRange().end():
+		cdef _EdgeRange edge_range = dereference(self._this).edgeRange()
+		cdef _EdgeIterator it = edge_range.begin()
+		cdef _EdgeIterator end_it = edge_range.end()
+		while it != end_it:
 			yield dereference(it).u, dereference(it).v
 			preincrement(it)
 
@@ -735,8 +739,10 @@ cdef class Graph:
 
 		Iterates over the edges of the graph and their weights.
 		"""
-		it = dereference(self._this).edgeWeightRange().begin()
-		while it != dereference(self._this).edgeWeightRange().end():
+		cdef _EdgeWeightRange edge_weight_range = dereference(self._this).edgeWeightRange()
+		cdef _EdgeWeightIterator it = edge_weight_range.begin()
+		cdef _EdgeWeightIterator end_it = edge_weight_range.end()
+		while it != end_it:
 			yield dereference(it).u, dereference(it).v, dereference(it).weight
 			preincrement(it)
 
@@ -744,15 +750,17 @@ cdef class Graph:
 		"""
 		iterNeighbors(u)
 
-		Iterates over a range of the neighbors of a node.
+		Iterates over the neighbors of a node.
 
 		Parameters
 		----------
 		u : int
 			The input node.
 		"""
-		it = dereference(self._this).neighborRange(u).begin()
-		while it != dereference(self._this).neighborRange(u).end():
+		cdef _OutNeighborRange neighbor_range = dereference(self._this).neighborRange(u)
+		cdef _NeighborIterator it = neighbor_range.begin()
+		cdef _NeighborIterator end_it = neighbor_range.end()
+		while it != end_it:
 			yield dereference(it)
 			preincrement(it)
 
@@ -760,15 +768,17 @@ cdef class Graph:
 		"""
 		iterInNeighbors(u)
 
-		Iterates over a range of the in-neighbors of a node.
+		Iterates over the in-neighbors of a node.
 
 		Parameters
 		----------
 		u : int
 			The input node.
 		"""
-		it = dereference(self._this).inNeighborRange(u).begin()
-		while it != dereference(self._this).inNeighborRange(u).end():
+		cdef _InNeighborRange in_neighbor_range = dereference(self._this).inNeighborRange(u)
+		cdef _NeighborIterator it = in_neighbor_range.begin()
+		cdef _NeighborIterator end_it = in_neighbor_range.end()
+		while it != end_it:
 			yield dereference(it)
 			preincrement(it)
 
@@ -788,8 +798,10 @@ cdef class Graph:
 		if not dereference(self._this).isWeighted():
 			raise RuntimeError("iterNeighborsWeights: Use this iterator only on weighted graphs.")
 
-		it = dereference(self._this).weightNeighborRange(u).begin()
-		while it != dereference(self._this).weightNeighborRange(u).end():
+		cdef _OutNeighborWeightRange weight_neighbor_range = dereference(self._this).weightNeighborRange(u)
+		cdef _NeighborWeightIterator it = weight_neighbor_range.begin()
+		cdef _NeighborWeightIterator end_it = weight_neighbor_range.end()
+		while it != end_it:
 			yield dereference(it)
 			preincrement(it)
 
@@ -809,8 +821,10 @@ cdef class Graph:
 		if not dereference(self._this).isWeighted():
 			raise RuntimeError("iterInNeighborsWeights: Use this iterator only on weighted graphs.")
 
-		it = dereference(self._this).weightInNeighborRange(u).begin()
-		while it != dereference(self._this).weightInNeighborRange(u).end():
+		cdef _InNeighborWeightRange weight_in_neighbor_range = dereference(self._this).weightInNeighborRange(u)
+		cdef _NeighborWeightIterator it = weight_in_neighbor_range.begin()
+		cdef _NeighborWeightIterator end_it = weight_in_neighbor_range.end()
+		while it != end_it:
 			yield dereference(it)
 			preincrement(it)
 
@@ -1635,8 +1649,10 @@ cdef class GraphW:
 
 		Iterates over the nodes of the graph.
 		"""
-		it = self._this.nodeRange().begin()
-		while it != self._this.nodeRange().end():
+		cdef _NodeRange node_range = self._this.nodeRange()
+		cdef _NodeIterator it = node_range.begin()
+		cdef _NodeIterator end_it = node_range.end()
+		while it != end_it:
 			yield dereference(it)
 			preincrement(it)
 
@@ -1652,8 +1668,10 @@ cdef class GraphW:
 
 		It does not follow the order of edge ids (if present).
 		"""
-		it = self._this.edgeRange().begin()
-		while it != self._this.edgeRange().end():
+		cdef _EdgeRange edge_range = self._this.edgeRange()
+		cdef _EdgeIterator it = edge_range.begin()
+		cdef _EdgeIterator end_it = edge_range.end()
+		while it != end_it:
 			yield dereference(it).u, dereference(it).v
 			preincrement(it)
 
@@ -1663,8 +1681,10 @@ cdef class GraphW:
 
 		Iterates over the edges of the graph and their weights.
 		"""
-		it = self._this.edgeWeightRange().begin()
-		while it != self._this.edgeWeightRange().end():
+		cdef _EdgeWeightRange edge_weight_range = self._this.edgeWeightRange()
+		cdef _EdgeWeightIterator it = edge_weight_range.begin()
+		cdef _EdgeWeightIterator end_it = edge_weight_range.end()
+		while it != end_it:
 			yield dereference(it).u, dereference(it).v, dereference(it).weight
 			preincrement(it)
 
@@ -1679,8 +1699,10 @@ cdef class GraphW:
 		u : int
 			The input node.
 		"""
-		it = self._this.neighborRange(u).begin()
-		while it != self._this.neighborRange(u).end():
+		cdef _OutNeighborRange neighbor_range = self._this.neighborRange(u)
+		cdef _NeighborIterator it = neighbor_range.begin()
+		cdef _NeighborIterator end_it = neighbor_range.end()
+		while it != end_it:
 			yield dereference(it)
 			preincrement(it)
 
@@ -1695,8 +1717,10 @@ cdef class GraphW:
 		u : int
 			The input node.
 		"""
-		it = self._this.inNeighborRange(u).begin()
-		while it != self._this.inNeighborRange(u).end():
+		cdef _InNeighborRange in_neighbor_range = self._this.inNeighborRange(u)
+		cdef _NeighborIterator it = in_neighbor_range.begin()
+		cdef _NeighborIterator end_it = in_neighbor_range.end()
+		while it != end_it:
 			yield dereference(it)
 			preincrement(it)
 
@@ -1716,8 +1740,10 @@ cdef class GraphW:
 		if not self._this.isWeighted():
 			raise RuntimeError("iterNeighborsWeights: Use this iterator only on weighted graphs.")
 
-		it = self._this.weightNeighborRange(u).begin()
-		while it != self._this.weightNeighborRange(u).end():
+		cdef _OutNeighborWeightRange weight_neighbor_range = self._this.weightNeighborRange(u)
+		cdef _NeighborWeightIterator it = weight_neighbor_range.begin()
+		cdef _NeighborWeightIterator end_it = weight_neighbor_range.end()
+		while it != end_it:
 			yield dereference(it)
 			preincrement(it)
 
@@ -1737,8 +1763,10 @@ cdef class GraphW:
 		if not self._this.isWeighted():
 			raise RuntimeError("iterInNeighborsWeights: Use this iterator only on weighted graphs.")
 
-		it = self._this.weightInNeighborRange(u).begin()
-		while it != self._this.weightInNeighborRange(u).end():
+		cdef _InNeighborWeightRange weight_in_neighbor_range = self._this.weightInNeighborRange(u)
+		cdef _NeighborWeightIterator it = weight_in_neighbor_range.begin()
+		cdef _NeighborWeightIterator end_it = weight_in_neighbor_range.end()
+		while it != end_it:
 			yield dereference(it)
 			preincrement(it)
 
