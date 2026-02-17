@@ -1754,16 +1754,11 @@ inline void Graph::forInEdgesOfImpl(node u, L handle) const {
         // Check exists for mutable graphs
         if (!exists[u])
             return;
-        // Create a wrapper function that swaps the first two arguments
-        // The handle expects (source, target, ...) but virtual method provides (target, source,
-        // ...)
-        auto wrapper = std::function<void(node, node, edgeweight, edgeid)>(
-            [&](node target, node source, edgeweight w, edgeid e) {
-                // Swap arguments: call handle with (source, target, ...) instead of (target,
-                // source, ...)
-                edgeLambda(handle, source, target, w, e);
-            });
-        forInEdgesVirtualImpl(u, graphIsDirected, hasWeights, graphHasEdgeIds, wrapper);
+        // GraphW's forInEdgesVirtualImpl calls handle(v, u, ...) where v is source and u is target
+        // This matches our expected signature of (source, target, ...), so no swap needed
+        forInEdgesVirtualImpl(
+            u, graphIsDirected, hasWeights, graphHasEdgeIds,
+            [&](node v, node u, edgeweight w, edgeid e) { edgeLambda(handle, v, u, w, e); });
     }
 }
 
