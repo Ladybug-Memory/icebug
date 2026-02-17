@@ -33,8 +33,11 @@ void EigenvectorCentrality::run() {
         // iterate matrix-vector product
         G.parallelForNodes([&](node u) {
             values[u] = 0.0;
-            G.forInEdgesOf(u,
-                           [&](node u, node v, edgeweight ew) { values[u] += ew * scoreData[v]; });
+            G.forInEdgesOf(u, [&](node v, node /* target_u */, edgeweight ew) {
+                // forInEdgesOf callback receives (source, target, weight, eid)
+                // where target is u and source is v
+                values[u] += ew * scoreData[v];
+            });
         });
 
         // normalize values

@@ -67,10 +67,12 @@ void PageRank::run() {
         handler.assureRunning();
         G.balancedParallelForNodes([&](const node u) {
             pr[u] = 0.0;
-            G.forInEdgesOf(u, [&](const node u, const node v, const edgeweight w) {
+            G.forInEdgesOf(u, [&](const node v, const node /* target_u */, const edgeweight w) {
                 // note: inconsistency in definition in Newman's book (Ch. 7) regarding directed
                 // graphs we follow the verbal description, which requires to sum over the incoming
                 // edges
+                // forInEdgesOf callback receives (source, target, weight, eid)
+                // where target is u (the node we're iterating for) and source is v
                 pr[u] += scoreData[v] * w / deg[v];
             });
             pr[u] *= damp;
