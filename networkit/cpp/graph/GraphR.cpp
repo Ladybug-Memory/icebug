@@ -136,7 +136,7 @@ index GraphR::indexInOutEdgeArray(node u, node v) const {
     return none;
 }
 
-edgeid GraphR::edgeId(node u, node v) const {
+edgeid GraphR::edgeId([[maybe_unused]] node u, [[maybe_unused]] node v) const {
     throw std::runtime_error("edgeId not supported for CSR-based GraphR - use GraphW");
 }
 
@@ -186,7 +186,8 @@ std::pair<node, edgeweight> GraphR::getIthNeighborWithWeight(node u, index i) co
     return {v, w};
 }
 
-std::pair<node, edgeid> GraphR::getIthNeighborWithId(node u, index i) const {
+std::pair<node, edgeid> GraphR::getIthNeighborWithId([[maybe_unused]] node u,
+                                                     [[maybe_unused]] index i) const {
     throw std::runtime_error(
         "getIthNeighborWithId not supported for CSR-based GraphR - use GraphW");
 }
