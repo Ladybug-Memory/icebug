@@ -157,6 +157,10 @@ protected:
     //!< Arrow array for CSR indptr (offsets into indices array) for incoming edges - only for
     //!< directed graphs
     std::shared_ptr<arrow::UInt64Array> inEdgesCSRIndptr;
+    //!< Arrow array for CSR edge weights for outgoing edges
+    std::shared_ptr<arrow::DoubleArray> outEdgesCSRWeights;
+    //!< Arrow array for CSR edge weights for incoming edges - only for directed graphs
+    std::shared_ptr<arrow::DoubleArray> inEdgesCSRWeights;
     //!< flag to indicate if CSR arrays are being used instead of vectors
     bool usingCSR;
 
@@ -754,7 +758,8 @@ public:
           directed(other.directed), edgesIndexed(other.edgesIndexed), deletedID(other.deletedID),
           exists(other.exists), outEdgesCSRIndices(other.outEdgesCSRIndices),
           outEdgesCSRIndptr(other.outEdgesCSRIndptr), inEdgesCSRIndices(other.inEdgesCSRIndices),
-          inEdgesCSRIndptr(other.inEdgesCSRIndptr), usingCSR(other.usingCSR),
+          inEdgesCSRIndptr(other.inEdgesCSRIndptr), outEdgesCSRWeights(other.outEdgesCSRWeights),
+          inEdgesCSRWeights(other.inEdgesCSRWeights), usingCSR(other.usingCSR),
           // call special constructors to copy attribute maps
           nodeAttributeMap(other.nodeAttributeMap, this),
           edgeAttributeMap(other.edgeAttributeMap, this) {
@@ -779,7 +784,8 @@ protected:
           directed(other.directed), edgesIndexed(other.edgesIndexed), deletedID(other.deletedID),
           exists(other.exists), outEdgesCSRIndices(other.outEdgesCSRIndices),
           outEdgesCSRIndptr(other.outEdgesCSRIndptr), inEdgesCSRIndices(other.inEdgesCSRIndices),
-          inEdgesCSRIndptr(other.inEdgesCSRIndptr), usingCSR(other.usingCSR),
+          inEdgesCSRIndptr(other.inEdgesCSRIndptr), outEdgesCSRWeights(other.outEdgesCSRWeights),
+          inEdgesCSRWeights(other.inEdgesCSRWeights), usingCSR(other.usingCSR),
           // call special constructors to copy attribute maps
           nodeAttributeMap(other.nodeAttributeMap, this),
           edgeAttributeMap(other.edgeAttributeMap, this) {
@@ -796,7 +802,9 @@ public:
           exists(std::move(other.exists)), outEdgesCSRIndices(std::move(other.outEdgesCSRIndices)),
           outEdgesCSRIndptr(std::move(other.outEdgesCSRIndptr)),
           inEdgesCSRIndices(std::move(other.inEdgesCSRIndices)),
-          inEdgesCSRIndptr(std::move(other.inEdgesCSRIndptr)), usingCSR(other.usingCSR),
+          inEdgesCSRIndptr(std::move(other.inEdgesCSRIndptr)),
+          outEdgesCSRWeights(std::move(other.outEdgesCSRWeights)),
+          inEdgesCSRWeights(std::move(other.inEdgesCSRWeights)), usingCSR(other.usingCSR),
           nodeAttributeMap(std::move(other.nodeAttributeMap)),
           edgeAttributeMap(std::move(other.edgeAttributeMap)) {
         // attributes: set graph pointer to this new graph
@@ -816,11 +824,16 @@ public:
      * directed graphs).
      * @param inIndptr Arrow array containing offsets into inIndices for each node (only for
      * directed graphs).
+     * @param outWeights Arrow array containing edge weights for outgoing edges (optional).
+     * @param inWeights Arrow array containing edge weights for incoming edges (optional, only for
+     * directed graphs).
      */
     Graph(count n, bool directed, std::shared_ptr<arrow::UInt64Array> outIndices,
           std::shared_ptr<arrow::UInt64Array> outIndptr,
           std::shared_ptr<arrow::UInt64Array> inIndices = nullptr,
-          std::shared_ptr<arrow::UInt64Array> inIndptr = nullptr);
+          std::shared_ptr<arrow::UInt64Array> inIndptr = nullptr,
+          std::shared_ptr<arrow::DoubleArray> outWeights = nullptr,
+          std::shared_ptr<arrow::DoubleArray> inWeights = nullptr);
 
     /** move assignment operator */
     Graph &operator=(Graph &&other) noexcept {
@@ -839,6 +852,8 @@ public:
         std::swap(outEdgesCSRIndptr, other.outEdgesCSRIndptr);
         std::swap(inEdgesCSRIndices, other.inEdgesCSRIndices);
         std::swap(inEdgesCSRIndptr, other.inEdgesCSRIndptr);
+        std::swap(outEdgesCSRWeights, other.outEdgesCSRWeights);
+        std::swap(inEdgesCSRWeights, other.inEdgesCSRWeights);
         std::swap(deletedID, other.deletedID);
 
         // attributes: set graph pointer to this new graph

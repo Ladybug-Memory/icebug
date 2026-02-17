@@ -51,13 +51,18 @@ public:
      * directed graphs).
      * @param inIndptr Arrow array containing offsets into inIndices for each node (only for
      * directed graphs).
+     * @param outWeights Arrow array containing edge weights for outgoing edges (optional).
+     * @param inWeights Arrow array containing edge weights for incoming edges (optional, only for
+     * directed graphs).
      */
     GraphR(count n, bool directed, std::shared_ptr<arrow::UInt64Array> outIndices,
            std::shared_ptr<arrow::UInt64Array> outIndptr,
            std::shared_ptr<arrow::UInt64Array> inIndices = nullptr,
-           std::shared_ptr<arrow::UInt64Array> inIndptr = nullptr)
+           std::shared_ptr<arrow::UInt64Array> inIndptr = nullptr,
+           std::shared_ptr<arrow::DoubleArray> outWeights = nullptr,
+           std::shared_ptr<arrow::DoubleArray> inWeights = nullptr)
         : Graph(n, directed, std::move(outIndices), std::move(outIndptr), std::move(inIndices),
-                std::move(inIndptr)) {}
+                std::move(inIndptr), std::move(outWeights), std::move(inWeights)) {}
 
     /**
      * Copy constructor
@@ -96,7 +101,8 @@ public:
 
     /**
      * Return edge weight of edge {@a u,@a v}. Returns 0 if edge does not
-     * exist. For CSR graphs, always returns 1.0 if edge exists (unweighted).
+     * exist. If weights are provided during construction, returns the actual
+     * edge weight; otherwise returns defaultEdgeWeight (1.0).
      *
      * @param u Endpoint of edge.
      * @param v Endpoint of edge.

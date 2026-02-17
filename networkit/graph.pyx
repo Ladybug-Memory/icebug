@@ -80,9 +80,9 @@ cdef class Graph:
 		self._this = make_shared[_GraphW](dereference((<Graph>newG)._this), <bool_t>(newG.isWeighted()), <bool_t>(newG.isDirected()), <bool_t>(newG.hasEdgeIds()))
 
 	@classmethod
-	def fromCSR(cls, count n, bool_t directed, out_indices, out_indptr, in_indices=None, in_indptr=None):
+	def fromCSR(cls, count n, bool_t directed, out_indices, out_indptr, in_indices=None, in_indptr=None, out_weights=None, in_weights=None):
 		"""
-		fromCSR(n, directed, out_indices, out_indptr, in_indices=None, in_indptr=None)
+		fromCSR(n, directed, out_indices, out_indptr, in_indices=None, in_indptr=None, out_weights=None, in_weights=None)
 
 		Create a graph from CSR (Compressed Sparse Row) arrays using zero-copy Arrow arrays.
 
@@ -100,6 +100,10 @@ cdef class Graph:
 			CSR indices array for incoming edges (only needed for directed graphs)
 		in_indptr : pyarrow.Array, optional
 			CSR indptr array for incoming edges (only needed for directed graphs)
+		out_weights : pyarrow.Array, optional
+			CSR edge weights array for outgoing edges
+		in_weights : pyarrow.Array, optional
+			CSR edge weights array for incoming edges (only needed for directed graphs)
 
 		Returns
 		-------
@@ -113,10 +117,14 @@ cdef class Graph:
 		cdef CResult[shared_ptr[CArray]] out_indptr_result
 		cdef CResult[shared_ptr[CArray]] in_indices_result
 		cdef CResult[shared_ptr[CArray]] in_indptr_result
+		cdef CResult[shared_ptr[CArray]] out_weights_result
+		cdef CResult[shared_ptr[CArray]] in_weights_result
 		cdef shared_ptr[UInt64Array] out_indices_ptr
 		cdef shared_ptr[UInt64Array] out_indptr_ptr
 		cdef shared_ptr[UInt64Array] in_indices_ptr
 		cdef shared_ptr[UInt64Array] in_indptr_ptr
+		cdef shared_ptr[DoubleArray] out_weights_ptr
+		cdef shared_ptr[DoubleArray] in_weights_ptr
 		cdef Graph result
 
 		# Ensure arrays are UInt64Arrays
@@ -177,6 +185,40 @@ cdef class Graph:
 				raise RuntimeError(error_msg)
 			in_indptr_ptr = static_pointer_cast[UInt64Array, CArray](in_indptr_result.ValueOrDie())
 
+		# Handle outgoing weights
+		if out_weights is not None:
+			if not isinstance(out_weights, pa.DoubleArray):
+				out_weights = pa.array(out_weights, type=pa.float64())
+
+			# Convert using C Data Interface - keep Python objects alive
+			out_weights_c_data = out_weights.__arrow_c_array__()
+			out_weights_schema_capsule, out_weights_array_capsule = out_weights_c_data
+
+			# Import array from C Data Interface
+			out_weights_result = ImportArray(<ArrowArray*>PyCapsule_GetPointer(out_weights_array_capsule, "arrow_array"),
+			                                <ArrowSchema*>PyCapsule_GetPointer(out_weights_schema_capsule, "arrow_schema"))
+			if not out_weights_result.ok():
+				error_msg = f"Failed to import out_weights array: {out_weights_result.status().ToString().decode()}"
+				raise RuntimeError(error_msg)
+			out_weights_ptr = static_pointer_cast[DoubleArray, CArray](out_weights_result.ValueOrDie())
+
+		# Handle incoming weights for directed graphs
+		if directed and in_weights is not None:
+			if not isinstance(in_weights, pa.DoubleArray):
+				in_weights = pa.array(in_weights, type=pa.float64())
+
+			# Convert using C Data Interface - keep Python objects alive
+			in_weights_c_data = in_weights.__arrow_c_array__()
+			in_weights_schema_capsule, in_weights_array_capsule = in_weights_c_data
+
+			# Import array from C Data Interface
+			in_weights_result = ImportArray(<ArrowArray*>PyCapsule_GetPointer(in_weights_array_capsule, "arrow_array"),
+			                               <ArrowSchema*>PyCapsule_GetPointer(in_weights_schema_capsule, "arrow_schema"))
+			if not in_weights_result.ok():
+				error_msg = f"Failed to import in_weights array: {in_weights_result.status().ToString().decode()}"
+				raise RuntimeError(error_msg)
+			in_weights_ptr = static_pointer_cast[DoubleArray, CArray](in_weights_result.ValueOrDie())
+
 		# Create Graph using Arrow CSR constructor
 		result = Graph.__new__(Graph)
 
@@ -188,6 +230,10 @@ cdef class Graph:
 		if directed and in_indices is not None and in_indptr is not None:
 			result._arrow_arrays['in_indices'] = in_indices
 			result._arrow_arrays['in_indptr'] = in_indptr
+		if out_weights is not None:
+			result._arrow_arrays['out_weights'] = out_weights
+		if directed and in_weights is not None:
+			result._arrow_arrays['in_weights'] = in_weights
 
 		# Force the correct constructor by explicitly casting parameters
 		result._this = make_shared[_GraphR](
@@ -196,7 +242,9 @@ cdef class Graph:
 			<shared_ptr[UInt64Array]>out_indices_ptr,
 			<shared_ptr[UInt64Array]>out_indptr_ptr,
 			<shared_ptr[UInt64Array]>in_indices_ptr,
-			<shared_ptr[UInt64Array]>in_indptr_ptr
+			<shared_ptr[UInt64Array]>in_indptr_ptr,
+			<shared_ptr[DoubleArray]>out_weights_ptr,
+			<shared_ptr[DoubleArray]>in_weights_ptr
 		)
 
 		return result
