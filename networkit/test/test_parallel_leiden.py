@@ -116,7 +116,7 @@ def create_graph_arrow_optimized(df, directed=False):
     return graph
 
 
-def test_small_graph():
+def small_graph_test():
     """Test with a small known graph structure."""
     print("=== Testing Small Graph ===")
 
@@ -142,7 +142,7 @@ def test_small_graph():
     return graph
 
 
-def test_parallel_leiden_algorithm(graph):
+def run_parallel_leiden_algorithm(graph):
     """Test ParallelLeidenView algorithm on the graph."""
     print("\n=== Testing ParallelLeidenView Algorithm ===")
 
@@ -181,7 +181,7 @@ def test_parallel_leiden_algorithm(graph):
         return False
 
 
-def test_larger_graph():
+def larger_graph_test():
     """Test with a larger graph to ensure scalability and community structure."""
     print("\n=== Testing Larger Graph ===")
 
@@ -216,7 +216,7 @@ def test_larger_graph():
     graph = create_graph_arrow_optimized(df_arrow, directed=False)
 
     # Run ParallelLeidenView
-    success = test_parallel_leiden_algorithm(graph)
+    success = run_parallel_leiden_algorithm(graph)
 
     return graph, success
 
@@ -228,11 +228,11 @@ def main():
 
     try:
         # Test 1: Small graph
-        small_graph = test_small_graph()
-        small_success = test_parallel_leiden_algorithm(small_graph)
+        small_graph = small_graph_test()
+        small_success = run_parallel_leiden_algorithm(small_graph)
 
         # Test 2: Larger graph
-        large_graph, large_success = test_larger_graph()
+        large_graph, large_success = larger_graph_test()
 
         print("\n" + "=" * 60)
         if small_success and large_success:
