@@ -423,20 +423,20 @@ cdef class GraphUpdater:
 		 Initial graph
 	"""
 	cdef _GraphUpdater* _this
-	cdef Graph _G
+	cdef object _G
 
 	def __cinit__(self, G):
+		cdef _GraphW* gw = NULL
+		self._G = G
 		if isinstance(G, GraphW):
-			# If passed a GraphW, we need to convert it to a Graph
-			self._G = Graph(0)
-			self._G._this = make_shared[_GraphW]((<GraphW>G)._this)
+			self._this = new _GraphUpdater((<GraphW>G)._this)
 		elif isinstance(G, Graph):
-			self._G = G
+			gw = <_GraphW*>((<Graph>G)._this.get())
+			if gw == NULL:
+				raise TypeError("GraphUpdater requires a writable graph (GraphW)")
+			self._this = new _GraphUpdater(dereference(gw))
 		else:
 			raise TypeError("GraphUpdater expects a Graph or GraphW instance")
-		# Pass a reference to the GraphW inside the shared_ptr
-		# Cast the _Graph& to _GraphW& since we know it contains a GraphW
-		self._this = new _GraphUpdater(<_GraphW&>dereference(self._G._this))
 
 	def __dealloc__(self):
 		del self._this
