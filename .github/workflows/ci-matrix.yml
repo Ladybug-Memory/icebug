@@ -162,3 +162,13 @@ jobs:
         if: matrix.os != 'windows'
         run: ${{ github.workspace }}/.github/workflows/scripts/cpp_only.sh
         shell: bash
+
+      - name: Setup uv (Linux)
+        if: matrix.os == 'linux'
+        uses: astral-sh/setup-uv@v5
+
+      - name: Run pytest (Linux)
+        if: matrix.os == 'linux'
+        run: |
+          uv sync --extra test --extra vizbridges
+          uv run pytest

@@ -42,6 +42,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest", "pandas", "networkx"]
+vizbridges = ["ipycytoscape", "plotly", "seaborn", "anywidget"]
 
 [project.urls]
 homepage = "https://github.com/Ladybug-Memory/icebug"
