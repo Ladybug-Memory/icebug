@@ -135,46 +135,41 @@ def test_small_graph():
     print(f"  Directed: {graph.isDirected()}")
     print(f"  Weighted: {graph.isWeighted()}")
     
+    assert graph.numberOfNodes() == 5
+    # Note: CSR for undirected graphs doubles edges (each edge stored once, but we add reverse edges)
+    assert graph.numberOfEdges() == 10  # 5 edges * 2 for undirected CSR
+    
     # Test basic graph operations
     print(f"\nTesting graph operations:")
     for u in range(graph.numberOfNodes()):
         degree = graph.degree(u)
         print(f"  Node {u}: degree = {degree}")
-    
-    return graph
 
 def run_pagerank_algorithm(graph):
     """Test PageRank algorithm on the graph."""
     print("\n=== Testing PageRank Algorithm ===")
     
-    try:
-        # Create PageRank instance
-        pr = nk.centrality.PageRank(graph, damp=0.85, tol=1e-8)
-        print("Created PageRank instance")
-        
-        # Run the algorithm
-        print("Running PageRank...")
-        pr.run()
-        print("PageRank completed successfully!")
-        
-        # Get results
-        scores = pr.scores()
-        print(f"PageRank scores for {len(scores)} nodes:")
-        
-        # Print PageRank scores
-        for node in range(min(graph.numberOfNodes(), 10)):  # Show first 10 nodes
-            print(f"  Node {node}: PageRank = {scores[node]:.6f}")
-        
-        if graph.numberOfNodes() > 10:
-            print(f"  ... and {graph.numberOfNodes() - 10} more nodes")
-            
-        return True
-        
-    except Exception as e:
-        print(f"Error running PageRank: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+    # Create PageRank instance
+    pr = nk.centrality.PageRank(graph, damp=0.85, tol=1e-8)
+    print("Created PageRank instance")
+    
+    # Run the algorithm
+    print("Running PageRank...")
+    pr.run()
+    print("PageRank completed successfully!")
+    
+    # Get results
+    scores = pr.scores()
+    print(f"PageRank scores for {len(scores)} nodes:")
+    
+    # Print PageRank scores
+    for node in range(min(graph.numberOfNodes(), 10)):  # Show first 10 nodes
+        print(f"  Node {node}: PageRank = {scores[node]:.6f}")
+    
+    if graph.numberOfNodes() > 10:
+        print(f"  ... and {graph.numberOfNodes() - 10} more nodes")
+    
+    assert len(scores) == graph.numberOfNodes()
 
 def test_larger_graph():
     """Test with a larger graph to ensure scalability."""
@@ -210,38 +205,27 @@ def test_larger_graph():
     # Create graph
     graph = create_graph_arrow_optimized(df_arrow, directed=False)
     
-    # Run PageRank
-    success = run_pagerank_algorithm(graph)
+    assert graph.numberOfNodes() == 10
     
-    return graph, success
+    # Run PageRank
+    run_pagerank_algorithm(graph)
 
 def main():
     """Main test function."""
     print("NetworKit Arrow-backed Graph + PageRank Test")
     print("=" * 50)
     
-    try:
-        # Test 1: Small graph
-        small_graph = test_small_graph()
-        small_success = run_pagerank_algorithm(small_graph)
-        
-        # Test 2: Larger graph
-        large_graph, large_success = test_larger_graph()
-        
-        print("\n" + "=" * 50)
-        print("✅ ALL TESTS PASSED!")
-        print("✅ Arrow-backed CSR graph construction works")
-        print("✅ PageRank algorithm works on CSR graphs")
-        print("✅ Memory-efficient zero-copy construction verified")
-        
-    except Exception as e:
-        print(f"\n❌ TEST FAILED: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+    # Test 1: Small graph
+    test_small_graph()
     
-    return True
+    # Test 2: Larger graph
+    test_larger_graph()
+    
+    print("\n" + "=" * 50)
+    print("✅ ALL TESTS PASSED!")
+    print("✅ Arrow-backed CSR graph construction works")
+    print("✅ PageRank algorithm works on CSR graphs")
+    print("✅ Memory-efficient zero-copy construction verified")
 
 if __name__ == "__main__":
-    success = main()
-    exit(0 if success else 1)
+    main()
