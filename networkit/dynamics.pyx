@@ -426,7 +426,6 @@ cdef class GraphUpdater:
 	cdef Graph _G
 
 	def __cinit__(self, G):
-		cdef _GraphW gw
 		if isinstance(G, GraphW):
 			# If passed a GraphW, we need to convert it to a Graph
 			self._G = Graph(0)
@@ -435,9 +434,9 @@ cdef class GraphUpdater:
 			self._G = G
 		else:
 			raise TypeError("GraphUpdater expects a Graph or GraphW instance")
-		gw = _GraphW(dereference(self._G._this))
-		self._this = new _GraphUpdater(gw)
-		self._G.setThisFromGraphW(gw)
+		# Pass a reference to the GraphW inside the shared_ptr
+		# Cast the _Graph& to _GraphW& since we know it contains a GraphW
+		self._this = new _GraphUpdater(<_GraphW&>dereference(self._G._this))
 
 	def __dealloc__(self):
 		del self._this
