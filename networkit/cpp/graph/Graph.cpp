@@ -345,11 +345,15 @@ std::pair<const node *, count> Graph::getCSROutNeighbors(node u) const {
 }
 
 std::pair<const node *, count> Graph::getCSRInNeighbors(node u) const {
-    if (!usingCSR || u >= z || !directed || !inEdgesCSRIndices || !inEdgesCSRIndptr) {
-        // For undirected graphs, incoming neighbors are the same as outgoing neighbors
-        if (!directed) {
-            return getCSROutNeighbors(u);
-        }
+    if (!usingCSR || u >= z) {
+        return {nullptr, 0};
+    }
+
+    if (!directed) {
+        return getCSROutNeighbors(u);
+    }
+
+    if (!inEdgesCSRIndices || !inEdgesCSRIndptr) {
         return {nullptr, 0};
     }
 

@@ -170,5 +170,7 @@ jobs:
       - name: Run pytest (Linux)
         if: matrix.os == 'linux'
         run: |
-          uv sync --extra test --extra vizbridges
+          uv sync --extra pytest
           uv run pytest
+        env:
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache

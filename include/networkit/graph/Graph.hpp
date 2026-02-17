@@ -1725,12 +1725,11 @@ inline void Graph::forInEdgesOfImpl(node u, L handle) const {
                 // Get edge ID (CSR graphs don't currently support edge IDs)
                 edgeid eid = graphHasEdgeIds ? none : none;
 
-                // For incoming edges, v is the source and u is the target
-                edgeLambda(handle, v, u, weight, eid);
+                // For incoming edges: u is current node (target), v is neighbor (source)
+                edgeLambda(handle, u, v, weight, eid);
             }
         } else {
             // For undirected graphs, incoming edges are the same as outgoing edges
-            // but we need to swap u and v in the handle call
             auto [neighbors, degree] = getCSROutNeighbors(u);
             if (neighbors == nullptr || degree == 0)
                 return;
@@ -1745,8 +1744,8 @@ inline void Graph::forInEdgesOfImpl(node u, L handle) const {
                 // Get edge ID (CSR graphs don't currently support edge IDs)
                 edgeid eid = graphHasEdgeIds ? none : none;
 
-                // For undirected graphs, call with v, u (swapped)
-                edgeLambda(handle, v, u, weight, eid);
+                // For undirected graphs, pass (u, v) where u is current node and v is neighbor
+                edgeLambda(handle, u, v, weight, eid);
             }
         }
     } else {
