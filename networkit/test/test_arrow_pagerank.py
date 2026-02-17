@@ -143,7 +143,7 @@ def test_small_graph():
     
     return graph
 
-def test_pagerank_algorithm(graph):
+def run_pagerank_algorithm(graph):
     """Test PageRank algorithm on the graph."""
     print("\n=== Testing PageRank Algorithm ===")
     
@@ -211,7 +211,7 @@ def test_larger_graph():
     graph = create_graph_arrow_optimized(df_arrow, directed=False)
     
     # Run PageRank
-    success = test_pagerank_algorithm(graph)
+    success = run_pagerank_algorithm(graph)
     
     return graph, success
 
@@ -223,7 +223,7 @@ def main():
     try:
         # Test 1: Small graph
         small_graph = test_small_graph()
-        small_success = test_pagerank_algorithm(small_graph)
+        small_success = run_pagerank_algorithm(small_graph)
         
         # Test 2: Larger graph
         large_graph, large_success = test_larger_graph()
