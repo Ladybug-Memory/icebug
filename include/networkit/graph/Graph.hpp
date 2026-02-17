@@ -1754,11 +1754,12 @@ inline void Graph::forInEdgesOfImpl(node u, L handle) const {
         // Check exists for mutable graphs
         if (!exists[u])
             return;
-        // GraphW's forInEdgesVirtualImpl calls handle(v, u, ...) where v is source and u is target
-        // This matches our expected signature of (source, target, ...), so no swap needed
+        // GraphW's forInEdgesVirtualImpl calls handle(v, u, ...) where v is neighbor and u is
+        // current node We need to swap so that edgeLambda receives (current, neighbor, ...) and
+        // passes neighbor to f
         forInEdgesVirtualImpl(
             u, graphIsDirected, hasWeights, graphHasEdgeIds,
-            [&](node v, node u, edgeweight w, edgeid e) { edgeLambda(handle, v, u, w, e); });
+            [&](node v, node u, edgeweight w, edgeid e) { edgeLambda(handle, u, v, w, e); });
     }
 }
 
