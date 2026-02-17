@@ -1370,6 +1370,27 @@ cdef class Graph:
 			raise RuntimeError("Graph is read-only (GraphR), cannot compact edges")
 		gw.compactEdges()
 
+	def setWeight(self, u, v, w):
+		"""
+		setWeight(u, v, w)
+
+		Set the weight of an edge. If the edge does not exist, it will be inserted.
+
+		Parameters
+		----------
+		u : int
+			Endpoint of edge.
+		v : int
+			Endpoint of edge.
+		w : float
+			Edge weight.
+		"""
+		cdef _GraphW* gw = <_GraphW*>(self._this.get())
+		if gw == NULL:
+			raise RuntimeError("Graph is read-only (GraphR), cannot set weight")
+		gw.setWeight(u, v, w)
+		return self
+
 cdef class GraphW:
 	"""
 	GraphW(n=0, weighted=False, directed=False, edgesIndexed=False)
