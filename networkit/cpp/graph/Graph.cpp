@@ -51,26 +51,40 @@ Graph::Graph(count n, bool directed, std::shared_ptr<arrow::UInt64Array> outIndi
         m = outIndices->length();
     }
 
-    // For directed graphs, we need both in and out CSR arrays
-    if (directed && (!inIndices || !inIndptr)) {
-        throw std::invalid_argument(
-            "Directed CSR graphs require both incoming and outgoing arrays");
-    }
-
     // Validate CSR arrays
     if (outIndptr && static_cast<size_t>(outIndptr->length()) != n + 1) {
-        throw std::invalid_argument("outIndptr must have length n+1");
+        throw std::runtime_error("outIndptr must have length n+1");
     }
-    if (directed && inIndptr && static_cast<size_t>(inIndptr->length()) != n + 1) {
-        throw std::invalid_argument("inIndptr must have length n+1");
+    if (inIndptr && static_cast<size_t>(inIndptr->length()) != n + 1) {
+        throw std::runtime_error("inIndptr must have length n+1");
     }
 
     // Validate weight arrays if provided
     if (outWeights && outIndices && outWeights->length() != outIndices->length()) {
-        throw std::invalid_argument("outWeights must have same length as outIndices");
+        throw std::runtime_error("outWeights must have same length as outIndices");
     }
-    if (directed && inWeights && inIndices && inWeights->length() != inIndices->length()) {
-        throw std::invalid_argument("inWeights must have same length as inIndices");
+    if (inWeights && inIndices && inWeights->length() != inIndices->length()) {
+        throw std::runtime_error("inWeights must have same length as inIndices");
+    }
+
+    // Validate that all node IDs are within bounds [0, n)
+    if (outIndices) {
+        for (int64_t i = 0; i < outIndices->length(); ++i) {
+            node v = outIndices->Value(i);
+            if (v >= n) {
+                throw std::runtime_error("outIndices contains node ID " + std::to_string(v)
+                                         + " which is >= n (" + std::to_string(n) + ")");
+            }
+        }
+    }
+    if (inIndices) {
+        for (int64_t i = 0; i < inIndices->length(); ++i) {
+            node v = inIndices->Value(i);
+            if (v >= n) {
+                throw std::runtime_error("inIndices contains node ID " + std::to_string(v)
+                                         + " which is >= n (" + std::to_string(n) + ")");
+            }
+        }
     }
 }
 
