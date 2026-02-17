@@ -41,7 +41,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest"]
+test = ["pytest", "pandas", "networkx"]
 
 [project.urls]
 homepage = "https://github.com/Ladybug-Memory/icebug"
