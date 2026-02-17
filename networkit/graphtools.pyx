@@ -45,7 +45,7 @@ cdef extern from "<networkit/graph/GraphTools.hpp>" namespace "NetworKit::GraphT
 	vector[node] topologicalSort(_Graph G, unordered_map[node, node], bool_t) except + nogil
 	node augmentGraph(_GraphW G) except + nogil
 	pair[_GraphW, node] createAugmentedGraph(const _Graph& G) except + nogil
-	void randomizeWeights(_Graph G) except + nogil
+	void randomizeWeights(_Graph& G) except + nogil
 
 cdef class GraphTools:
 
@@ -718,7 +718,7 @@ cdef class GraphTools:
 		return Graph().setThisFromGraphW(result.first), result.second
 
 	@staticmethod
-	def randomizeWeights(GraphW G):
+	def randomizeWeights(Graph G):
 		"""
 		randomizeWeights(G)
 
@@ -732,4 +732,4 @@ cdef class GraphTools:
 		G : networkit.Graph
 			The input graph.
 		"""
-		randomizeWeights(G._this)
+		randomizeWeights(dereference(G._this))
