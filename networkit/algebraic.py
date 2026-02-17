@@ -7,11 +7,12 @@ __author__ = "Christian Staudt"
 
 # external imports
 import scipy.sparse
+import scipy.linalg
 from scipy.sparse import csgraph, linalg
 import numpy as np
 
 def column(matrix, i):
-	""" 
+	"""
 	column(matrix, i)
 
 	Get the ith column of a matrix
@@ -27,12 +28,12 @@ def column(matrix, i):
 	-------
 	list(float)
 		Column i of matrix.
-	"""	
+	"""
 	return [row[i] for row in matrix]
 
 
 def adjacencyMatrix(G, matrixType="sparse"):
-	""" 
+	"""
 	adjacencyMatrix(G, matrixType="sparse")
 
 	Get the adjacency matrix of the graph `G`.
@@ -79,7 +80,7 @@ def adjacencyMatrix(G, matrixType="sparse"):
 	return A
 
 def laplacianMatrix(G):
-	""" 
+	"""
 	laplacianMatrix(G)
 
 	Get the laplacian matrix of the graph `G`.
@@ -200,15 +201,38 @@ def eigenvectors(matrix, cutoff=-1, reverse=False):
 	if cutoff == -1:
 		cutoff = matrix.shape[0] - 3
 
-	if reverse:
-		mode = "SR"
+	# For small matrices or when requesting many eigenvalues, use dense solver
+	# as sparse solver can be unreliable
+	if matrix.shape[0] <= 10 or cutoff + 1 >= matrix.shape[0] - 1:
+		# Convert to dense and use scipy.linalg.eig
+		w, v = scipy.linalg.eig(matrix.toarray())
+
+		# Convert to numpy complex128 for consistent sorting behavior
+		w = np.array(w, dtype=np.complex128)
+
+		# Sort all eigenvalues by real part (ascending)
+		orderlist = list(zip(w, range(0, len(w))))
+		orderlist = sorted(orderlist)
+
+		# Select the requested eigenvalues based on mode
+		if reverse:
+			# mode='SR': want smallest real part
+			orderlist = orderlist[:cutoff + 1]
+		else:
+			# mode='LR': want largest real part
+			orderlist = orderlist[-(cutoff + 1):]
+			# Re-sort to maintain ascending order
+			orderlist = sorted(orderlist)
 	else:
-		mode = "LR"
+		if reverse:
+			mode = "SR"
+		else:
+			mode = "LR"
 
-	w, v = scipy.sparse.linalg.eigs(matrix, cutoff + 1, which=mode)
+		w, v = scipy.sparse.linalg.eigs(matrix, cutoff + 1, which=mode)
 
-	orderlist = zip(w, range(0, len(w)))
-	orderlist = sorted(orderlist)
+		orderlist = zip(w, range(0, len(w)))
+		orderlist = sorted(orderlist)
 
 	orderedW = column(orderlist, 0)
 	orderedV = [v[:,i] for i in column(orderlist, 1)]
