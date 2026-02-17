@@ -83,14 +83,14 @@ index Graph::indexInInEdgeArray(node v, node u) const {
     throw std::runtime_error("indexInInEdgeArray not implemented for CSR format");
 }
 
-index Graph::indexInOutEdgeArray(node u, node v) const {
+index Graph::indexInOutEdgeArray([[maybe_unused]] node u, [[maybe_unused]] node v) const {
     throw std::runtime_error(
         "indexInOutEdgeArray not implemented - use GraphW for vector-based implementation");
 }
 
 /** EDGE IDS **/
 
-edgeid Graph::edgeId(node u, node v) const {
+edgeid Graph::edgeId([[maybe_unused]] node u, [[maybe_unused]] node v) const {
     throw std::runtime_error("edgeId not implemented - use GraphW for vector-based implementation");
 }
 
