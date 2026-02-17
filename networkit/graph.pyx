@@ -1076,6 +1076,30 @@ cdef class Graph:
 		cdef _GraphW* gw = <_GraphW*>(self._this.get())
 		if gw == NULL:
 			raise RuntimeError("Graph is read-only (GraphR), cannot add edges")
+
+		if not (gw.hasNode(u) and gw.hasNode(v)):
+			if not addMissing:
+				raise RuntimeError(
+					"Cannot create edge ({0}, {1}) as at least one end point does not exist".format(
+						u, v
+					)
+				)
+
+			k = max(u, v)
+			previous_num_nodes = gw.numberOfNodes()
+			if k >= gw.upperNodeIdBound():
+				gw.addNodes(k - gw.upperNodeIdBound() + 1)
+				# Remove nodes that were only created as gap fillers.
+				for node in range(previous_num_nodes, gw.numberOfNodes()):
+					if node != u and node != v:
+						gw.removeNode(node)
+
+			if not gw.hasNode(u):
+				gw.restoreNode(u)
+
+			if not gw.hasNode(v):
+				gw.restoreNode(v)
+
 		return gw.addEdge(u, v, w, checkMultiEdge)
 
 	def removeNode(self, u):
