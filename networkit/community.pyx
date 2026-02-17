@@ -255,7 +255,7 @@ cdef class GraphClusteringTools:
 		int
 			Imbalance of the partition.
 		"""
-		if graph is not None:
+		if G is not None:
 			return getImbalance(zeta._this, dereference(G._this))
 		else:
 			return getImbalance(zeta._this)
