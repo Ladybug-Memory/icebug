@@ -19,7 +19,7 @@ class TestDistance(unittest.TestCase):
 			for weighted in [True, False]:
 				g = nk.generators.ErdosRenyiGenerator(100, 0.15, directed).generate()
 				if weighted:
-					g = nk.graph.GraphW(nk.graphtools.toWeighted(g))
+					g = nk.graphtools.toWeighted(g)
 					g.forEdges(lambda u, v, ew, eid: g.setWeight(u, v, random.random()))
 				apsp = nk.distance.APSP(g)
 				apsp.run()
@@ -214,7 +214,7 @@ class TestDistance(unittest.TestCase):
 			for weighted in [True, False]:
 				g = nk.generators.ErdosRenyiGenerator(100, 0.15, directed).generate()
 				if weighted:
-					g = nk.graph.GraphW(nk.graphtools.toWeighted(g))
+					g = nk.graphtools.toWeighted(g)
 					g.forEdges(lambda u, v, ew, eid: g.setWeight(u, v, random.random()))
 				yield g
 
@@ -225,7 +225,7 @@ class TestDistance(unittest.TestCase):
 			for weighted in [True, False]:
 				g = nk.generators.ErdosRenyiGenerator(100, 0.15, directed).generate()
 				if weighted:
-					g = nk.graph.GraphW(nk.graphtools.toWeighted(g))
+					g = nk.graphtools.toWeighted(g)
 					g.forEdges(lambda u, v, ew, eid: g.setWeight(u, v, random.random()))
 				spsp = nk.distance.SPSP(g, [0,1,2,3,4])
 				spsp.run()
