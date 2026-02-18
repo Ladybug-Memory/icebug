@@ -1,6 +1,6 @@
 name='networkit'
 
-version='12.0'
+version='12.1'
 
 url='https://github.com/Ladybug-Memory/icebug'
 
