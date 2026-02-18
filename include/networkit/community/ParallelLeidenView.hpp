@@ -109,8 +109,8 @@ private:
 
     bool random;
 
-    // Store coarsened graph views to avoid recreating them
-    std::vector<std::shared_ptr<CoarsenedGraphView>> coarsenedGraphs;
+    // Current coarsened graph view (only keep current, not all historical)
+    std::shared_ptr<CoarsenedGraphView> currentCoarsenedView;
 };
 
 } // namespace NetworKit

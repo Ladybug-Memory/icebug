@@ -18,7 +18,7 @@ ParallelLeidenView::ParallelLeidenView(const Graph &graph, int iterations, bool 
 
 ParallelLeidenView::~ParallelLeidenView() {
     // Explicitly clear resources in proper order to avoid double-free
-    coarsenedGraphs.clear();
+    currentCoarsenedView.reset();
     mappings.clear();
     communityVolumes.clear();
 }
@@ -128,7 +128,6 @@ void ParallelLeidenView::run() {
                 mappings.emplace_back(std::move(map));
 
                 result = std::move(p);
-                coarsenedGraphs.push_back(newCoarsenedView);
                 currentCoarsenedView = newCoarsenedView;
 
             } else {
@@ -148,8 +147,7 @@ void ParallelLeidenView::run() {
                 mappings.emplace_back(std::move(map));
                 result = std::move(p);
 
-                // Store the coarsened view and use it for the next iteration
-                coarsenedGraphs.push_back(newCoarsenedView);
+                // Use the coarsened view for the next iteration
                 currentCoarsenedView = newCoarsenedView;
                 currentGraph = nullptr; // No longer using the original graph directly
             }
@@ -221,7 +219,7 @@ void ParallelLeidenView::flattenPartition() {
     flattenedPartition.compact(true);
     result = flattenedPartition;
     mappings.clear();
-    coarsenedGraphs.clear(); // Clear the stored views
+    currentCoarsenedView.reset(); // Clear the current coarsened view
     TRACE("Flattening partition took " + timer.elapsedTag());
 }
 
