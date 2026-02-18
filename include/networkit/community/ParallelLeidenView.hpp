@@ -66,7 +66,7 @@ private:
     void calculateVolumes(const GraphType &graph);
 
     template <typename GraphType>
-    void parallelMove(const GraphType &graph);
+    count parallelMove(const GraphType &graph);
 
     template <typename GraphType>
     Partition parallelRefine(const GraphType &graph);

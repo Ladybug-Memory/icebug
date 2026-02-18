@@ -50,19 +50,25 @@ void ParallelLeidenView::run() {
 
         int innerIterations = 0;
         const int maxInnerIterations = 100; // Safety limit to prevent infinite loops
+        INFO("Starting inner loop with ", result.numberOfSubsets(), " communities");
         do {
             innerIterations++;
             if (innerIterations > maxInnerIterations) {
+                INFO("Reached max inner iterations (", maxInnerIterations, ")");
                 break;
             }
             handler.assureRunning();
 
             // Parallel move phase
+            count nodesMoved;
             if (currentCoarsenedView) {
-                parallelMove(*currentCoarsenedView);
+                nodesMoved = parallelMove(*currentCoarsenedView);
             } else {
-                parallelMove(*currentGraph);
+                nodesMoved = parallelMove(*currentGraph);
             }
+
+            INFO("Inner iter ", innerIterations, ": moved ", nodesMoved, " nodes, ",
+                 result.numberOfSubsets(), " communities");
 
             // If each community consists of exactly one node we're done
             count numNodes = currentCoarsenedView ? currentCoarsenedView->numberOfNodes()
@@ -220,7 +226,7 @@ void ParallelLeidenView::flattenPartition() {
 }
 
 template <typename GraphType>
-void ParallelLeidenView::parallelMove(const GraphType &graph) {
+count ParallelLeidenView::parallelMove(const GraphType &graph) {
     DEBUG("Local Moving : ", graph.numberOfNodes(), " Nodes ");
     std::vector<count> moved(omp_get_max_threads(), 0);
     std::vector<count> totalNodesPerThread(omp_get_max_threads(), 0);
@@ -434,15 +440,15 @@ void ParallelLeidenView::parallelMove(const GraphType &graph) {
     result.setUpperBound(upperBound);
     assert(queue.empty());
     assert(waitingForNodes == tcount);
+    count totalMoved = std::accumulate(moved.begin(), moved.end(), (count)0);
     if (Aux::Log::isLogLevelEnabled(Aux::Log::LogLevel::DEBUG)) {
-        count totalMoved = std::accumulate(moved.begin(), moved.end(), (count)0);
         count totalWorked =
             std::accumulate(totalNodesPerThread.begin(), totalNodesPerThread.end(), (count)0);
-        tlx::unused(totalMoved);
         tlx::unused(totalWorked);
         DEBUG("Total worked: ", totalWorked, " Total moved: ", totalMoved,
               " moved to singleton community: ", singleton);
     }
+    return totalMoved;
 }
 
 template <typename GraphType>
@@ -643,8 +649,8 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
 template void ParallelLeidenView::calculateVolumes<Graph>(const Graph &graph);
 template void
 ParallelLeidenView::calculateVolumes<CoarsenedGraphView>(const CoarsenedGraphView &graph);
-template void ParallelLeidenView::parallelMove<Graph>(const Graph &graph);
-template void ParallelLeidenView::parallelMove<CoarsenedGraphView>(const CoarsenedGraphView &graph);
+template count ParallelLeidenView::parallelMove<Graph>(const Graph &graph);
+template count ParallelLeidenView::parallelMove<CoarsenedGraphView>(const CoarsenedGraphView &graph);
 template Partition ParallelLeidenView::parallelRefine<Graph>(const Graph &graph);
 template Partition
 ParallelLeidenView::parallelRefine<CoarsenedGraphView>(const CoarsenedGraphView &graph);
