@@ -137,14 +137,11 @@ private:
     std::vector<std::vector<node>> supernodeToOriginal; // supernode -> [original_nodes]
     count numSupernodes;
 
-    // Pre-computed neighborhood lists (no locking needed)
-    mutable std::vector<std::vector<std::pair<node, edgeweight>>> neighborCache;
-
     /**
-     * Get neighbors of a supernode (pre-computed at construction)
+     * Get neighbors of a supernode (compute on demand, no caching)
      */
-    const std::vector<std::pair<node, edgeweight>> &getNeighbors(node supernode) const {
-        return neighborCache[supernode];
+    std::vector<std::pair<node, edgeweight>> getNeighbors(node supernode) const {
+        return computeNeighbors(supernode);
     }
 
     /**

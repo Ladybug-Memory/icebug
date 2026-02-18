@@ -28,13 +28,6 @@ CoarsenedGraphView::CoarsenedGraphView(const Graph &originalGraph, const Partiti
         supernodeToOriginal[supernode].push_back(u);
     });
 
-    // Pre-compute all neighbor lists in parallel (avoids locking during algorithm)
-    neighborCache.resize(numSupernodes);
-    #pragma omp parallel for schedule(dynamic, 100)
-    for (omp_index u = 0; u < static_cast<omp_index>(numSupernodes); ++u) {
-        neighborCache[u] = computeNeighbors(u);
-    }
-
     TRACE("Created CoarsenedGraphView with ", numSupernodes, " supernodes from ",
           originalGraph.numberOfNodes(), " original nodes");
 }
