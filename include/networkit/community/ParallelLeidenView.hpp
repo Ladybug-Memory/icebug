@@ -95,7 +95,9 @@ private:
 
     std::vector<double> communityVolumes;
 
-    std::vector<std::vector<node>> mappings;
+    // Single composed mapping: accumulated incrementally during inner loop
+    // Each new mapping is composed into this one, avoiding accumulation
+    std::vector<node> composedMapping;
 
     static constexpr int WORKING_SIZE = 1000;
 

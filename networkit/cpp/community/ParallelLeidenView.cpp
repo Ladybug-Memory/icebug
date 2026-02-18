@@ -17,9 +17,9 @@ ParallelLeidenView::ParallelLeidenView(const Graph &graph, int iterations, bool 
 }
 
 ParallelLeidenView::~ParallelLeidenView() {
-    // Explicitly clear resources in proper order to avoid double-free
     currentCoarsenedView.reset();
-    mappings.clear();
+    composedMapping.clear();
+    composedMapping.shrink_to_fit();
     communityVolumes.clear();
 }
 
@@ -35,21 +35,22 @@ void ParallelLeidenView::run() {
         numberOfIterations--;
         changed = false;
 
+        // Initialize composed mapping to identity
+        composedMapping.clear();
+        composedMapping.resize(G->numberOfNodes());
+        G->parallelForNodes([&](node u) { composedMapping[u] = u; });
+
         // Start with the original graph
         const Graph *currentGraph = G;
-        std::shared_ptr<CoarsenedGraphView> currentCoarsenedView = nullptr;
+        currentCoarsenedView.reset();
 
         Partition refined;
 
-        // Calculate volumes for the current graph (either original or coarsened view)
-        if (currentCoarsenedView) {
-            calculateVolumes(*currentCoarsenedView);
-        } else {
-            calculateVolumes(*currentGraph);
-        }
+        // Calculate volumes for the current graph
+        calculateVolumes(*currentGraph);
 
         int innerIterations = 0;
-        const int maxInnerIterations = 100; // Safety limit to prevent infinite loops
+        const int maxInnerIterations = 100;
         INFO("Starting inner loop with ", result.numberOfSubsets(), " communities");
         do {
             innerIterations++;
@@ -88,14 +89,11 @@ void ParallelLeidenView::run() {
 
             handler.assureRunning();
 
-            // Create coarsened view instead of new graph
-            // For coarsened views, we need to map the refined partition back to the original graph
+            // Create coarsened view
             if (currentCoarsenedView) {
-                // Create a refined partition in terms of the original graph nodes
                 Partition originalRefined(G->numberOfNodes());
                 originalRefined.setUpperBound(refined.upperBound());
 
-                // Map each coarse node's refined assignment back to original nodes
                 for (node coarseNode = 0; coarseNode < currentCoarsenedView->numberOfNodes();
                      ++coarseNode) {
                     const auto &originalNodes = currentCoarsenedView->getOriginalNodes(coarseNode);
@@ -111,45 +109,40 @@ void ParallelLeidenView::run() {
                 auto map = ppcView.getFineToCoarseNodeMapping();
                 const auto &oldNodeMapping = currentCoarsenedView->getNodeMapping();
 
-                // Create new partition for the new coarsened view
                 Partition p(newCoarsenedView->numberOfNodes());
                 p.setUpperBound(result.upperBound());
 
-                // Map communities through the chain of coarsenings BEFORE moving map
-                // Capture map by value and other refs explicitly
                 G->parallelForNodes([map = map, &p, this, &oldNodeMapping](node originalNode) {
                     node newCoarseNode = map[originalNode];
-                    // Find what community this original node belonged to
                     node oldCoarseNode = oldNodeMapping[originalNode];
                     p[newCoarseNode] = result[oldCoarseNode];
                 });
 
-                // Update mappings after using map
-                mappings.emplace_back(std::move(map));
+                // Compose: composedMapping[idx] = map[composedMapping[idx]]
+                G->parallelForNodes([&](node idx) {
+                    composedMapping[idx] = map[composedMapping[idx]];
+                });
 
                 result = std::move(p);
                 currentCoarsenedView = newCoarsenedView;
 
             } else {
-                // First coarsening from original graph
                 ParallelPartitionCoarseningView ppcView(*currentGraph, refined);
                 ppcView.run();
                 auto newCoarsenedView = ppcView.getCoarsenedGraphView();
                 auto map = ppcView.getFineToCoarseNodeMapping();
 
-                // Maintain Partition, add every coarse Node to the community its fine Nodes were in
                 Partition p(newCoarsenedView->numberOfNodes());
                 p.setUpperBound(result.upperBound());
-                // Capture map by value and other refs explicitly
                 currentGraph->parallelForNodes(
                     [map = map, &p, this](node u) { p[map[u]] = result[u]; });
 
-                mappings.emplace_back(std::move(map));
+                // First mapping: just assign (composedMapping is identity, so map[composedMapping[idx]] = map[idx])
+                composedMapping = std::move(map);
                 result = std::move(p);
 
-                // Use the coarsened view for the next iteration
                 currentCoarsenedView = newCoarsenedView;
-                currentGraph = nullptr; // No longer using the original graph directly
+                currentGraph = nullptr;
             }
 
         } while (true);
@@ -167,10 +160,9 @@ void ParallelLeidenView::calculateVolumes(const GraphType &graph) {
     auto timer = Aux::Timer();
     timer.start();
 
-    // thread safe reduction. Avoid atomic calculation of total graph volume for unweighted graphs.
     communityVolumes.clear();
     communityVolumes.resize(result.upperBound() + VECTOR_OVERSIZE);
-    inverseGraphVolume = 0.0; // Reset to 0 before accumulation
+    inverseGraphVolume = 0.0;
 
     if (graph.isWeighted()) {
         std::vector<double> threadVolumes(omp_get_max_threads());
@@ -197,29 +189,20 @@ void ParallelLeidenView::calculateVolumes(const GraphType &graph) {
 void ParallelLeidenView::flattenPartition() {
     auto timer = Aux::Timer();
     timer.start();
-    if (mappings.empty()) {
+    if (composedMapping.empty()) {
         return;
     }
-    // Create a new partition with size |V(G)| (the fine/bigger Graph)
+    // composedMapping already contains the composed mapping: original -> final coarse node
     Partition flattenedPartition(G->numberOfNodes());
     flattenedPartition.setUpperBound(result.upperBound());
-    int i = mappings.size() - 1;
-    std::vector<node> &lower = mappings[i--];
-    while (i >= 0) {
-        // iteratively "resolve" (i.e compose) mappings. Let "lower" be a mapping thats
-        // below "higher" in the hierarchy (i.e. of a later aggregation)
-        // If higher[index] = z and lower[z] = x then set higher[index] = x
-        std::vector<node> &upper = mappings[i--];
-        for (auto &idx : upper) {
-            idx = lower[idx];
-        }
-        lower = upper;
-    }
-    G->parallelForNodes([&](node a) { flattenedPartition[a] = lower[a]; });
+    G->parallelForNodes([&](node a) { 
+        flattenedPartition[a] = result[composedMapping[a]]; 
+    });
     flattenedPartition.compact(true);
     result = flattenedPartition;
-    mappings.clear();
-    currentCoarsenedView.reset(); // Clear the current coarsened view
+    composedMapping.clear();
+    composedMapping.shrink_to_fit();
+    currentCoarsenedView.reset();
     TRACE("Flattening partition took " + timer.elapsedTag());
 }
 
@@ -230,14 +213,13 @@ count ParallelLeidenView::parallelMove(const GraphType &graph) {
     std::vector<count> totalNodesPerThread(omp_get_max_threads(), 0);
     std::atomic_int singleton(0);
 
-    // Only insert nodes to the queue when they're not already in it.
     std::vector<std::atomic_bool> inQueue(graph.upperNodeIdBound());
     for (auto &val : inQueue) {
         val.store(false);
     }
     std::queue<std::vector<node>> queue;
-    std::mutex qlock;                      // queue lock
-    std::condition_variable workAvailable; // waiting/notifying for new Nodes
+    std::mutex qlock;
+    std::condition_variable workAvailable;
 
     std::atomic_bool resize(false);
     std::atomic_int waitingForResize(0);
@@ -267,7 +249,6 @@ count ParallelLeidenView::parallelMove(const GraphType &graph) {
         currentNodes.reserve(tshare);
         std::vector<node> newNodes;
         newNodes.reserve(WORKING_SIZE);
-        // cutWeight[Community] returns cut of Node to Community
         std::vector<double> cutWeights(communityVolumes.capacity());
         std::vector<index> pointers;
         int start = tshare * order[omp_get_thread_num()];
@@ -285,7 +266,6 @@ count ParallelLeidenView::parallelMove(const GraphType &graph) {
         do {
             handler.assureRunning();
             for (node u : currentNodes) {
-                // If a vector resize is needed, yield until done
                 if (resize) {
                     waitingForResize++;
                     while (resize) {
@@ -300,7 +280,6 @@ count ParallelLeidenView::parallelMove(const GraphType &graph) {
                 index bestCommunity = none;
                 double degree = 0;
                 for (auto z : pointers) {
-                    // Reset the clearlist : Set all cutweights to 0 and clear the pointer vector
                     cutWeights[z] = 0;
                 }
                 pointers.clear();
@@ -315,15 +294,13 @@ count ParallelLeidenView::parallelMove(const GraphType &graph) {
                     } else {
                         cutWeights[neighborCommunity] += ew;
                     }
-                    degree += ew; // keep track of the nodes degree. Loops count twice
+                    degree += ew;
                 });
 
                 if (pointers.empty())
                     continue;
 
-                // Determine Modularity delta for all neighbor communities
                 for (auto community : pointers) {
-                    // "Moving" a node to its current community is pointless
                     if (community != currentCommunity) {
                         double delta;
                         delta = modularityDelta(cutWeights[community], degree,
@@ -339,11 +316,10 @@ count ParallelLeidenView::parallelMove(const GraphType &graph) {
 
                 if (0 > modThreshold || maxDelta > modThreshold) {
                     moved[omp_get_thread_num()]++;
-                    if (0 > maxDelta) { // move node to empty community
+                    if (0 > maxDelta) {
                         singleton++;
                         bestCommunity = upperBound++;
                         if (bestCommunity >= communityVolumes.size()) {
-                            // Wait until all other threads yielded, then increase vector size
                             bool expected = false;
                             if (resize.compare_exchange_strong(expected, true)) {
                                 vectorSize += VECTOR_OVERSIZE;
@@ -351,7 +327,6 @@ count ParallelLeidenView::parallelMove(const GraphType &graph) {
                                 while (waitingForResize < tcount - 1) {
                                     std::this_thread::yield();
                                 }
-                                // all other threads are yielding, so resize is fine
                                 communityVolumes.resize(vectorSize);
                                 expected = true;
                                 resize.compare_exchange_strong(expected, false);
@@ -375,18 +350,14 @@ count ParallelLeidenView::parallelMove(const GraphType &graph) {
                     inQueue[u].compare_exchange_strong(expected, false);
                     assert(expected);
                     graph.forNeighborsOf(u, [&](node neighbor, edgeweight) {
-                        // Only add the node to the queue if it's not already
-                        // in it, and it's not the Node we're currently moving
                         if (result[neighbor] != bestCommunity && neighbor != u) {
                             expected = false;
                             if (inQueue[neighbor].compare_exchange_strong(expected, true)) {
                                 newNodes.push_back(neighbor);
-                                // push new nodes to the queue in WORKING_SIZE steps
                                 if (newNodes.size() == WORKING_SIZE) {
                                     qlock.lock();
                                     queue.emplace(std::move(newNodes));
                                     qlock.unlock();
-                                    // Notify threads that new is available
                                     workAvailable.notify_all();
                                     newNodes.clear();
                                     newNodes.reserve(WORKING_SIZE);
@@ -398,7 +369,6 @@ count ParallelLeidenView::parallelMove(const GraphType &graph) {
                 }
             }
 
-            // queue check/wait
             totalNodesPerThread[omp_get_thread_num()] += currentNodes.size();
             if (!newNodes.empty()) {
                 std::swap(currentNodes, newNodes);
@@ -410,15 +380,14 @@ count ParallelLeidenView::parallelMove(const GraphType &graph) {
             if (!queue.empty()) {
                 std::swap(currentNodes, queue.front());
                 queue.pop();
-            } else { // queue empty && newNodes empty
+            } else {
                 waitingForNodes++;
-                if (waitingForNodes < tcount) { // Not all nodes are done yet, wait for new work
+                if (waitingForNodes < tcount) {
                     waitingForResize++;
                     while (queue.empty() && waitingForNodes < tcount) {
                         workAvailable.wait(uniqueLock);
                     }
                     if (waitingForNodes < tcount) {
-                        // Notified and not all done means there's new work
                         std::swap(currentNodes, queue.front());
                         queue.pop();
                         waitingForNodes--;
@@ -426,7 +395,7 @@ count ParallelLeidenView::parallelMove(const GraphType &graph) {
                         continue;
                     }
                 }
-                uniqueLock.unlock(); // Notified and all done, stop.
+                uniqueLock.unlock();
                 workAvailable.notify_all();
                 break;
             }
@@ -456,15 +425,14 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
     DEBUG("Starting refinement with ", result.numberOfSubsets(), " partitions");
     std::vector<uint_fast8_t> singleton(refined.upperBound(), true);
     std::vector<double> cutCtoSminusC(refined.upperBound());
-    std::vector<double> refinedVolumes(refined.upperBound()); // Community Volumes P_refined
+    std::vector<double> refinedVolumes(refined.upperBound());
     std::vector<std::mutex> locks(refined.upperBound());
     std::vector<node> nodes(graph.upperNodeIdBound(), none);
 
 #pragma omp parallel
     {
         std::vector<index> neighComms;
-        // Keeps track of relevant Neighbor communities. Needed to reset the clearlist fast
-        std::vector<double> cutWeights(refined.upperBound()); // cut from Node to Communities
+        std::vector<double> cutWeights(refined.upperBound());
         auto &mt = Aux::Random::getURNG();
 #pragma omp for
         for (omp_index u = 0; u < static_cast<omp_index>(graph.upperNodeIdBound()); u++) {
@@ -473,8 +441,6 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
                 graph.forNeighborsOf(u, [&](node neighbor, edgeweight ew) {
                     if (u != neighbor) {
                         if (result[neighbor] == result[u]) {
-                            // Cut to communities in the refined partition that
-                            // are in the same community in the original partition
                             cutCtoSminusC[u] += ew;
                         }
                     } else {
@@ -498,11 +464,11 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
 #pragma omp for schedule(dynamic, WORKING_SIZE)
         for (omp_index i = 0; i < static_cast<omp_index>(nodes.size()); i++) {
             node u = nodes[i];
-            if (u == none || !singleton[u]) { // only consider singletons
+            if (u == none || !singleton[u]) {
                 continue;
             }
-            index S = result[u];                // Node's community ID in the original partition (S)
-            for (auto neighComm : neighComms) { // Reset the clearlist : Set all cutweights to 0
+            index S = result[u];
+            for (auto neighComm : neighComms) {
                 if (neighComm != none)
                     cutWeights[neighComm] = 0;
             }
@@ -510,11 +476,9 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
             neighComms.clear();
 
             std::vector<node> criticalNodes;
-            // Nodes whose community ID equals their Node ID. These may be singletons that can
-            // affect the cut which we need to update later
             double degree = 0;
 
-            graph.forNeighborsOf(u, [&](node neighbor, edgeweight ew) { // Calculate degree and cut
+            graph.forNeighborsOf(u, [&](node neighbor, edgeweight ew) {
                 degree += ew;
                 if (neighbor != u) {
                     if (S == result[neighbor]) {
@@ -522,10 +486,8 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
                         if (z == neighbor) {
                             criticalNodes.push_back(neighbor);
                         }
-                        // We don't need to remember the weight of that edge since it's
-                        // already saved in cutWeights
                         if (cutWeights[z] == 0)
-                            neighComms.push_back(z); // Keep track of neighbor communities
+                            neighComms.push_back(z);
                         cutWeights[z] += ew;
                     }
                 } else {
@@ -533,11 +495,11 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
                 }
             });
             if (cutCtoSminusC[u] < this->gamma * degree * (communityVolumes[S] - degree)
-                                       * inverseGraphVolume) { // R-Set Condition
+                                       * inverseGraphVolume) {
                 continue;
             }
 
-            if (cutWeights[u] != 0) { // Node has been moved -> not a singleton anymore. Stop.
+            if (cutWeights[u] != 0) {
                 continue;
             }
 
@@ -545,7 +507,6 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
             index bestC = none;
             double bestDelta = std::numeric_limits<double>::lowest();
             int idx;
-            // Determine Community that yields highest modularity delta
             auto bestCommunity = [&] {
                 for (unsigned int j = 0; j < neighComms.size(); j++) {
                     index C = neighComms[j];
@@ -554,36 +515,29 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
                     }
                     delta = modularityDelta(cutWeights[C], degree, refinedVolumes[C]);
 
-                    if (delta < 0) { // modThreshold is 0, since cutw(v,C-) = 0 and volw(C-) = 0
+                    if (delta < 0) {
                         continue;
                     }
 
                     auto volC = refinedVolumes[C];
                     if (delta > bestDelta
                         && cutCtoSminusC[C] >= this->gamma * volC * (communityVolumes[S] - volC)
-                                                   * inverseGraphVolume) { // T-Set Condition
+                                                   * inverseGraphVolume) {
                         bestDelta = delta;
                         bestC = C;
                         idx = j;
                     }
                 }
             };
-            // To update cut values in case neighbors of this node have moved in the meantime
             auto updateCut = [&] {
                 for (node &neighbor : criticalNodes) {
                     if (neighbor != none) {
                         index neighborCommunity = refined[neighbor];
                         if (neighborCommunity != neighbor) {
                             if (cutWeights[neighborCommunity] == 0) {
-                                // remember to clear the vector, this community was not saved
-                                // initially since the neighbor moved to it later
                                 neighComms.push_back(neighborCommunity);
                             }
-                            // cutWeights[Neighbor] is the weight of the edge between Node and
-                            // Neighbor, since Neighbor was a singleton
                             cutWeights[neighborCommunity] += cutWeights[neighbor];
-                            // Clear cutWeights entry beforehand, so we can "erase" bestC
-                            // from the pointers vector by replacing it with "none"
                             cutWeights[neighbor] = 0;
                             neighbor = none;
                         }
@@ -594,14 +548,10 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
             if (bestC == none) {
                 continue;
             }
-            lockLowerFirst(u, bestC, locks); // avoid deadlocks
-            // If this node is no longer a singleton, stop.
+            lockLowerFirst(u, bestC, locks);
             if (singleton[u]) {
-                // Target community still contains its "host" node? If not,this community is
-                // now empty, choose a new one.
                 while (bestC != none && refined[bestC] != bestC) {
                     locks[bestC].unlock();
-                    // This makes sure it won't be considered in the next bestCommunity() call
                     neighComms[idx] = none;
                     bestC = none;
                     bestDelta = std::numeric_limits<double>::lowest();
@@ -612,7 +562,6 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
                             if (u < bestC) {
                                 locks[bestC].lock();
                             } else {
-                                // temporarily release lock on current Node to avoid deadlocks
                                 locks[u].unlock();
                                 lockLowerFirst(u, bestC, locks);
                             }
@@ -625,7 +574,7 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
                     }
                 }
                 if (bestC == none) {
-                    locks[u].unlock(); // bestC was already unlocked in the loop above
+                    locks[u].unlock();
                     continue;
                 }
                 singleton[bestC] = false;
@@ -643,7 +592,6 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
     return refined;
 }
 
-// Explicit template instantiations
 template void ParallelLeidenView::calculateVolumes<Graph>(const Graph &graph);
 template void
 ParallelLeidenView::calculateVolumes<CoarsenedGraphView>(const CoarsenedGraphView &graph);
