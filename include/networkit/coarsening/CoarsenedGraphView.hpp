@@ -7,9 +7,6 @@
 #ifndef NETWORKIT_COARSENING_COARSENED_GRAPH_VIEW_HPP_
 #define NETWORKIT_COARSENING_COARSENED_GRAPH_VIEW_HPP_
 
-#include <mutex>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 #include <networkit/Globals.hpp>
 #include <networkit/graph/Graph.hpp>
@@ -140,19 +137,20 @@ private:
     std::vector<std::vector<node>> supernodeToOriginal; // supernode -> [original_nodes]
     count numSupernodes;
 
-    // Cache for computed neighborhoods to avoid recomputation
-    mutable std::unordered_map<node, std::vector<std::pair<node, edgeweight>>> neighborCache;
-    mutable std::mutex cacheMutex; // Mutex to protect neighborCache access
+    // Pre-computed neighborhood lists (no locking needed)
+    mutable std::vector<std::vector<std::pair<node, edgeweight>>> neighborCache;
 
     /**
-     * Compute neighbors of a supernode on-demand
+     * Get neighbors of a supernode (pre-computed at construction)
+     */
+    const std::vector<std::pair<node, edgeweight>> &getNeighbors(node supernode) const {
+        return neighborCache[supernode];
+    }
+
+    /**
+     * Compute neighbors of a supernode
      */
     std::vector<std::pair<node, edgeweight>> computeNeighbors(node supernode) const;
-
-    /**
-     * Get neighbors of a supernode (cached)
-     */
-    const std::vector<std::pair<node, edgeweight>> &getNeighbors(node supernode) const;
 };
 
 } /* namespace NetworKit */

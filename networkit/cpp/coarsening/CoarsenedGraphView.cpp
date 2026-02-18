@@ -28,6 +28,13 @@ CoarsenedGraphView::CoarsenedGraphView(const Graph &originalGraph, const Partiti
         supernodeToOriginal[supernode].push_back(u);
     });
 
+    // Pre-compute all neighbor lists in parallel (avoids locking during algorithm)
+    neighborCache.resize(numSupernodes);
+    #pragma omp parallel for schedule(dynamic, 100)
+    for (omp_index u = 0; u < static_cast<omp_index>(numSupernodes); ++u) {
+        neighborCache[u] = computeNeighbors(u);
+    }
+
     TRACE("Created CoarsenedGraphView with ", numSupernodes, " supernodes from ",
           originalGraph.numberOfNodes(), " original nodes");
 }
@@ -130,35 +137,6 @@ CoarsenedGraphView::computeNeighbors(node supernode) const {
     }
 
     return neighbors;
-}
-
-const std::vector<std::pair<node, edgeweight>> &
-CoarsenedGraphView::getNeighbors(node supernode) const {
-    // Double-checked locking pattern to minimize lock contention
-    // First check without lock (fast path for cached entries)
-    {
-        std::lock_guard<std::mutex> lock(cacheMutex);
-        auto it = neighborCache.find(supernode);
-        if (it != neighborCache.end()) {
-            return it->second;
-        }
-    }
-
-    // Compute neighbors WITHOUT holding the lock (slow path)
-    // This is safe because computeNeighbors() only reads immutable data
-    auto result = computeNeighbors(supernode);
-
-    // Now acquire lock and insert the result
-    std::lock_guard<std::mutex> lock(cacheMutex);
-    // Check again in case another thread computed it while we were computing
-    auto it = neighborCache.find(supernode);
-    if (it != neighborCache.end()) {
-        // Another thread beat us to it, use their result
-        return it->second;
-    }
-    // We're the first to compute it, insert our result
-    auto [insertIt, inserted] = neighborCache.emplace(supernode, std::move(result));
-    return insertIt->second;
 }
 
 } /* namespace NetworKit */
