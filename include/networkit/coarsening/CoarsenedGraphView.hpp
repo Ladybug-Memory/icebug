@@ -51,8 +51,9 @@ public:
 
     /**
      * Get the weighted degree of a supernode
+     * @param countSelfLoopsTwice If true, count self-loops twice (for undirected graphs)
      */
-    edgeweight weightedDegree(node supernode, bool countSelfLoops = false) const;
+    edgeweight weightedDegree(node supernode, bool countSelfLoopsTwice = false) const;
 
     /**
      * Check if there's an edge between two supernodes

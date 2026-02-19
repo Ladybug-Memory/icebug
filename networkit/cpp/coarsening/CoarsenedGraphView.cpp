@@ -51,7 +51,7 @@ count CoarsenedGraphView::degree(node supernode) const {
     return getNeighbors(supernode).size();
 }
 
-edgeweight CoarsenedGraphView::weightedDegree(node supernode, bool countSelfLoops) const {
+edgeweight CoarsenedGraphView::weightedDegree(node supernode, bool countSelfLoopsTwice) const {
     if (!hasNode(supernode))
         return 0.0;
 
@@ -60,8 +60,8 @@ edgeweight CoarsenedGraphView::weightedDegree(node supernode, bool countSelfLoop
     edgeweight totalWeight = 0.0;
     for (const auto &entry : neighbors) {
         if (entry.first == supernode) {
-            if (countSelfLoops) {
-                totalWeight += entry.second;
+            if (countSelfLoopsTwice) {
+                totalWeight += 2 * entry.second;
             }
         } else {
             totalWeight += entry.second;
