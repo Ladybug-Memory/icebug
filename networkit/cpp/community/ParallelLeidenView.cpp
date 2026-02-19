@@ -124,6 +124,7 @@ void ParallelLeidenView::run() {
                 });
 
                 result = std::move(p);
+                result.compact(true);
                 currentCoarsenedView = newCoarsenedView;
 
             } else {
@@ -137,13 +138,14 @@ void ParallelLeidenView::run() {
                 currentGraph->parallelForNodes(
                     [map = map, &p, this](node u) { p[map[u]] = result[u]; });
 
-                // First mapping: just assign (composedMapping is identity, so map[composedMapping[idx]] = map[idx])
                 composedMapping = std::move(map);
                 result = std::move(p);
-
+                result.compact(true);
                 currentCoarsenedView = newCoarsenedView;
                 currentGraph = nullptr;
             }
+            
+            calculateVolumes(*currentCoarsenedView);
 
         } while (true);
 
