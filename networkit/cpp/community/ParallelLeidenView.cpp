@@ -61,15 +61,24 @@ void ParallelLeidenView::run() {
             handler.assureRunning();
 
             // Parallel move phase
-            count nodesMoved;
+            MoveStats moveStats;
             if (currentCoarsenedView) {
-                nodesMoved = parallelMove(*currentCoarsenedView);
+                moveStats = parallelMove(*currentCoarsenedView);
             } else {
-                nodesMoved = parallelMove(*currentGraph);
+                moveStats = parallelMove(*currentGraph);
             }
 
-            INFO("Inner iter ", innerIterations, ": moved ", nodesMoved, " nodes, ",
-                 result.numberOfSubsets(), " communities");
+            const double avgGainMargin =
+                moveStats.moved ? (moveStats.gainMarginSum / moveStats.moved) : 0.0;
+            const double minGainMargin =
+                moveStats.moved ? moveStats.gainMarginMin : 0.0;
+            const double maxGainMargin =
+                moveStats.moved ? moveStats.gainMarginMax : 0.0;
+            INFO("Inner iter ", innerIterations, ": moved ", moveStats.moved, " nodes, ",
+                 result.numberOfSubsets(), " communities",
+                 " | singleton moves=", moveStats.movedToSingleton,
+                 " | avg gain margin=", std::setprecision(6), avgGainMargin,
+                 " | min/max gain margin=", minGainMargin, "/", maxGainMargin);
 
             // If each community consists of exactly one node we're done
             count numNodes = currentCoarsenedView ? currentCoarsenedView->numberOfNodes()
@@ -208,9 +217,13 @@ void ParallelLeidenView::flattenPartition() {
 }
 
 template <typename GraphType>
-count ParallelLeidenView::parallelMove(const GraphType &graph) {
+ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &graph) {
     DEBUG("Local Moving : ", graph.numberOfNodes(), " Nodes ");
     std::vector<count> moved(omp_get_max_threads(), 0);
+    std::vector<count> movedToSingleton(omp_get_max_threads(), 0);
+    std::vector<double> gainMarginSum(omp_get_max_threads(), 0.0);
+    std::vector<double> gainMarginMin(omp_get_max_threads(), std::numeric_limits<double>::max());
+    std::vector<double> gainMarginMax(omp_get_max_threads(), std::numeric_limits<double>::lowest());
     std::vector<count> totalNodesPerThread(omp_get_max_threads(), 0);
     std::atomic_int singleton(0);
 
@@ -316,10 +329,14 @@ count ParallelLeidenView::parallelMove(const GraphType &graph) {
                     cutWeights[currentCommunity], communityVolumes[currentCommunity], degree);
 
                 if (0 > modThreshold || maxDelta > modThreshold) {
-                    moved[omp_get_thread_num()]++;
+                    const int tid = omp_get_thread_num();
+                    moved[tid]++;
+                    double gainMargin = 0.0;
                     if (0 > maxDelta) {
                         singleton++;
+                        movedToSingleton[tid]++;
                         bestCommunity = upperBound++;
+                        gainMargin = -modThreshold;
                         if (bestCommunity >= communityVolumes.size()) {
                             bool expected = false;
                             if (resize.compare_exchange_strong(expected, true)) {
@@ -340,7 +357,12 @@ count ParallelLeidenView::parallelMove(const GraphType &graph) {
                                 waitingForResize--;
                             }
                         }
+                    } else {
+                        gainMargin = maxDelta - modThreshold;
                     }
+                    gainMarginSum[tid] += gainMargin;
+                    gainMarginMin[tid] = std::min(gainMarginMin[tid], gainMargin);
+                    gainMarginMax[tid] = std::max(gainMarginMax[tid], gainMargin);
                     result[u] = bestCommunity;
 #pragma omp atomic
                     communityVolumes[bestCommunity] += degree;
@@ -416,7 +438,24 @@ count ParallelLeidenView::parallelMove(const GraphType &graph) {
         DEBUG("Total worked: ", totalWorked, " Total moved: ", totalMoved,
               " moved to singleton community: ", singleton);
     }
-    return totalMoved;
+    MoveStats stats;
+    stats.moved = totalMoved;
+    stats.movedToSingleton =
+        std::accumulate(movedToSingleton.begin(), movedToSingleton.end(), static_cast<count>(0));
+    stats.gainMarginSum = std::accumulate(gainMarginSum.begin(), gainMarginSum.end(), 0.0);
+    if (totalMoved > 0) {
+        for (int i = 0; i < omp_get_max_threads(); ++i) {
+            if (moved[i] == 0) {
+                continue;
+            }
+            stats.gainMarginMin = std::min(stats.gainMarginMin, gainMarginMin[i]);
+            stats.gainMarginMax = std::max(stats.gainMarginMax, gainMarginMax[i]);
+        }
+    } else {
+        stats.gainMarginMin = 0.0;
+        stats.gainMarginMax = 0.0;
+    }
+    return stats;
 }
 
 template <typename GraphType>
@@ -596,8 +635,9 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
 template void ParallelLeidenView::calculateVolumes<Graph>(const Graph &graph);
 template void
 ParallelLeidenView::calculateVolumes<CoarsenedGraphView>(const CoarsenedGraphView &graph);
-template count ParallelLeidenView::parallelMove<Graph>(const Graph &graph);
-template count ParallelLeidenView::parallelMove<CoarsenedGraphView>(const CoarsenedGraphView &graph);
+template ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove<Graph>(const Graph &graph);
+template ParallelLeidenView::MoveStats
+ParallelLeidenView::parallelMove<CoarsenedGraphView>(const CoarsenedGraphView &graph);
 template Partition ParallelLeidenView::parallelRefine<Graph>(const Graph &graph);
 template Partition
 ParallelLeidenView::parallelRefine<CoarsenedGraphView>(const CoarsenedGraphView &graph);

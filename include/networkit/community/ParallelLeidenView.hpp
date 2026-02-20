@@ -11,6 +11,7 @@
 #include <condition_variable>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <omp.h>
@@ -61,12 +62,20 @@ public:
     int VECTOR_OVERSIZE = 10000;
 
 private:
+    struct MoveStats {
+        count moved = 0;
+        count movedToSingleton = 0;
+        double gainMarginSum = 0.0;
+        double gainMarginMin = std::numeric_limits<double>::max();
+        double gainMarginMax = std::numeric_limits<double>::lowest();
+    };
+
     // Template interface to work with both Graph and CoarsenedGraphView
     template <typename GraphType>
     void calculateVolumes(const GraphType &graph);
 
     template <typename GraphType>
-    count parallelMove(const GraphType &graph);
+    MoveStats parallelMove(const GraphType &graph);
 
     template <typename GraphType>
     Partition parallelRefine(const GraphType &graph);
