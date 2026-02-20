@@ -7,6 +7,7 @@
 #include <networkit/auxiliary/Log.hpp>
 #include <networkit/auxiliary/Timer.hpp>
 #include <networkit/coarsening/CoarsenedGraphView.hpp>
+#include <algorithm>
 
 namespace NetworKit {
 
@@ -51,7 +52,7 @@ count CoarsenedGraphView::degree(node supernode) const {
     return getNeighbors(supernode).size();
 }
 
-edgeweight CoarsenedGraphView::weightedDegree(node supernode, bool countSelfLoops) const {
+edgeweight CoarsenedGraphView::weightedDegree(node supernode, bool countSelfLoopsTwice) const {
     if (!hasNode(supernode))
         return 0.0;
 
@@ -60,7 +61,8 @@ edgeweight CoarsenedGraphView::weightedDegree(node supernode, bool countSelfLoop
     edgeweight totalWeight = 0.0;
     for (const auto &entry : neighbors) {
         if (entry.first == supernode) {
-            if (countSelfLoops) {
+            totalWeight += entry.second;
+            if (countSelfLoopsTwice) {
                 totalWeight += entry.second;
             }
         } else {
@@ -106,7 +108,15 @@ const std::vector<node> &CoarsenedGraphView::getOriginalNodes(node supernode) co
 
 std::vector<std::pair<node, edgeweight>>
 CoarsenedGraphView::computeNeighbors(node supernode) const {
-    std::unordered_map<node, edgeweight> aggregatedWeights;
+    // Hash-map based aggregation dominated runtime on large instances.
+    // Collect then sort/fold to reduce hashing and allocator pressure.
+    count incidentEdgeUpperBound = 0;
+    for (node originalNode : supernodeToOriginal[supernode]) {
+        incidentEdgeUpperBound += originalGraph.degree(originalNode);
+    }
+
+    std::vector<std::pair<node, edgeweight>> rawNeighbors;
+    rawNeighbors.reserve(incidentEdgeUpperBound);
 
     // No locks needed here - supernodeToOriginal and nodeMapping are read-only after construction
     // Iterate through all original nodes in this supernode
@@ -114,51 +124,45 @@ CoarsenedGraphView::computeNeighbors(node supernode) const {
         // Iterate through neighbors of each original node
         originalGraph.forNeighborsOf(originalNode, [&](node originalNeighbor, edgeweight weight) {
             node neighborSupernode = nodeMapping[originalNeighbor];
-            // Aggregate weights to the same supernode
-            aggregatedWeights[neighborSupernode] += weight;
+            // For internal edges, aggregate each undirected edge only once.
+            // This mirrors ParallelPartitionCoarsening semantics.
+            if (neighborSupernode == supernode && originalNode < originalNeighbor) {
+                return;
+            }
+            rawNeighbors.emplace_back(neighborSupernode, weight);
         });
     }
 
-    // Convert to vector format
-    std::vector<std::pair<node, edgeweight>> neighbors;
-    neighbors.reserve(aggregatedWeights.size());
+    if (rawNeighbors.empty()) {
+        return {};
+    }
 
-    for (const auto &entry : aggregatedWeights) {
-        if (entry.second > 0.0) { // Only include edges with positive weight
-            neighbors.emplace_back(entry.first, entry.second);
+    std::sort(rawNeighbors.begin(), rawNeighbors.end(),
+              [](const std::pair<node, edgeweight> &a, const std::pair<node, edgeweight> &b) {
+                  return a.first < b.first;
+              });
+
+    // Fold adjacent entries with same neighbor supernode.
+    std::vector<std::pair<node, edgeweight>> neighbors;
+    neighbors.reserve(rawNeighbors.size());
+    node currentNeighbor = rawNeighbors[0].first;
+    edgeweight currentWeight = rawNeighbors[0].second;
+    for (size_t i = 1; i < rawNeighbors.size(); ++i) {
+        if (rawNeighbors[i].first == currentNeighbor) {
+            currentWeight += rawNeighbors[i].second;
+        } else {
+            if (currentWeight > 0.0) {
+                neighbors.emplace_back(currentNeighbor, currentWeight);
+            }
+            currentNeighbor = rawNeighbors[i].first;
+            currentWeight = rawNeighbors[i].second;
         }
+    }
+    if (currentWeight > 0.0) {
+        neighbors.emplace_back(currentNeighbor, currentWeight);
     }
 
     return neighbors;
-}
-
-const std::vector<std::pair<node, edgeweight>> &
-CoarsenedGraphView::getNeighbors(node supernode) const {
-    // Double-checked locking pattern to minimize lock contention
-    // First check without lock (fast path for cached entries)
-    {
-        std::lock_guard<std::mutex> lock(cacheMutex);
-        auto it = neighborCache.find(supernode);
-        if (it != neighborCache.end()) {
-            return it->second;
-        }
-    }
-
-    // Compute neighbors WITHOUT holding the lock (slow path)
-    // This is safe because computeNeighbors() only reads immutable data
-    auto result = computeNeighbors(supernode);
-
-    // Now acquire lock and insert the result
-    std::lock_guard<std::mutex> lock(cacheMutex);
-    // Check again in case another thread computed it while we were computing
-    auto it = neighborCache.find(supernode);
-    if (it != neighborCache.end()) {
-        // Another thread beat us to it, use their result
-        return it->second;
-    }
-    // We're the first to compute it, insert our result
-    auto [insertIt, inserted] = neighborCache.emplace(supernode, std::move(result));
-    return insertIt->second;
 }
 
 } /* namespace NetworKit */
