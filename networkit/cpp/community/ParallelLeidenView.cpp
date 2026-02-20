@@ -8,7 +8,7 @@
 
 namespace NetworKit {
 namespace {
-constexpr double kMoveGainMarginEpsilon = 1e-8;
+constexpr double kMoveGainMarginEpsilon = 1e-4;
 }
 
 ParallelLeidenView::ParallelLeidenView(const Graph &graph, int iterations, bool randomize,
@@ -77,10 +77,16 @@ void ParallelLeidenView::run() {
                 moveStats.moved ? moveStats.gainMarginMin : 0.0;
             const double maxGainMargin =
                 moveStats.moved ? moveStats.gainMarginMax : 0.0;
+            const count candidateMoves = moveStats.moved + moveStats.marginalMovesRejected;
+            const double rejectedPct = candidateMoves
+                                           ? (100.0 * moveStats.marginalMovesRejected
+                                              / static_cast<double>(candidateMoves))
+                                           : 0.0;
             INFO("Inner iter ", innerIterations, ": moved ", moveStats.moved, " nodes, ",
                  result.numberOfSubsets(), " communities",
                  " | singleton moves=", moveStats.movedToSingleton,
                  " | marginal rejected=", moveStats.marginalMovesRejected,
+                 " (", std::setprecision(4), rejectedPct, "%)",
                  " | avg gain margin=", std::setprecision(6), avgGainMargin,
                  " | min/max gain margin=", minGainMargin, "/", maxGainMargin);
 
