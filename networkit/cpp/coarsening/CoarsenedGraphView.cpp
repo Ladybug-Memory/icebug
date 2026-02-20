@@ -7,6 +7,7 @@
 #include <networkit/auxiliary/Log.hpp>
 #include <networkit/auxiliary/Timer.hpp>
 #include <networkit/coarsening/CoarsenedGraphView.hpp>
+#include <algorithm>
 
 namespace NetworKit {
 
@@ -107,7 +108,15 @@ const std::vector<node> &CoarsenedGraphView::getOriginalNodes(node supernode) co
 
 std::vector<std::pair<node, edgeweight>>
 CoarsenedGraphView::computeNeighbors(node supernode) const {
-    std::unordered_map<node, edgeweight> aggregatedWeights;
+    // Hash-map based aggregation dominated runtime on large instances.
+    // Collect then sort/fold to reduce hashing and allocator pressure.
+    count incidentEdgeUpperBound = 0;
+    for (node originalNode : supernodeToOriginal[supernode]) {
+        incidentEdgeUpperBound += originalGraph.degree(originalNode);
+    }
+
+    std::vector<std::pair<node, edgeweight>> rawNeighbors;
+    rawNeighbors.reserve(incidentEdgeUpperBound);
 
     // No locks needed here - supernodeToOriginal and nodeMapping are read-only after construction
     // Iterate through all original nodes in this supernode
@@ -120,19 +129,37 @@ CoarsenedGraphView::computeNeighbors(node supernode) const {
             if (neighborSupernode == supernode && originalNode < originalNeighbor) {
                 return;
             }
-            // Aggregate weights to the same supernode
-            aggregatedWeights[neighborSupernode] += weight;
+            rawNeighbors.emplace_back(neighborSupernode, weight);
         });
     }
 
-    // Convert to vector format
-    std::vector<std::pair<node, edgeweight>> neighbors;
-    neighbors.reserve(aggregatedWeights.size());
+    if (rawNeighbors.empty()) {
+        return {};
+    }
 
-    for (const auto &entry : aggregatedWeights) {
-        if (entry.second > 0.0) { // Only include edges with positive weight
-            neighbors.emplace_back(entry.first, entry.second);
+    std::sort(rawNeighbors.begin(), rawNeighbors.end(),
+              [](const std::pair<node, edgeweight> &a, const std::pair<node, edgeweight> &b) {
+                  return a.first < b.first;
+              });
+
+    // Fold adjacent entries with same neighbor supernode.
+    std::vector<std::pair<node, edgeweight>> neighbors;
+    neighbors.reserve(rawNeighbors.size());
+    node currentNeighbor = rawNeighbors[0].first;
+    edgeweight currentWeight = rawNeighbors[0].second;
+    for (size_t i = 1; i < rawNeighbors.size(); ++i) {
+        if (rawNeighbors[i].first == currentNeighbor) {
+            currentWeight += rawNeighbors[i].second;
+        } else {
+            if (currentWeight > 0.0) {
+                neighbors.emplace_back(currentNeighbor, currentWeight);
+            }
+            currentNeighbor = rawNeighbors[i].first;
+            currentWeight = rawNeighbors[i].second;
         }
+    }
+    if (currentWeight > 0.0) {
+        neighbors.emplace_back(currentNeighbor, currentWeight);
     }
 
     return neighbors;
