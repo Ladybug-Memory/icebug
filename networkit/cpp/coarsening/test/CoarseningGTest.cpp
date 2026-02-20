@@ -9,6 +9,7 @@
 
 #include <networkit/auxiliary/Log.hpp>
 #include <networkit/coarsening/ClusteringProjector.hpp>
+#include <networkit/coarsening/CoarsenedGraphView.hpp>
 #include <networkit/coarsening/GraphCoarsening.hpp>
 #include <networkit/coarsening/MatchingCoarsening.hpp>
 #include <networkit/coarsening/ParallelPartitionCoarsening.hpp>
@@ -333,6 +334,42 @@ TEST_F(CoarseningGTest, testClusteringProjectorWithNClusterings) {
                 EXPECT_EQ(part.numberOfSubsets(), 1);
                 EXPECT_EQ(part.numberOfElements(), n);
             }
+        }
+    }
+}
+
+TEST_F(CoarseningGTest, testCoarsenedGraphViewMatchesParallelPartitionCoarseningWeights) {
+    GraphW G(5, true, false);
+    G.addEdge(0, 1, 1.0);
+    G.addEdge(1, 2, 2.0);
+    G.addEdge(0, 2, 3.0);
+    G.addEdge(3, 4, 4.0);
+    G.addEdge(2, 3, 5.0);
+    G.addEdge(0, 0, 6.0);
+
+    Partition zeta(G.numberOfNodes());
+    zeta[0] = 0;
+    zeta[1] = 0;
+    zeta[2] = 0;
+    zeta[3] = 1;
+    zeta[4] = 1;
+    zeta.setUpperBound(2);
+
+    ParallelPartitionCoarsening coarsening(G, zeta, false);
+    coarsening.run();
+    GraphW coarseGraph = coarsening.getCoarseGraph();
+
+    CoarsenedGraphView view(G, zeta);
+
+    ASSERT_EQ(coarseGraph.numberOfNodes(), view.numberOfNodes());
+    ASSERT_EQ(coarseGraph.numberOfEdges(), view.numberOfEdges());
+
+    for (node u = 0; u < view.numberOfNodes(); ++u) {
+        EXPECT_DOUBLE_EQ(coarseGraph.weightedDegree(u, false), view.weightedDegree(u, false));
+        EXPECT_DOUBLE_EQ(coarseGraph.weightedDegree(u, true), view.weightedDegree(u, true));
+
+        for (node v = 0; v < view.numberOfNodes(); ++v) {
+            EXPECT_DOUBLE_EQ(coarseGraph.weight(u, v), view.weight(u, v));
         }
     }
 }
