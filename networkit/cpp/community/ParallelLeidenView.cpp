@@ -26,6 +26,26 @@ ParallelLeidenView::ParallelLeidenView(const Graph &graph, int iterations, bool 
             // Keep default if parsing fails.
         }
     }
+    if (const char *maxInnerEnv = std::getenv("NETWORKIT_LEIDEN_MAX_INNER")) {
+        try {
+            const int parsed = std::stoi(maxInnerEnv);
+            if (parsed > 0) {
+                maxInnerIterations = parsed;
+            }
+        } catch (...) {
+            // Keep default if parsing fails.
+        }
+    }
+    if (const char *vectorOversizeEnv = std::getenv("NETWORKIT_LEIDEN_VECTOR_OVERSIZE")) {
+        try {
+            const int parsed = std::stoi(vectorOversizeEnv);
+            if (parsed >= 1) {
+                VECTOR_OVERSIZE = parsed;
+            }
+        } catch (...) {
+            // Keep default if parsing fails.
+        }
+    }
 }
 
 ParallelLeidenView::~ParallelLeidenView() {
@@ -47,6 +67,8 @@ void ParallelLeidenView::run() {
         numberOfIterations--;
         changed = false;
         INFO("Using move gain epsilon=", std::setprecision(6), moveGainMarginEpsilon);
+        INFO("Using max inner iterations=", maxInnerIterations,
+             " | vector oversize=", VECTOR_OVERSIZE);
 
         // Initialize composed mapping to identity
         composedMapping.clear();
@@ -63,7 +85,6 @@ void ParallelLeidenView::run() {
         calculateVolumes(*currentGraph);
 
         int innerIterations = 0;
-        const int maxInnerIterations = 20;
         INFO("Starting inner loop with ", result.numberOfSubsets(), " communities");
         do {
             innerIterations++;

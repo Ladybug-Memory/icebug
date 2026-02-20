@@ -126,6 +126,9 @@ private:
 
     // Reject moves whose gain margin is too small (numerical-noise churn filter).
     double moveGainMarginEpsilon = 1e-4;
+
+    // Maximum inner iterations per Leiden iteration.
+    int maxInnerIterations = 20;
 };
 
 } // namespace NetworKit
