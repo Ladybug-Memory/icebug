@@ -60,8 +60,9 @@ edgeweight CoarsenedGraphView::weightedDegree(node supernode, bool countSelfLoop
     edgeweight totalWeight = 0.0;
     for (const auto &entry : neighbors) {
         if (entry.first == supernode) {
+            totalWeight += entry.second;
             if (countSelfLoopsTwice) {
-                totalWeight += 2 * entry.second;
+                totalWeight += entry.second;
             }
         } else {
             totalWeight += entry.second;
@@ -114,6 +115,11 @@ CoarsenedGraphView::computeNeighbors(node supernode) const {
         // Iterate through neighbors of each original node
         originalGraph.forNeighborsOf(originalNode, [&](node originalNeighbor, edgeweight weight) {
             node neighborSupernode = nodeMapping[originalNeighbor];
+            // For internal edges, aggregate each undirected edge only once.
+            // This mirrors ParallelPartitionCoarsening semantics.
+            if (neighborSupernode == supernode && originalNode < originalNeighbor) {
+                return;
+            }
             // Aggregate weights to the same supernode
             aggregatedWeights[neighborSupernode] += weight;
         });

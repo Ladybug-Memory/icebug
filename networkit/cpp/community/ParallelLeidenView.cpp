@@ -118,10 +118,9 @@ void ParallelLeidenView::run() {
                     p[newCoarseNode] = result[oldCoarseNode];
                 });
 
-                // Compose: composedMapping[idx] = map[composedMapping[idx]]
-                G->parallelForNodes([&](node idx) {
-                    composedMapping[idx] = map[composedMapping[idx]];
-                });
+                // Since each coarsened view is rebuilt from the original graph, this map already
+                // represents original -> current-coarse.
+                composedMapping = std::move(map);
 
                 result = std::move(p);
                 result.compact(true);
