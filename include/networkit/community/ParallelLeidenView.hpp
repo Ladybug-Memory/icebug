@@ -123,6 +123,9 @@ private:
 
     // Current coarsened graph view (only keep current, not all historical)
     std::shared_ptr<CoarsenedGraphView> currentCoarsenedView;
+
+    // Reject moves whose gain margin is too small (numerical-noise churn filter).
+    double moveGainMarginEpsilon = 1e-4;
 };
 
 } // namespace NetworKit

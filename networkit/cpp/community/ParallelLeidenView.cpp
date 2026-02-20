@@ -5,11 +5,9 @@
  */
 
 #include <networkit/community/ParallelLeidenView.hpp>
+#include <cstdlib>
 
 namespace NetworKit {
-namespace {
-constexpr double kMoveGainMarginEpsilon = 1e-4;
-}
 
 ParallelLeidenView::ParallelLeidenView(const Graph &graph, int iterations, bool randomize,
                                        double gamma)
@@ -17,6 +15,17 @@ ParallelLeidenView::ParallelLeidenView(const Graph &graph, int iterations, bool 
       random(randomize) {
     this->result = Partition(graph.numberOfNodes());
     this->result.allToSingletons();
+
+    if (const char *epsilonEnv = std::getenv("NETWORKIT_LEIDEN_MOVE_EPS")) {
+        try {
+            const double parsed = std::stod(epsilonEnv);
+            if (parsed >= 0.0) {
+                moveGainMarginEpsilon = parsed;
+            }
+        } catch (...) {
+            // Keep default if parsing fails.
+        }
+    }
 }
 
 ParallelLeidenView::~ParallelLeidenView() {
@@ -37,6 +46,7 @@ void ParallelLeidenView::run() {
         INFO(numberOfIterations, " Leiden iteration(s) left");
         numberOfIterations--;
         changed = false;
+        INFO("Using move gain epsilon=", std::setprecision(6), moveGainMarginEpsilon);
 
         // Initialize composed mapping to identity
         composedMapping.clear();
@@ -349,7 +359,7 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                     gainMargin = maxDelta - modThreshold;
                     acceptedMove = (maxDelta > modThreshold);
                 }
-                if (acceptedMove && gainMargin <= kMoveGainMarginEpsilon) {
+                if (acceptedMove && gainMargin <= moveGainMarginEpsilon) {
                     marginalMovesRejected[omp_get_thread_num()]++;
                     acceptedMove = false;
                 }
