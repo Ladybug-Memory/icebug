@@ -51,9 +51,8 @@ void ParallelLeidenView::run() {
 
         int innerIterations = 0;
         const int maxInnerIterations = 100;
-        count lastNumNodes = currentGraph->numberOfNodes();
         count lastNumCommunities = result.numberOfSubsets();
-        int stagnantIterations = 0;
+        int stagnantCommunityIterations = 0;
         INFO("Starting inner loop with ", result.numberOfSubsets(), " communities");
         do {
             innerIterations++;
@@ -154,20 +153,17 @@ void ParallelLeidenView::run() {
             
             calculateVolumes(*currentCoarsenedView);
 
-            const count currentNumNodes = currentCoarsenedView->numberOfNodes();
             const count currentNumCommunities = result.numberOfSubsets();
-            if (currentNumNodes == lastNumNodes && currentNumCommunities == lastNumCommunities) {
-                ++stagnantIterations;
-                if (stagnantIterations >= 5) {
-                    INFO("No structural progress for ", stagnantIterations,
-                         " inner iterations (nodes=", currentNumNodes,
-                         ", communities=", currentNumCommunities, "), stopping");
+            if (currentNumCommunities == lastNumCommunities) {
+                ++stagnantCommunityIterations;
+                if (stagnantCommunityIterations >= 5) {
+                    INFO("No community-count progress for ", stagnantCommunityIterations,
+                         " inner iterations (communities=", currentNumCommunities, "), stopping");
                     break;
                 }
             } else {
-                stagnantIterations = 0;
+                stagnantCommunityIterations = 0;
             }
-            lastNumNodes = currentNumNodes;
             lastNumCommunities = currentNumCommunities;
 
         } while (true);
