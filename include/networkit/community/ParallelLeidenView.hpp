@@ -129,6 +129,10 @@ private:
 
     // Maximum inner iterations per Leiden iteration.
     int maxInnerIterations = 20;
+
+    // Optional convergence stop: minimum relative reduction in community count per inner iter.
+    // 0.0 disables this criterion.
+    double minCommunityReduction = 0.0;
 };
 
 } // namespace NetworKit

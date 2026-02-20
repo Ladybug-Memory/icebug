@@ -46,6 +46,16 @@ ParallelLeidenView::ParallelLeidenView(const Graph &graph, int iterations, bool 
             // Keep default if parsing fails.
         }
     }
+    if (const char *minReductionEnv = std::getenv("NETWORKIT_LEIDEN_MIN_COMM_REDUCTION")) {
+        try {
+            const double parsed = std::stod(minReductionEnv);
+            if (parsed >= 0.0) {
+                minCommunityReduction = parsed;
+            }
+        } catch (...) {
+            // Keep default if parsing fails.
+        }
+    }
 }
 
 ParallelLeidenView::~ParallelLeidenView() {
@@ -68,7 +78,8 @@ void ParallelLeidenView::run() {
         changed = false;
         INFO("Using move gain epsilon=", std::setprecision(6), moveGainMarginEpsilon);
         INFO("Using max inner iterations=", maxInnerIterations,
-             " | vector oversize=", VECTOR_OVERSIZE);
+             " | vector oversize=", VECTOR_OVERSIZE,
+             " | min community reduction=", minCommunityReduction);
 
         // Initialize composed mapping to identity
         composedMapping.clear();
@@ -85,6 +96,7 @@ void ParallelLeidenView::run() {
         calculateVolumes(*currentGraph);
 
         int innerIterations = 0;
+        count previousCommunities = result.numberOfSubsets();
         INFO("Starting inner loop with ", result.numberOfSubsets(), " communities");
         do {
             innerIterations++;
@@ -195,6 +207,19 @@ void ParallelLeidenView::run() {
             }
             
             calculateVolumes(*currentCoarsenedView);
+
+            const count currentCommunities = result.numberOfSubsets();
+            if (minCommunityReduction > 0.0 && previousCommunities > 0) {
+                const double reduction =
+                    static_cast<double>(previousCommunities - currentCommunities)
+                    / static_cast<double>(previousCommunities);
+                if (reduction < minCommunityReduction) {
+                    INFO("Stopping inner loop: community reduction ", reduction,
+                         " below threshold ", minCommunityReduction);
+                    break;
+                }
+            }
+            previousCommunities = currentCommunities;
 
         } while (true);
 
