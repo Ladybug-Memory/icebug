@@ -63,7 +63,7 @@ void ParallelLeidenView::run() {
         calculateVolumes(*currentGraph);
 
         int innerIterations = 0;
-        const int maxInnerIterations = 100;
+        const int maxInnerIterations = 20;
         INFO("Starting inner loop with ", result.numberOfSubsets(), " communities");
         do {
             innerIterations++;
