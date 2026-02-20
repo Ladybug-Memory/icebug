@@ -65,6 +65,7 @@ private:
     struct MoveStats {
         count moved = 0;
         count movedToSingleton = 0;
+        count marginalMovesRejected = 0;
         double gainMarginSum = 0.0;
         double gainMarginMin = std::numeric_limits<double>::max();
         double gainMarginMax = std::numeric_limits<double>::lowest();

@@ -7,6 +7,9 @@
 #include <networkit/community/ParallelLeidenView.hpp>
 
 namespace NetworKit {
+namespace {
+constexpr double kMoveGainMarginEpsilon = 1e-8;
+}
 
 ParallelLeidenView::ParallelLeidenView(const Graph &graph, int iterations, bool randomize,
                                        double gamma)
@@ -77,6 +80,7 @@ void ParallelLeidenView::run() {
             INFO("Inner iter ", innerIterations, ": moved ", moveStats.moved, " nodes, ",
                  result.numberOfSubsets(), " communities",
                  " | singleton moves=", moveStats.movedToSingleton,
+                 " | marginal rejected=", moveStats.marginalMovesRejected,
                  " | avg gain margin=", std::setprecision(6), avgGainMargin,
                  " | min/max gain margin=", minGainMargin, "/", maxGainMargin);
 
@@ -221,6 +225,7 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
     DEBUG("Local Moving : ", graph.numberOfNodes(), " Nodes ");
     std::vector<count> moved(omp_get_max_threads(), 0);
     std::vector<count> movedToSingleton(omp_get_max_threads(), 0);
+    std::vector<count> marginalMovesRejected(omp_get_max_threads(), 0);
     std::vector<double> gainMarginSum(omp_get_max_threads(), 0.0);
     std::vector<double> gainMarginMin(omp_get_max_threads(), std::numeric_limits<double>::max());
     std::vector<double> gainMarginMax(omp_get_max_threads(), std::numeric_limits<double>::lowest());
@@ -328,15 +333,28 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                 double modThreshold = modularityThreshold(
                     cutWeights[currentCommunity], communityVolumes[currentCommunity], degree);
 
-                if (0 > modThreshold || maxDelta > modThreshold) {
+                bool acceptedMove = false;
+                bool singletonMove = (0 > maxDelta);
+                double gainMargin = 0.0;
+                if (singletonMove) {
+                    gainMargin = -modThreshold;
+                    acceptedMove = (0 > modThreshold);
+                } else {
+                    gainMargin = maxDelta - modThreshold;
+                    acceptedMove = (maxDelta > modThreshold);
+                }
+                if (acceptedMove && gainMargin <= kMoveGainMarginEpsilon) {
+                    marginalMovesRejected[omp_get_thread_num()]++;
+                    acceptedMove = false;
+                }
+
+                if (acceptedMove) {
                     const int tid = omp_get_thread_num();
                     moved[tid]++;
-                    double gainMargin = 0.0;
-                    if (0 > maxDelta) {
+                    if (singletonMove) {
                         singleton++;
                         movedToSingleton[tid]++;
                         bestCommunity = upperBound++;
-                        gainMargin = -modThreshold;
                         if (bestCommunity >= communityVolumes.size()) {
                             bool expected = false;
                             if (resize.compare_exchange_strong(expected, true)) {
@@ -357,8 +375,6 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                                 waitingForResize--;
                             }
                         }
-                    } else {
-                        gainMargin = maxDelta - modThreshold;
                     }
                     gainMarginSum[tid] += gainMargin;
                     gainMarginMin[tid] = std::min(gainMarginMin[tid], gainMargin);
@@ -442,6 +458,9 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
     stats.moved = totalMoved;
     stats.movedToSingleton =
         std::accumulate(movedToSingleton.begin(), movedToSingleton.end(), static_cast<count>(0));
+    stats.marginalMovesRejected = std::accumulate(marginalMovesRejected.begin(),
+                                                  marginalMovesRejected.end(),
+                                                  static_cast<count>(0));
     stats.gainMarginSum = std::accumulate(gainMarginSum.begin(), gainMarginSum.end(), 0.0);
     if (totalMoved > 0) {
         for (int i = 0; i < omp_get_max_threads(); ++i) {
