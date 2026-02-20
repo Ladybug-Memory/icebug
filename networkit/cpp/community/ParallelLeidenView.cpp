@@ -50,9 +50,7 @@ void ParallelLeidenView::run() {
         calculateVolumes(*currentGraph);
 
         int innerIterations = 0;
-        const int maxInnerIterations = 20;
-        const double minCommunityReduction = 0.01; // 1%
-        count lastNumCommunities = result.numberOfSubsets();
+        const int maxInnerIterations = 100;
         INFO("Starting inner loop with ", result.numberOfSubsets(), " communities");
         do {
             innerIterations++;
@@ -72,11 +70,6 @@ void ParallelLeidenView::run() {
 
             INFO("Inner iter ", innerIterations, ": moved ", nodesMoved, " nodes, ",
                  result.numberOfSubsets(), " communities");
-
-            if (nodesMoved == 0) {
-                INFO("No nodes moved in inner iter ", innerIterations, ", stopping");
-                break;
-            }
 
             // If each community consists of exactly one node we're done
             count numNodes = currentCoarsenedView ? currentCoarsenedView->numberOfNodes()
@@ -152,19 +145,6 @@ void ParallelLeidenView::run() {
             }
             
             calculateVolumes(*currentCoarsenedView);
-
-            const count currentNumCommunities = result.numberOfSubsets();
-            if (lastNumCommunities > 0) {
-                const double reduction = static_cast<double>(lastNumCommunities - currentNumCommunities)
-                                         / static_cast<double>(lastNumCommunities);
-                if (reduction < minCommunityReduction) {
-                    INFO("Community reduction ", std::setprecision(4), reduction * 100.0,
-                         "% is below tolerance ", minCommunityReduction * 100.0,
-                         "%, stopping inner loop");
-                    break;
-                }
-            }
-            lastNumCommunities = currentNumCommunities;
 
         } while (true);
 
