@@ -50,22 +50,9 @@ or build the Python module from source.
 
 While the most recent version is in general available for all package managers, the number of older downloadable versions differ. 
 
-##### pip
+##### uv
 
-    pip3 install [--user] icebug
-
-##### conda (channel conda-forge)
-
-    conda config --add channels conda-forge
-    conda install icebug [-c conda-forge]
-
-##### brew
-
-    brew install icebug
-
-##### spack
-
-    spack install py-icebug
+    uv pip install icebug
 
 More system-specific information on how to install Icebug on Linux, macOS (both Intel and M1) and Windows-systems can be found [here](https://networkit.github.io/get_started.html).
 
@@ -90,7 +77,7 @@ We also provide a Binder-instance of our notebooks. To access this service, you 
 
 If you only want to see in short how Icebug is used - the following example provides a climpse at that. Here we generate a random hyperbolic graph with 100k nodes and compute its communities with the PLM method:
 
-    >>> import icebug as nk
+    >>> import networkit as nk
     >>> g = nk.generators.HyperbolicGenerator(1e5).generate()
     >>> communities = nk.community.detectCommunities(g, inspect=True)
     PLM(balanced,pc,turbo) detected communities in 0.14577102661132812 [s]
