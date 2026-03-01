@@ -186,8 +186,8 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.23.0
         env:
-          CIBW_BEFORE_BUILD: 
-            pip install cython delvewheel &&
+          CIBW_BEFORE_BUILD: |
+            pip install cython delocate &&
             brew install ninja ccache apache-arrow libomp
           CIBW_ARCHS_MACOS: ${{ matrix.buildplat[1] }}
           CIBW_BUILD: ${{ github.event_name == 'release' && 'cp310-* cp311-* cp312-* cp313-*' || 'cp313-*' }}
@@ -200,7 +200,7 @@ jobs:
             CMAKE_C_COMPILER_LAUNCHER=ccache
             CMAKE_CXX_COMPILER_LAUNCHER=ccache
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: >
-            python -m delvewheel repair --exclude-libs libomp -w {dest_dir} {wheel}
+            delocate-wheel -e libomp -w {dest_dir} {wheel}
           CIBW_SKIP: "pp* *-musllinux_*"
           CIBW_TEST_COMMAND: python3 -c 'import networkit'
           CIBW_TEST_SKIP: "*-macosx_x86_64 *-macosx_universal2:x86_64"
@@ -419,4 +419,3 @@ jobs:
       - name: Deploy to PyPI
         if: ${{ github.event_name == 'release' || github.event.inputs.isDeploy == 'true' }}
         uses: pypa/gh-action-pypi-publish@release/v1
-
