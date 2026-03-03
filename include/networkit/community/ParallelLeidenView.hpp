@@ -11,6 +11,7 @@
 #include <condition_variable>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <omp.h>
@@ -61,12 +62,21 @@ public:
     int VECTOR_OVERSIZE = 10000;
 
 private:
+    struct MoveStats {
+        count moved = 0;
+        count movedToSingleton = 0;
+        count marginalMovesRejected = 0;
+        double gainMarginSum = 0.0;
+        double gainMarginMin = std::numeric_limits<double>::max();
+        double gainMarginMax = std::numeric_limits<double>::lowest();
+    };
+
     // Template interface to work with both Graph and CoarsenedGraphView
     template <typename GraphType>
     void calculateVolumes(const GraphType &graph);
 
     template <typename GraphType>
-    void parallelMove(const GraphType &graph);
+    MoveStats parallelMove(const GraphType &graph);
 
     template <typename GraphType>
     Partition parallelRefine(const GraphType &graph);
@@ -95,7 +105,9 @@ private:
 
     std::vector<double> communityVolumes;
 
-    std::vector<std::vector<node>> mappings;
+    // Single composed mapping: accumulated incrementally during inner loop
+    // Each new mapping is composed into this one, avoiding accumulation
+    std::vector<node> composedMapping;
 
     static constexpr int WORKING_SIZE = 1000;
 
@@ -109,8 +121,18 @@ private:
 
     bool random;
 
-    // Store coarsened graph views to avoid recreating them
-    std::vector<std::shared_ptr<CoarsenedGraphView>> coarsenedGraphs;
+    // Current coarsened graph view (only keep current, not all historical)
+    std::shared_ptr<CoarsenedGraphView> currentCoarsenedView;
+
+    // Reject moves whose gain margin is too small (numerical-noise churn filter).
+    double moveGainMarginEpsilon = 1e-4;
+
+    // Maximum inner iterations per Leiden iteration.
+    int maxInnerIterations = 20;
+
+    // Optional convergence stop: minimum relative reduction in community count per inner iter.
+    // 0.0 disables this criterion.
+    double minCommunityReduction = 0.0;
 };
 
 } // namespace NetworKit

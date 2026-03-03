@@ -7,9 +7,6 @@
 #ifndef NETWORKIT_COARSENING_COARSENED_GRAPH_VIEW_HPP_
 #define NETWORKIT_COARSENING_COARSENED_GRAPH_VIEW_HPP_
 
-#include <mutex>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 #include <networkit/Globals.hpp>
 #include <networkit/graph/Graph.hpp>
@@ -54,8 +51,9 @@ public:
 
     /**
      * Get the weighted degree of a supernode
+     * @param countSelfLoopsTwice If true, count self-loops twice (for undirected graphs)
      */
-    edgeweight weightedDegree(node supernode, bool countSelfLoops = false) const;
+    edgeweight weightedDegree(node supernode, bool countSelfLoopsTwice = false) const;
 
     /**
      * Check if there's an edge between two supernodes
@@ -140,19 +138,17 @@ private:
     std::vector<std::vector<node>> supernodeToOriginal; // supernode -> [original_nodes]
     count numSupernodes;
 
-    // Cache for computed neighborhoods to avoid recomputation
-    mutable std::unordered_map<node, std::vector<std::pair<node, edgeweight>>> neighborCache;
-    mutable std::mutex cacheMutex; // Mutex to protect neighborCache access
+    /**
+     * Get neighbors of a supernode (compute on demand, no caching)
+     */
+    std::vector<std::pair<node, edgeweight>> getNeighbors(node supernode) const {
+        return computeNeighbors(supernode);
+    }
 
     /**
-     * Compute neighbors of a supernode on-demand
+     * Compute neighbors of a supernode
      */
     std::vector<std::pair<node, edgeweight>> computeNeighbors(node supernode) const;
-
-    /**
-     * Get neighbors of a supernode (cached)
-     */
-    const std::vector<std::pair<node, edgeweight>> &getNeighbors(node supernode) const;
 };
 
 } /* namespace NetworKit */

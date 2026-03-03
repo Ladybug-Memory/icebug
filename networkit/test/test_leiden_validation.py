@@ -128,9 +128,9 @@ def test_triangle():
 
 
 def test_connected_cycle():
-    """Test with a 20-node cycle - should find 1 community."""
+    """Test with a 20-node cycle - should find 1 community at low gamma."""
     print("\n=== Test 3: 20-Node Cycle ===")
-    print("Ground truth: 1 connected cycle = 1 community")
+    print("Ground truth: with low gamma and deterministic execution, cycle => 1 community")
 
     n = 20
     edges = [(i, (i + 1) % n) for i in range(n)]
@@ -141,9 +141,16 @@ def test_connected_cycle():
 
     print(f"Graph: {graph.numberOfNodes()} nodes, {graph.numberOfEdges()} edges")
 
-    leiden = nk.community.ParallelLeidenView(graph, iterations=10, gamma=1.0, randomize=False)
-    leiden.run()
-    partition = leiden.getPartition()
+    old_threads = nk.getCurrentNumberOfThreads()
+    nk.setNumberOfThreads(1)
+    try:
+        # gamma=1.0 often favors splitting ring-like graphs into multiple groups.
+        # Use low gamma for this test to validate deterministic merge behavior.
+        leiden = nk.community.ParallelLeidenView(graph, iterations=10, gamma=0.1, randomize=False)
+        leiden.run()
+        partition = leiden.getPartition()
+    finally:
+        nk.setNumberOfThreads(old_threads)
 
     n_communities = partition.numberOfSubsets()
     print(f"Communities found: {n_communities}")
