@@ -128,7 +128,7 @@ Then call [CMake] to generate files for the `make` build system, specifying the 
 
 To speed up the compilation with make a multi-core machine, you can append `-jX` where X denotes the number of threads to compile with.
 
-### Use NetworKit as a library
+### Use Icebug as a library
 
 This paragraph explains how to use the Icebug core C++ library in case it has been built from source. 
 For how to use it when installed via package managers, best refer to the official documentation ([brew](https://brew.sh), [conda](https://docs.conda.io), [spack](https://spack.readthedocs.io/en/latest)). 
