@@ -48,12 +48,23 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.23.0
         env:
-          CIBW_BEFORE_BUILD: |
-            pip install cython auditwheel --upgrade
+          CIBW_BEFORE_ALL: |
             yum install -y epel-release || yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1).noarch.rpm
             yum install -y https://apache.jfrog.io/artifactory/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe)/apache-arrow-release-latest.rpm
             yum install -y --enablerepo=epel arrow-devel arrow-compute-devel ccache
+            export CCACHE_DIR=/root/.ccache
+            mkdir -p /tmp/nk_core_build /tmp/nk_core_install
+            cmake -S {project} -B /tmp/nk_core_build \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX=/tmp/nk_core_install \
+              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            cmake --build /tmp/nk_core_build --target install -j$(nproc)
+          CIBW_BEFORE_BUILD: |
+            pip install cython auditwheel --upgrade
           CIBW_ENVIRONMENT_LINUX: >
+            NETWORKIT_EXTERNAL_CORE=1
+            NETWORKIT_CORE_PREFIX=/tmp/nk_core_install
             CCACHE_DIR=/root/.ccache
             CCACHE_MAXSIZE=2G
             CMAKE_C_COMPILER_LAUNCHER=ccache
@@ -120,12 +131,23 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.23.0
         env:
-          CIBW_BEFORE_BUILD: |
-            pip install cython auditwheel --upgrade
+          CIBW_BEFORE_ALL: |
             yum install -y epel-release || yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1).noarch.rpm
             yum install -y https://apache.jfrog.io/artifactory/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe)/apache-arrow-release-latest.rpm
             yum install -y --enablerepo=epel arrow-devel arrow-compute-devel ccache
+            export CCACHE_DIR=/root/.ccache
+            mkdir -p /tmp/nk_core_build /tmp/nk_core_install
+            cmake -S {project} -B /tmp/nk_core_build \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX=/tmp/nk_core_install \
+              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            cmake --build /tmp/nk_core_build --target install -j$(nproc)
+          CIBW_BEFORE_BUILD: |
+            pip install cython auditwheel --upgrade
           CIBW_ENVIRONMENT_LINUX: >
+            NETWORKIT_EXTERNAL_CORE=1
+            NETWORKIT_CORE_PREFIX=/tmp/nk_core_install
             CCACHE_DIR=/root/.ccache
             CCACHE_MAXSIZE=2G
             CMAKE_C_COMPILER_LAUNCHER=ccache
@@ -193,14 +215,26 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.23.0
         env:
-          CIBW_BEFORE_BUILD: |
-            pip install cython delocate &&
+          CIBW_BEFORE_ALL: |
             brew install ninja ccache apache-arrow libomp
+            export CCACHE_DIR=$HOME/.ccache
+            mkdir -p /tmp/nk_core_build /tmp/nk_core_install
+            cmake -S {project} -B /tmp/nk_core_build \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX=/tmp/nk_core_install \
+              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              -GNinja
+            cmake --build /tmp/nk_core_build --target install
+          CIBW_BEFORE_BUILD: |
+            pip install cython delocate
           CIBW_ARCHS_MACOS: ${{ matrix.buildplat[1] }}
           CIBW_BUILD: ${{ github.event_name == 'release' && 'cp310-* cp311-* cp312-* cp313-* cp314-*' || 'cp313-*' }}
           CIBW_ENVIRONMENT: >
             CXX='c++'
             ${{ matrix.buildplat[2] }}
+            NETWORKIT_EXTERNAL_CORE=1
+            NETWORKIT_CORE_PREFIX=/tmp/nk_core_install
             MACOSX_DEPLOYMENT_TARGET='15.0'
             CCACHE_DIR=$HOME/.ccache
             CCACHE_MAXSIZE=2G

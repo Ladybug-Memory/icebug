@@ -84,6 +84,11 @@ def buildNetworKit(install_prefix, externalCore=False, externalTlx=None, withTes
 	if cmakeCompiler:
 		comp_cmd.append("-DCMAKE_CXX_COMPILER="+cmakeCompiler)
 	comp_cmd.append("-DNETWORKIT_FLATINSTALL=ON")
+	# When reusing a pre-built core (NETWORKIT_CORE_PREFIX env var), tell cmake
+	# where to find libnetworkit so find_library() succeeds.
+	core_prefix = os.environ.get('NETWORKIT_CORE_PREFIX')
+	if externalCore and core_prefix:
+		comp_cmd.append("-DCMAKE_PREFIX_PATH="+core_prefix)
 	from sysconfig import get_paths, get_config_var
 	# The following cmake parameters set Python-variables. This is done to avoid differences between the 
 	# python-toolchain calling setup.py and cmake-based find-mechanisms.
@@ -210,7 +215,16 @@ class build_ext(Command):
 			# The --inplace implementation is less sophisticated than in distutils,
 			# but it should be sufficient for NetworKit.
 			prefix = self.distribution.src_root or os.getcwd()
-		buildNetworKit(prefix, externalCore=self.networkit_external_core, externalTlx=self.external_tlx, rpath=self.rpath)
+		# Allow the C++ core build to be skipped via an env var so that CI can
+		# build the core once and reuse it across multiple Python-version builds.
+		external_core = self.networkit_external_core or bool(os.environ.get('NETWORKIT_EXTERNAL_CORE'))
+		rpath = self.rpath
+		# When using a pre-built core, point the extension .so RPATH at the
+		# directory that contains libnetworkit so auditwheel/delocate can find it.
+		core_prefix = os.environ.get('NETWORKIT_CORE_PREFIX')
+		if external_core and core_prefix and not rpath:
+			rpath = os.path.join(core_prefix, 'lib')
+		buildNetworKit(prefix, externalCore=external_core, externalTlx=self.external_tlx, rpath=rpath)
 
 	def get_ext_fullpath(self, ext_name):
 		"""Returns the path of the filename for a given extension.
