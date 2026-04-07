@@ -216,7 +216,7 @@ jobs:
         uses: pypa/cibuildwheel@v3.4.1
         env:
           CIBW_BEFORE_ALL: |
-            brew install ninja ccache apache-arrow libomp
+            brew install ninja ccache apache-arrow
             export CCACHE_DIR=$HOME/.ccache
             mkdir -p /tmp/nk_core_build /tmp/nk_core_install
             cmake -S {project} -B /tmp/nk_core_build \
