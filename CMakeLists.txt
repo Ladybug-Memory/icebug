@@ -329,7 +329,11 @@ if(NETWORKIT_PYTHON)
 			if(NOT EXTERNAL_NETWORKIT_CORE)
 				message(FATAL_ERROR "Core build is disabled but no external core library was found.")
 			endif()
-			target_link_libraries(${TARGET_LIB} PRIVATE ${EXTERNAL_NETWORKIT_CORE})
+			# ${EXTERNAL_NETWORKIT_CORE} is a raw library path, not a CMake imported
+			# target, so Arrow's include directories are not propagated transitively.
+			# Link Arrow::arrow_shared explicitly so the Cython extensions can find
+			# arrow headers (e.g. arrow/api.h) when building against an external core.
+			target_link_libraries(${TARGET_LIB} PRIVATE ${EXTERNAL_NETWORKIT_CORE} Arrow::arrow_shared)
 		else()
 			target_link_libraries(${TARGET_LIB} PRIVATE networkit)
 		endif()
