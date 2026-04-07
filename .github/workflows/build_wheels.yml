@@ -46,7 +46,7 @@ jobs:
             ccache-wheels-linux-${{ matrix.manylinux_image }}-
             ccache-wheels-linux-
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.23.0
+        uses: pypa/cibuildwheel@v3.4.1
         env:
           CIBW_BEFORE_ALL: |
             yum install -y epel-release || yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1).noarch.rpm
@@ -129,7 +129,7 @@ jobs:
             ccache-wheels-linux-${{ matrix.manylinux_image }}-
             ccache-wheels-linux-
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.23.0
+        uses: pypa/cibuildwheel@v3.4.1
         env:
           CIBW_BEFORE_ALL: |
             yum install -y epel-release || yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1).noarch.rpm
@@ -213,7 +213,7 @@ jobs:
             ccache-wheels-macos-${{ matrix.buildplat[1] }}-
             ccache-wheels-macos-
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.23.0
+        uses: pypa/cibuildwheel@v3.4.1
         env:
           CIBW_BEFORE_ALL: |
             brew install ninja ccache apache-arrow libomp
@@ -334,7 +334,7 @@ jobs:
             ccache-wheels-windows-${{ matrix.cibw_archs }}-
             ccache-wheels-windows-
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.23.0
+        uses: pypa/cibuildwheel@v3.4.1
         env:
           CIBW_BEFORE_BUILD: pip install cython ipython delvewheel
           CIBW_ARCHS: "AMD64"
