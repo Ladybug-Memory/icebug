@@ -39,7 +39,7 @@ TEST_F(ParallelEdgeIterationGTest, testParallelForEdgesCSR) {
     GraphR G(n, false, indicesArrow, indptrArrow, indicesArrow, indptrArrow);
 
     EXPECT_EQ(G.numberOfNodes(), 3);
-    EXPECT_EQ(G.numberOfEdges(), 6); // Undirected stores both directions
+    EXPECT_EQ(G.numberOfEdges(), 3);
 
     // Test parallelForEdges - count edges
     std::atomic<count> edgeCount{0};

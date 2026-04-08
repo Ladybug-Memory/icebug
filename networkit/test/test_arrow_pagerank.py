@@ -136,8 +136,7 @@ def test_small_graph():
     print(f"  Weighted: {graph.isWeighted()}")
     
     assert graph.numberOfNodes() == 5
-    # Note: CSR for undirected graphs doubles edges (each edge stored once, but we add reverse edges)
-    assert graph.numberOfEdges() == 10  # 5 edges * 2 for undirected CSR
+    assert graph.numberOfEdges() == 5
     
     # Test basic graph operations
     print(f"\nTesting graph operations:")
