@@ -404,7 +404,10 @@ private:
      * @param handle The handle that shall be executed for each edge
      * @return void
      */
-    template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
+    // applyUndirectedFilter=true deduplicates edges (u>=v) for full-graph traversal.
+    // forEdgesOf / forNeighborsOf use the default false so all neighbors are returned.
+    template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L,
+              bool applyUndirectedFilter = false>
     inline void forOutEdgesOfImpl(node u, L handle) const;
 
     /**
@@ -1665,33 +1668,26 @@ inline bool Graph::useEdgeInIteration<false>(node u, node v) const {
     return u >= v;
 }
 
-template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
+template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L,
+          bool applyUndirectedFilter>
 inline void Graph::forOutEdgesOfImpl(node u, L handle) const {
     if (usingCSR) {
         // CSR-based implementation
-        // Note: For immutable CSR graphs, all nodes exist so we skip exists check to avoid
-        // thread-safety issues with std::vector<bool> in parallel contexts
         auto [neighbors, degree] = getCSROutNeighbors(u);
         if (neighbors == nullptr || degree == 0)
             return;
 
         for (count i = 0; i < degree; ++i) {
             node v = neighbors[i];
-            // Skip exists[v] check for CSR graphs - all nodes always exist in immutable graphs
 
-            // For undirected graphs, only process edge if u >= v to avoid duplicates
-            if constexpr (!graphIsDirected) {
+            // Apply u>=v deduplication only for full-graph traversals, not forNeighborsOf.
+            if constexpr (!graphIsDirected && applyUndirectedFilter) {
                 if (!useEdgeInIteration<graphIsDirected>(u, v))
                     continue;
             }
 
-            // Get edge weight (currently CSR graphs are unweighted, so use defaultEdgeWeight)
-            edgeweight weight = hasWeights ? defaultEdgeWeight : defaultEdgeWeight;
-
-            // Get edge ID (CSR graphs don't currently support edge IDs)
+            edgeweight weight = defaultEdgeWeight;
             edgeid eid = graphHasEdgeIds ? none : none;
-
-            // Call the appropriate lambda based on its signature
             edgeLambda(handle, u, v, weight, eid);
         }
     } else {
@@ -1766,7 +1762,7 @@ template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename 
 inline void Graph::forEdgeImpl(L handle) const {
     if (usingCSR) {
         for (node u = 0; u < z; ++u) {
-            forOutEdgesOfImpl<graphIsDirected, hasWeights, graphHasEdgeIds, L>(u, handle);
+            forOutEdgesOfImpl<graphIsDirected, hasWeights, graphHasEdgeIds, L, true>(u, handle);
         }
     } else {
         // For vector-based graphs (GraphW), use the virtual dispatch
@@ -1781,7 +1777,7 @@ inline void Graph::parallelForEdgesImpl(L handle) const {
     if (usingCSR) {
 #pragma omp parallel for schedule(guided)
         for (omp_index u = 0; u < static_cast<omp_index>(z); ++u) {
-            forOutEdgesOfImpl<graphIsDirected, hasWeights, graphHasEdgeIds, L>(u, handle);
+            forOutEdgesOfImpl<graphIsDirected, hasWeights, graphHasEdgeIds, L, true>(u, handle);
         }
     } else {
         // For vector-based graphs, use the virtual dispatch

@@ -46,9 +46,12 @@ Graph::Graph(count n, bool directed, std::shared_ptr<arrow::UInt64Array> outIndi
       outEdgesCSRWeights(outWeights), inEdgesCSRWeights(inWeights), usingCSR(true),
       nodeAttributeMap(this), edgeAttributeMap(this) {
 
-    // Calculate number of edges from CSR data
+    // Calculate number of edges from CSR data.
+    // For undirected graphs each edge (u,v) appears twice in outIndices (once as u→v, once as
+    // v→u), so divide by 2.
     if (outIndices) {
-        m = outIndices->length();
+        m = directed ? static_cast<count>(outIndices->length())
+                     : static_cast<count>(outIndices->length()) / 2;
     }
 
     // Validate CSR arrays
