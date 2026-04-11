@@ -209,7 +209,7 @@ void ParallelLeidenView::flattenPartition() {
         }
         lower = upper;
     }
-    G->parallelForNodes([&](node a) { flattenedPartition[a] = lower[a]; });
+    G->parallelForNodes([&](node a) { flattenedPartition[a] = result[lower[a]]; });
     flattenedPartition.compact(true);
     result = flattenedPartition;
     mappings.clear();
