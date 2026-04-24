@@ -710,6 +710,8 @@ cdef extern from "<networkit/community/ParallelLeidenView.hpp>":
 	cdef cppclass _ParallelLeidenView "NetworKit::ParallelLeidenView"(_CommunityDetectionAlgorithm):
 		_ParallelLeidenView(_Graph _G) except +
 		_ParallelLeidenView(_Graph _G, int iterations, bool_t randomize, double gamma) except +
+		void loadMoveScoringExtension(const string &sharedLibraryPath) except +
+		void unloadMoveScoringExtension() except +
 
 cdef class ParallelLeiden(CommunityDetector):
 	""" 
@@ -776,6 +778,28 @@ cdef class ParallelLeidenView(CommunityDetector):
 	def __cinit__(self, Graph G not None, int iterations = 3, bool_t randomize = True, double gamma = 1):
 		self._G = G
 		self._this = new _ParallelLeidenView(dereference(G._this),iterations,randomize,gamma)
+
+	def loadMoveScoringExtension(self, shared_library_path):
+		"""
+		loadMoveScoringExtension(shared_library_path)
+
+		Load a shared library that overrides the move-phase community scoring used by
+		ParallelLeidenView. The library must export
+		`networkitParallelLeidenCommunityScore` and may additionally export
+		`networkitParallelLeidenCurrentCommunityThreshold`.
+		"""
+		(<_ParallelLeidenView*>(self._this)).loadMoveScoringExtension(stdstring(shared_library_path))
+		return self
+
+	def unloadMoveScoringExtension(self):
+		"""
+		unloadMoveScoringExtension()
+
+		Unload a previously configured move-scoring extension and restore the
+		built-in modularity scorer.
+		"""
+		(<_ParallelLeidenView*>(self._this)).unloadMoveScoringExtension()
+		return self
 
 cdef extern from "<networkit/community/LouvainMapEquation.hpp>":
 	cdef cppclass _LouvainMapEquation "NetworKit::LouvainMapEquation"(_CommunityDetectionAlgorithm):

@@ -6,6 +6,10 @@
 
 #include <networkit/community/ParallelLeidenView.hpp>
 #include <cstdlib>
+#ifndef _WIN32
+#include <dlfcn.h>
+#endif
+#include <stdexcept>
 
 namespace NetworKit {
 
@@ -56,13 +60,70 @@ ParallelLeidenView::ParallelLeidenView(const Graph &graph, int iterations, bool 
             // Keep default if parsing fails.
         }
     }
+    if (const char *scoringLibEnv = std::getenv("NETWORKIT_LEIDEN_MOVE_SCORING_LIB")) {
+        loadMoveScoringExtension(scoringLibEnv);
+    }
 }
 
 ParallelLeidenView::~ParallelLeidenView() {
+    unloadMoveScoringExtension();
     currentCoarsenedView.reset();
     composedMapping.clear();
     composedMapping.shrink_to_fit();
     communityVolumes.clear();
+}
+
+void ParallelLeidenView::loadMoveScoringExtension(const std::string &sharedLibraryPath) {
+#ifdef _WIN32
+    throw std::runtime_error(
+        "ParallelLeidenView shared-library scoring extensions are not supported on Windows");
+#else
+    void *handle = dlopen(sharedLibraryPath.c_str(), RTLD_NOW | RTLD_LOCAL);
+    if (handle == nullptr) {
+        throw std::runtime_error("Failed to load ParallelLeidenView scoring extension '" +
+                                 sharedLibraryPath + "': " + dlerror());
+    }
+
+    dlerror();
+    auto *communityScore = reinterpret_cast<ParallelLeidenCommunityScoreFunction>(
+        dlsym(handle, "networkitParallelLeidenCommunityScore"));
+    const char *communityScoreError = dlerror();
+    if (communityScoreError != nullptr || communityScore == nullptr) {
+        dlclose(handle);
+        throw std::runtime_error(
+            "ParallelLeidenView scoring extension '" + sharedLibraryPath
+            + "' does not export required symbol networkitParallelLeidenCommunityScore");
+    }
+
+    dlerror();
+    auto *thresholdScore = reinterpret_cast<ParallelLeidenCommunityScoreFunction>(
+        dlsym(handle, "networkitParallelLeidenCurrentCommunityThreshold"));
+    const char *thresholdScoreError = dlerror();
+    if (thresholdScoreError != nullptr) {
+        thresholdScore = &modularityThresholdScore;
+    }
+
+    unloadMoveScoringExtension();
+    scoringExtensionHandle_ = handle;
+    communityScoreFunction_ = communityScore;
+    currentCommunityThresholdFunction_ = thresholdScore != nullptr ? thresholdScore
+                                                                   : &modularityThresholdScore;
+    scoringExtensionPath_ = sharedLibraryPath;
+#endif
+}
+
+void ParallelLeidenView::unloadMoveScoringExtension() {
+    communityScoreFunction_ = &modularityCommunityScore;
+    currentCommunityThresholdFunction_ = &modularityThresholdScore;
+    scoringExtensionPath_.clear();
+#ifndef _WIN32
+    if (scoringExtensionHandle_ != nullptr) {
+        dlclose(scoringExtensionHandle_);
+        scoringExtensionHandle_ = nullptr;
+    }
+#else
+    scoringExtensionHandle_ = nullptr;
+#endif
 }
 
 void ParallelLeidenView::run() {
@@ -399,16 +460,16 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                     // "Moving" a node to its current community is pointless
                     if (community != currentCommunity) {
                         double delta;
-                        delta = modularityDelta(cutWeights[community], degree,
-                                                communityVolumes[community]);
+                        delta = scoreCommunity(cutWeights[community], degree,
+                                               communityVolumes[community]);
                         if (delta > maxDelta) {
                             maxDelta = delta;
                             bestCommunity = community;
                         }
                     }
                 }
-                double modThreshold = modularityThreshold(
-                    cutWeights[currentCommunity], communityVolumes[currentCommunity], degree);
+                double modThreshold = scoreCurrentCommunityThreshold(
+                    cutWeights[currentCommunity], degree, communityVolumes[currentCommunity]);
 
                 if (0 > modThreshold || maxDelta > modThreshold) {
                     bool acceptedMove = false;
@@ -667,7 +728,7 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
                     if (C == none) {
                         continue;
                     }
-                    delta = modularityDelta(cutWeights[C], degree, refinedVolumes[C]);
+                    delta = scoreCommunity(cutWeights[C], degree, refinedVolumes[C]);
 
                     if (delta < 0) { // modThreshold is 0, since cutw(v,C-) = 0 and volw(C-) = 0
                         continue;

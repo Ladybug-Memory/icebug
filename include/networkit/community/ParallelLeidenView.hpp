@@ -14,6 +14,7 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <omp.h>
 #include <thread>
 #include <tlx/unused.hpp>
@@ -27,6 +28,7 @@
 #include <networkit/community/CommunityDetectionAlgorithm.hpp>
 #include <networkit/community/Modularity.hpp>
 #include <networkit/community/PLM.hpp>
+#include <networkit/community/ParallelLeidenScoringExtension.hpp>
 #include <networkit/graph/Graph.hpp>
 #include <networkit/structures/Partition.hpp>
 
@@ -59,6 +61,17 @@ public:
 
     void run() override;
 
+    /**
+     * Load a shared library that customizes the move-phase scoring metric.
+     *
+     * The library must export `networkitParallelLeidenCommunityScore`. It may additionally export
+     * `networkitParallelLeidenCurrentCommunityThreshold` to replace the default modularity-based
+     * stay threshold as well.
+     */
+    void loadMoveScoringExtension(const std::string &sharedLibraryPath);
+
+    void unloadMoveScoringExtension();
+
     int VECTOR_OVERSIZE = 10000;
 
 private:
@@ -81,12 +94,25 @@ private:
     template <typename GraphType>
     Partition parallelRefine(const GraphType &graph);
 
-    inline double modularityDelta(double cutD, double degreeV, double volD) const {
+    static double modularityCommunityScore(double cutD, double degreeV, double volD, double gamma,
+                                           double inverseGraphVolume) {
         return cutD - gamma * degreeV * volD * inverseGraphVolume;
-    };
+    }
 
-    inline double modularityThreshold(double cutC, double volC, double degreeV) const {
+    static double modularityThresholdScore(double cutC, double degreeV, double volC, double gamma,
+                                           double inverseGraphVolume) {
         return cutC - gamma * (volC - degreeV) * degreeV * inverseGraphVolume;
+    }
+
+    inline double scoreCommunity(double cutWeight, double degree, double communityVolume) const {
+        return communityScoreFunction_(cutWeight, degree, communityVolume, gamma,
+                                       inverseGraphVolume);
+    }
+
+    inline double scoreCurrentCommunityThreshold(double cutWeight, double degree,
+                                                 double communityVolume) const {
+        return currentCommunityThresholdFunction_(cutWeight, degree, communityVolume, gamma,
+                                                  inverseGraphVolume);
     }
 
     static inline void lockLowerFirst(index a, index b, std::vector<std::mutex> &locks) {
@@ -131,6 +157,12 @@ private:
     // Optional convergence stop: minimum relative reduction in community count per inner iter.
     // 0.0 disables this criterion.
     double minCommunityReduction = 0.0;
+
+    void *scoringExtensionHandle_ = nullptr;
+    ParallelLeidenCommunityScoreFunction communityScoreFunction_ = &modularityCommunityScore;
+    ParallelLeidenCommunityScoreFunction currentCommunityThresholdFunction_ =
+        &modularityThresholdScore;
+    std::string scoringExtensionPath_;
 };
 
 } // namespace NetworKit

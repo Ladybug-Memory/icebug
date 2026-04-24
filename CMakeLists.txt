@@ -268,6 +268,9 @@ if(NETWORKIT_BUILD_CORE AND NETWORKIT_MONOLITH)
 	endif()
 
 	target_link_libraries(networkit PRIVATE OpenMP::OpenMP_CXX PUBLIC tlx Arrow::arrow_shared)
+	if(CMAKE_DL_LIBS)
+		target_link_libraries(networkit PRIVATE ${CMAKE_DL_LIBS})
+	endif()
 
 	set_target_properties(networkit PROPERTIES
 			CXX_STANDARD ${NETWORKIT_CXX_STANDARD}
