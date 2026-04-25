@@ -3,7 +3,7 @@ name = "icebug"
 version = "12.5"
 description = "High performance graph analytics backed by read-only memory"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = {file = "License.txt"}
 keywords =["graph algorithm", "network analysis", "social network", "apache arrow", "columnar"]
 authors = [
