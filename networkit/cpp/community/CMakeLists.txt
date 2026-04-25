@@ -48,6 +48,8 @@ add_library(networkit_parallel_leiden_modularity_extension SHARED
 target_include_directories(networkit_parallel_leiden_modularity_extension BEFORE PUBLIC
     "${PROJECT_SOURCE_DIR}/include")
 set_target_properties(networkit_parallel_leiden_modularity_extension PROPERTIES
-    OUTPUT_NAME "networkit_parallel_leiden_modularity_extension")
+    OUTPUT_NAME "networkit_parallel_leiden_modularity_extension"
+    CXX_STANDARD ${NETWORKIT_CXX_STANDARD}
+    CXX_STANDARD_REQUIRED YES)
 
 add_subdirectory(test)
