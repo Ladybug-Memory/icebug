@@ -94,25 +94,75 @@ private:
     template <typename GraphType>
     Partition parallelRefine(const GraphType &graph);
 
-    static double modularityCommunityScore(double cutD, double degreeV, double volD, double gamma,
+    static count nodeSize(const Graph &graph, node u);
+
+    static count nodeSize(const CoarsenedGraphView &graph, node u);
+
+    static double modularityCommunityScore(double cutD, double degreeV, double volD,
+                                           count sizeD, double gamma,
                                            double inverseGraphVolume) {
+        tlx::unused(sizeD);
         return cutD - gamma * degreeV * volD * inverseGraphVolume;
     }
 
-    static double modularityThresholdScore(double cutC, double degreeV, double volC, double gamma,
+    static double modularityThresholdScore(double cutC, double degreeV, double volC, count sizeC,
+                                           double gamma,
                                            double inverseGraphVolume) {
+        tlx::unused(sizeC);
         return cutC - gamma * (volC - degreeV) * degreeV * inverseGraphVolume;
     }
 
-    inline double scoreCommunity(double cutWeight, double degree, double communityVolume) const {
-        return communityScoreFunction_(cutWeight, degree, communityVolume, gamma,
+    static bool modularityRefineRSetCondition(double cutWeight, double subsetVolume,
+                                              count subsetSize, double targetVolume,
+                                              count targetSize, double sourceVolume,
+                                              count sourceSize, double gamma,
+                                              double inverseGraphVolume) {
+        tlx::unused(subsetSize);
+        tlx::unused(targetSize);
+        tlx::unused(sourceVolume);
+        tlx::unused(sourceSize);
+        return cutWeight >= gamma * subsetVolume * targetVolume * inverseGraphVolume;
+    }
+
+    static bool modularityRefineTSetCondition(double cutWeight, double subsetVolume,
+                                              count subsetSize, double targetVolume,
+                                              count targetSize, double sourceVolume,
+                                              count sourceSize, double gamma,
+                                              double inverseGraphVolume) {
+        tlx::unused(subsetSize);
+        tlx::unused(targetSize);
+        tlx::unused(sourceVolume);
+        tlx::unused(sourceSize);
+        return cutWeight >= gamma * subsetVolume * targetVolume * inverseGraphVolume;
+    }
+
+    inline double scoreCommunity(double cutWeight, double degree, double communityVolume,
+                                 count communitySize) const {
+        return communityScoreFunction_(cutWeight, degree, communityVolume, communitySize, gamma,
                                        inverseGraphVolume);
     }
 
     inline double scoreCurrentCommunityThreshold(double cutWeight, double degree,
-                                                 double communityVolume) const {
-        return currentCommunityThresholdFunction_(cutWeight, degree, communityVolume, gamma,
-                                                  inverseGraphVolume);
+                                                 double communityVolume,
+                                                 count communitySize) const {
+        return currentCommunityThresholdFunction_(cutWeight, degree, communityVolume,
+                                                  communitySize, gamma, inverseGraphVolume);
+    }
+
+    inline bool refineRSetCondition(double cutWeight, double subsetVolume, count subsetSize,
+                                    double targetVolume, count targetSize, double sourceVolume,
+                                    count sourceSize) const {
+        return refineRSetConditionFunction_(cutWeight, subsetVolume, subsetSize, targetVolume,
+                                            targetSize, sourceVolume, sourceSize, gamma,
+                                            inverseGraphVolume);
+    }
+
+    inline bool refineTSetCondition(double cutWeight, double subsetVolume, count subsetSize,
+                                    double targetVolume, count targetSize, double sourceVolume,
+                                    count sourceSize) const {
+        return refineTSetConditionFunction_(cutWeight, subsetVolume, subsetSize, targetVolume,
+                                            targetSize, sourceVolume, sourceSize, gamma,
+                                            inverseGraphVolume);
     }
 
     static inline void lockLowerFirst(index a, index b, std::vector<std::mutex> &locks) {
@@ -130,6 +180,7 @@ private:
     double inverseGraphVolume; // 1/vol(V)
 
     std::vector<double> communityVolumes;
+    std::vector<count> communitySizes;
 
     std::vector<node> composedMapping;
 
@@ -162,6 +213,10 @@ private:
     ParallelLeidenCommunityScoreFunction communityScoreFunction_ = &modularityCommunityScore;
     ParallelLeidenCommunityScoreFunction currentCommunityThresholdFunction_ =
         &modularityThresholdScore;
+    ParallelLeidenRefineSetConditionFunction refineRSetConditionFunction_ =
+        &modularityRefineRSetCondition;
+    ParallelLeidenRefineSetConditionFunction refineTSetConditionFunction_ =
+        &modularityRefineTSetCondition;
     std::string scoringExtensionPath_;
 };
 

@@ -13,6 +13,16 @@
 
 namespace NetworKit {
 
+count ParallelLeidenView::nodeSize(const Graph &graph, node u) {
+    tlx::unused(graph);
+    tlx::unused(u);
+    return 1;
+}
+
+count ParallelLeidenView::nodeSize(const CoarsenedGraphView &graph, node u) {
+    return graph.getOriginalNodes(u).size();
+}
+
 ParallelLeidenView::ParallelLeidenView(const Graph &graph, int iterations, bool randomize,
                                        double gamma)
     : CommunityDetectionAlgorithm(graph), gamma(gamma), numberOfIterations(iterations),
@@ -71,6 +81,7 @@ ParallelLeidenView::~ParallelLeidenView() {
     composedMapping.clear();
     composedMapping.shrink_to_fit();
     communityVolumes.clear();
+    communitySizes.clear();
 }
 
 void ParallelLeidenView::loadMoveScoringExtension(const std::string &sharedLibraryPath) {
@@ -108,6 +119,21 @@ void ParallelLeidenView::loadMoveScoringExtension(const std::string &sharedLibra
     communityScoreFunction_ = communityScore;
     currentCommunityThresholdFunction_ = thresholdScore != nullptr ? thresholdScore
                                                                    : &modularityThresholdScore;
+    dlerror();
+    auto *refineRSet = reinterpret_cast<ParallelLeidenRefineSetConditionFunction>(
+        dlsym(handle, "networkitParallelLeidenRefineRSetCondition"));
+    const char *refineRSetError = dlerror();
+    refineRSetConditionFunction_ =
+        refineRSetError == nullptr && refineRSet != nullptr ? refineRSet
+                                                            : &modularityRefineRSetCondition;
+
+    dlerror();
+    auto *refineTSet = reinterpret_cast<ParallelLeidenRefineSetConditionFunction>(
+        dlsym(handle, "networkitParallelLeidenRefineTSetCondition"));
+    const char *refineTSetError = dlerror();
+    refineTSetConditionFunction_ =
+        refineTSetError == nullptr && refineTSet != nullptr ? refineTSet
+                                                            : &modularityRefineTSetCondition;
     scoringExtensionPath_ = sharedLibraryPath;
 #endif
 }
@@ -115,6 +141,8 @@ void ParallelLeidenView::loadMoveScoringExtension(const std::string &sharedLibra
 void ParallelLeidenView::unloadMoveScoringExtension() {
     communityScoreFunction_ = &modularityCommunityScore;
     currentCommunityThresholdFunction_ = &modularityThresholdScore;
+    refineRSetConditionFunction_ = &modularityRefineRSetCondition;
+    refineTSetConditionFunction_ = &modularityRefineTSetCondition;
     scoringExtensionPath_.clear();
 #ifndef _WIN32
     if (scoringExtensionHandle_ != nullptr) {
@@ -309,15 +337,20 @@ void ParallelLeidenView::calculateVolumes(const GraphType &graph) {
 
     // thread safe reduction. Avoid atomic calculation of total graph volume for unweighted graphs.
     communityVolumes.clear();
+    communitySizes.clear();
     communityVolumes.resize(result.upperBound() + VECTOR_OVERSIZE);
+    communitySizes.resize(result.upperBound() + VECTOR_OVERSIZE);
     inverseGraphVolume = 0.0; // Reset to 0 before accumulation
 
     if (graph.isWeighted()) {
         std::vector<double> threadVolumes(omp_get_max_threads());
         graph.parallelForNodes([&](node a) {
             edgeweight ew = graph.weightedDegree(a, true);
+            count size = nodeSize(graph, a);
 #pragma omp atomic
             communityVolumes[result[a]] += ew;
+#pragma omp atomic
+            communitySizes[result[a]] += size;
             threadVolumes[omp_get_thread_num()] += ew;
         });
         for (const auto vol : threadVolumes) {
@@ -327,8 +360,11 @@ void ParallelLeidenView::calculateVolumes(const GraphType &graph) {
     } else {
         inverseGraphVolume = 1.0 / (2 * graph.numberOfEdges());
         graph.parallelForNodes([&](node a) {
+            count size = nodeSize(graph, a);
 #pragma omp atomic
             communityVolumes[result[a]] += graph.weightedDegree(a, true);
+#pragma omp atomic
+            communitySizes[result[a]] += size;
         });
     }
     TRACE("Calculating Volumes took " + timer.elapsedTag());
@@ -433,6 +469,7 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                 double maxDelta = std::numeric_limits<double>::lowest();
                 index bestCommunity = none;
                 double degree = 0;
+                count nodeMass = nodeSize(graph, u);
                 for (auto z : pointers) {
                     // Reset the clearlist : Set all cutweights to 0 and clear the pointer vector
                     cutWeights[z] = 0;
@@ -455,13 +492,16 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                 if (pointers.empty())
                     continue;
 
-                // Determine Modularity delta for all neighbor communities
+                double singletonScore = scoreCommunity(0.0, degree, 0.0, 0);
+
+                // Determine move score for all neighbor communities
                 for (auto community : pointers) {
                     // "Moving" a node to its current community is pointless
                     if (community != currentCommunity) {
                         double delta;
                         delta = scoreCommunity(cutWeights[community], degree,
-                                               communityVolumes[community]);
+                                               communityVolumes[community],
+                                               communitySizes[community]);
                         if (delta > maxDelta) {
                             maxDelta = delta;
                             bestCommunity = community;
@@ -469,19 +509,16 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                     }
                 }
                 double modThreshold = scoreCurrentCommunityThreshold(
-                    cutWeights[currentCommunity], degree, communityVolumes[currentCommunity]);
+                    cutWeights[currentCommunity], degree, communityVolumes[currentCommunity],
+                    communitySizes[currentCommunity]);
 
-                if (0 > modThreshold || maxDelta > modThreshold) {
+                bool singletonMove = singletonScore > maxDelta;
+                double selectedScore = singletonMove ? singletonScore : maxDelta;
+                if (selectedScore > modThreshold) {
                     bool acceptedMove = false;
-                    bool singletonMove = (0 > maxDelta);
                     double gainMargin = 0.0;
-                    if (singletonMove) {
-                        gainMargin = -modThreshold;
-                        acceptedMove = (0 > modThreshold);
-                    } else {
-                        gainMargin = maxDelta - modThreshold;
-                        acceptedMove = (maxDelta > modThreshold);
-                    }
+                    gainMargin = selectedScore - modThreshold;
+                    acceptedMove = true;
                     if (acceptedMove && gainMargin <= moveGainMarginEpsilon) {
                         marginalMovesRejected[omp_get_thread_num()]++;
                         acceptedMove = false;
@@ -505,6 +542,7 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                                 }
                                 // all other threads are yielding, so resize is fine
                                 communityVolumes.resize(vectorSize);
+                                communitySizes.resize(vectorSize);
                                 expected = true;
                                 resize.compare_exchange_strong(expected, false);
                             } else {
@@ -525,6 +563,10 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                     communityVolumes[bestCommunity] += degree;
 #pragma omp atomic
                     communityVolumes[currentCommunity] -= degree;
+#pragma omp atomic
+                    communitySizes[bestCommunity] += nodeMass;
+#pragma omp atomic
+                    communitySizes[currentCommunity] -= nodeMass;
                     changed = true;
                     bool expected = true;
                     inQueue[u].compare_exchange_strong(expected, false);
@@ -633,6 +675,7 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
     std::vector<uint_fast8_t> singleton(refined.upperBound(), true);
     std::vector<double> cutCtoSminusC(refined.upperBound());
     std::vector<double> refinedVolumes(refined.upperBound()); // Community Volumes P_refined
+    std::vector<count> refinedSizes(refined.upperBound());
     std::vector<std::mutex> locks(refined.upperBound());
     std::vector<node> nodes(graph.upperNodeIdBound(), none);
 
@@ -646,6 +689,7 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
         for (omp_index u = 0; u < static_cast<omp_index>(graph.upperNodeIdBound()); u++) {
             if (graph.hasNode(u)) {
                 nodes[u] = u;
+                refinedSizes[u] = nodeSize(graph, u);
                 graph.forNeighborsOf(u, [&](node neighbor, edgeweight ew) {
                     if (u != neighbor) {
                         if (result[neighbor] == result[u]) {
@@ -689,6 +733,7 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
             // Nodes whose community ID equals their Node ID. These may be singletons that can
             // affect the cut which we need to update later
             double degree = 0;
+            count subsetSize = nodeSize(graph, u);
 
             graph.forNeighborsOf(u, [&](node neighbor, edgeweight ew) { // Calculate degree and cut
                 degree += ew;
@@ -708,8 +753,9 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
                     degree += ew;
                 }
             });
-            if (cutCtoSminusC[u] < this->gamma * degree * (communityVolumes[S] - degree)
-                                       * inverseGraphVolume) { // R-Set Condition
+            if (!refineRSetCondition(cutCtoSminusC[u], degree, subsetSize,
+                                     communityVolumes[S] - degree, communitySizes[S] - subsetSize,
+                                     communityVolumes[S], communitySizes[S])) {
                 continue;
             }
 
@@ -717,6 +763,7 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
                 continue;
             }
 
+            double singletonScore = scoreCommunity(0.0, degree, 0.0, 0);
             double delta;
             index bestC = none;
             double bestDelta = std::numeric_limits<double>::lowest();
@@ -728,16 +775,20 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
                     if (C == none) {
                         continue;
                     }
-                    delta = scoreCommunity(cutWeights[C], degree, refinedVolumes[C]);
+                    delta = scoreCommunity(cutWeights[C], degree, refinedVolumes[C],
+                                           refinedSizes[C]);
 
-                    if (delta < 0) { // modThreshold is 0, since cutw(v,C-) = 0 and volw(C-) = 0
+                    if (delta <= singletonScore) {
                         continue;
                     }
 
                     auto volC = refinedVolumes[C];
+                    auto sizeC = refinedSizes[C];
                     if (delta > bestDelta
-                        && cutCtoSminusC[C] >= this->gamma * volC * (communityVolumes[S] - volC)
-                                                   * inverseGraphVolume) { // T-Set Condition
+                        && refineTSetCondition(cutCtoSminusC[C], volC, sizeC,
+                                               communityVolumes[S] - volC,
+                                               communitySizes[S] - sizeC, communityVolumes[S],
+                                               communitySizes[S])) {
                         bestDelta = delta;
                         bestC = C;
                         idx = j;
@@ -807,6 +858,7 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
                 singleton[bestC] = false;
                 refined[u] = bestC;
                 refinedVolumes[bestC] += degree;
+                refinedSizes[bestC] += subsetSize;
                 updateCut();
                 cutCtoSminusC[bestC] += cutCtoSminusC[u] - 2 * cutWeights[bestC];
             }
