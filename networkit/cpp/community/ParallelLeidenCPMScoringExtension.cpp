@@ -1,7 +1,7 @@
 /*
- * ParallelLeidenModularityScoringExtension.cpp
+ * ParallelLeidenCPMScoringExtension.cpp
  *
- *  Default modularity scorer exported through the ParallelLeidenView extension ABI.
+ *  Constant Potts Model scorer exported through the ParallelLeidenView extension ABI.
  */
 
 #include <networkit/community/ParallelLeidenScoringExtension.hpp>
@@ -12,9 +12,11 @@ extern "C" double networkitParallelLeidenCommunityScore(double cutWeight, double
                                                         NetworKit::count communitySize,
                                                         double gamma,
                                                         double inverseGraphVolume) {
-    (void)subsetSize;
-    (void)communitySize;
-    return cutWeight - gamma * degree * communityVolume * inverseGraphVolume;
+    (void)degree;
+    (void)communityVolume;
+    (void)inverseGraphVolume;
+    return cutWeight
+           - gamma * static_cast<double>(subsetSize) * static_cast<double>(communitySize);
 }
 
 extern "C" double networkitParallelLeidenCurrentCommunityThreshold(double cutWeight, double degree,
@@ -23,9 +25,11 @@ extern "C" double networkitParallelLeidenCurrentCommunityThreshold(double cutWei
                                                                    NetworKit::count communitySize,
                                                                    double gamma,
                                                                    double inverseGraphVolume) {
-    (void)subsetSize;
-    (void)communitySize;
-    return cutWeight - gamma * (communityVolume - degree) * degree * inverseGraphVolume;
+    (void)degree;
+    (void)communityVolume;
+    (void)inverseGraphVolume;
+    return cutWeight - gamma * static_cast<double>(subsetSize)
+                           * static_cast<double>(communitySize - subsetSize);
 }
 
 extern "C" bool networkitParallelLeidenRefineRSetCondition(double cutWeight, double subsetVolume,
@@ -36,11 +40,12 @@ extern "C" bool networkitParallelLeidenRefineRSetCondition(double cutWeight, dou
                                                            NetworKit::count sourceSize,
                                                            double gamma,
                                                            double inverseGraphVolume) {
-    (void)subsetSize;
-    (void)targetSize;
+    (void)subsetVolume;
+    (void)targetVolume;
     (void)sourceVolume;
     (void)sourceSize;
-    return cutWeight >= gamma * subsetVolume * targetVolume * inverseGraphVolume;
+    (void)inverseGraphVolume;
+    return cutWeight >= gamma * static_cast<double>(subsetSize) * static_cast<double>(targetSize);
 }
 
 extern "C" bool networkitParallelLeidenRefineTSetCondition(double cutWeight, double subsetVolume,
@@ -51,9 +56,10 @@ extern "C" bool networkitParallelLeidenRefineTSetCondition(double cutWeight, dou
                                                            NetworKit::count sourceSize,
                                                            double gamma,
                                                            double inverseGraphVolume) {
-    (void)subsetSize;
-    (void)targetSize;
+    (void)subsetVolume;
+    (void)targetVolume;
     (void)sourceVolume;
     (void)sourceSize;
-    return cutWeight >= gamma * subsetVolume * targetVolume * inverseGraphVolume;
+    (void)inverseGraphVolume;
+    return cutWeight >= gamma * static_cast<double>(subsetSize) * static_cast<double>(targetSize);
 }

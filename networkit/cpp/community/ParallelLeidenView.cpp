@@ -492,7 +492,7 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                 if (pointers.empty())
                     continue;
 
-                double singletonScore = scoreCommunity(0.0, degree, 0.0, 0);
+                double singletonScore = scoreCommunity(0.0, degree, 0.0, nodeMass, 0);
 
                 // Determine move score for all neighbor communities
                 for (auto community : pointers) {
@@ -500,7 +500,7 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                     if (community != currentCommunity) {
                         double delta;
                         delta = scoreCommunity(cutWeights[community], degree,
-                                               communityVolumes[community],
+                                               communityVolumes[community], nodeMass,
                                                communitySizes[community]);
                         if (delta > maxDelta) {
                             maxDelta = delta;
@@ -510,6 +510,7 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                 }
                 double modThreshold = scoreCurrentCommunityThreshold(
                     cutWeights[currentCommunity], degree, communityVolumes[currentCommunity],
+                    nodeMass,
                     communitySizes[currentCommunity]);
 
                 bool singletonMove = singletonScore > maxDelta;
@@ -763,7 +764,7 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
                 continue;
             }
 
-            double singletonScore = scoreCommunity(0.0, degree, 0.0, 0);
+            double singletonScore = scoreCommunity(0.0, degree, 0.0, subsetSize, 0);
             double delta;
             index bestC = none;
             double bestDelta = std::numeric_limits<double>::lowest();
@@ -775,7 +776,7 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph) {
                     if (C == none) {
                         continue;
                     }
-                    delta = scoreCommunity(cutWeights[C], degree, refinedVolumes[C],
+                    delta = scoreCommunity(cutWeights[C], degree, refinedVolumes[C], subsetSize,
                                            refinedSizes[C]);
 
                     if (delta <= singletonScore) {

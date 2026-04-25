@@ -99,15 +99,17 @@ private:
     static count nodeSize(const CoarsenedGraphView &graph, node u);
 
     static double modularityCommunityScore(double cutD, double degreeV, double volD,
-                                           count sizeD, double gamma,
+                                           count subsetSize, count sizeD, double gamma,
                                            double inverseGraphVolume) {
+        tlx::unused(subsetSize);
         tlx::unused(sizeD);
         return cutD - gamma * degreeV * volD * inverseGraphVolume;
     }
 
-    static double modularityThresholdScore(double cutC, double degreeV, double volC, count sizeC,
-                                           double gamma,
+    static double modularityThresholdScore(double cutC, double degreeV, double volC,
+                                           count subsetSize, count sizeC, double gamma,
                                            double inverseGraphVolume) {
+        tlx::unused(subsetSize);
         tlx::unused(sizeC);
         return cutC - gamma * (volC - degreeV) * degreeV * inverseGraphVolume;
     }
@@ -137,15 +139,15 @@ private:
     }
 
     inline double scoreCommunity(double cutWeight, double degree, double communityVolume,
-                                 count communitySize) const {
-        return communityScoreFunction_(cutWeight, degree, communityVolume, communitySize, gamma,
-                                       inverseGraphVolume);
+                                 count subsetSize, count communitySize) const {
+        return communityScoreFunction_(cutWeight, degree, communityVolume, subsetSize,
+                                       communitySize, gamma, inverseGraphVolume);
     }
 
     inline double scoreCurrentCommunityThreshold(double cutWeight, double degree,
-                                                 double communityVolume,
+                                                 double communityVolume, count subsetSize,
                                                  count communitySize) const {
-        return currentCommunityThresholdFunction_(cutWeight, degree, communityVolume,
+        return currentCommunityThresholdFunction_(cutWeight, degree, communityVolume, subsetSize,
                                                   communitySize, gamma, inverseGraphVolume);
     }
 
