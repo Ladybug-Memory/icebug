@@ -37,7 +37,7 @@ classifiers = [
 dependencies = [
   "scipy",
   "numpy",
-  "pyarrow"
+  "pyarrow>=23.0.1,<24.0"
 ]
 
 [project.optional-dependencies]

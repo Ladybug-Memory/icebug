@@ -88,7 +88,7 @@ jobs:
           wget https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-noble.deb
           sudo apt-get install -y ./apache-arrow-apt-source-latest-noble.deb
           sudo apt-get update
-          sudo apt-get install -y clang-20 libomp-20-dev ninja-build libarrow-dev
+          sudo apt-get install -y clang-20 libomp-20-dev ninja-build libarrow-dev=23.0.1-1
 
       - name: Install prerequisites (Linux)
         if: matrix.os == 'linux' && matrix.compiler == 'gcc-14'
@@ -96,7 +96,7 @@ jobs:
           wget https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-noble.deb
           sudo apt-get install -y ./apache-arrow-apt-source-latest-noble.deb
           sudo apt-get update
-          sudo apt-get install -y g++-14 ninja-build libarrow-dev
+          sudo apt-get install -y g++-14 ninja-build libarrow-dev=23.0.1-1
 
       - name: Install prerequisites (macOS)
         if: matrix.os == 'macos'
