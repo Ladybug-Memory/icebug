@@ -261,7 +261,7 @@ void ParallelLeidenView::run() {
                 ParallelPartitionCoarseningView ppcView(*G, originalRefined);
                 ppcView.run();
                 auto newCoarsenedView = ppcView.getCoarsenedGraphView();
-                auto map = ppcView.getFineToCoarseNodeMapping();
+                const auto &map = ppcView.getFineToCoarseNodeMapping();
                 const auto &oldNodeMapping = currentCoarsenedView->getNodeMapping();
 
                 // Create new partition for the new coarsened view
@@ -269,8 +269,7 @@ void ParallelLeidenView::run() {
                 p.setUpperBound(result.upperBound());
 
                 // Map communities through the chain of coarsenings BEFORE moving map
-                // Capture map by value and other refs explicitly
-                G->parallelForNodes([map = map, &p, this, &oldNodeMapping](node originalNode) {
+                G->parallelForNodes([&map, &p, this, &oldNodeMapping](node originalNode) {
                     node newCoarseNode = map[originalNode];
                     // Find what community this original node belonged to
                     node oldCoarseNode = oldNodeMapping[originalNode];
@@ -279,7 +278,7 @@ void ParallelLeidenView::run() {
 
                 // Since ppcView is always built from *G, map already represents
                 // original -> current-coarse directly. No chain composition needed.
-                composedMapping = std::move(map);
+                composedMapping = map;
 
                 result = std::move(p);
                 currentCoarsenedView = newCoarsenedView;
@@ -289,16 +288,15 @@ void ParallelLeidenView::run() {
                 ParallelPartitionCoarseningView ppcView(*currentGraph, refined);
                 ppcView.run();
                 auto newCoarsenedView = ppcView.getCoarsenedGraphView();
-                auto map = ppcView.getFineToCoarseNodeMapping();
+                const auto &map = ppcView.getFineToCoarseNodeMapping();
 
                 // Maintain Partition, add every coarse Node to the community its fine Nodes were in
                 Partition p(newCoarsenedView->numberOfNodes());
                 p.setUpperBound(result.upperBound());
-                currentGraph->parallelForNodes(
-                    [map = map, &p, this](node u) { p[map[u]] = result[u]; });
+                currentGraph->parallelForNodes([&map, &p, this](node u) { p[map[u]] = result[u]; });
 
                 // ppcView is built from *G so map is already original -> coarse; just store it.
-                composedMapping = std::move(map);
+                composedMapping = map;
                 result = std::move(p);
 
                 currentCoarsenedView = newCoarsenedView;
