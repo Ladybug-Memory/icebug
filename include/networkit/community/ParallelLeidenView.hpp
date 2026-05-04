@@ -184,8 +184,6 @@ private:
     std::vector<double> communityVolumes;
     std::vector<count> communitySizes;
 
-    std::vector<node> composedMapping;
-
     static constexpr int WORKING_SIZE = 1000;
 
     double gamma; // Resolution parameter

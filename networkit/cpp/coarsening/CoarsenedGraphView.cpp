@@ -8,6 +8,8 @@
 #include <networkit/auxiliary/Timer.hpp>
 #include <networkit/coarsening/CoarsenedGraphView.hpp>
 
+#include <unordered_map>
+
 namespace NetworKit {
 
 CoarsenedGraphView::CoarsenedGraphView(const Graph &originalGraph, const Partition &partition)
@@ -30,6 +32,32 @@ CoarsenedGraphView::CoarsenedGraphView(const Graph &originalGraph, const Partiti
 
     TRACE("Created CoarsenedGraphView with ", numSupernodes, " supernodes from ",
           originalGraph.numberOfNodes(), " original nodes");
+}
+
+CoarsenedGraphView::CoarsenedGraphView(const CoarsenedGraphView &baseView,
+                                       const Partition &partition)
+    : originalGraph(baseView.originalGraph) {
+
+    Partition compactPartition = partition;
+    compactPartition.compact();
+    numSupernodes = compactPartition.upperBound();
+
+    nodeMapping.resize(originalGraph.upperNodeIdBound());
+    supernodeToOriginal.resize(numSupernodes);
+
+    for (node baseSupernode = 0; baseSupernode < baseView.numberOfNodes(); ++baseSupernode) {
+        const node supernode = compactPartition[baseSupernode];
+        const auto &originalNodes = baseView.supernodeToOriginal[baseSupernode];
+        supernodeToOriginal[supernode].reserve(supernodeToOriginal[supernode].size()
+                                               + originalNodes.size());
+        for (node originalNode : originalNodes) {
+            nodeMapping[originalNode] = supernode;
+            supernodeToOriginal[supernode].push_back(originalNode);
+        }
+    }
+
+    TRACE("Created layered CoarsenedGraphView with ", numSupernodes, " supernodes from ",
+          baseView.numberOfNodes(), " base supernodes");
 }
 
 count CoarsenedGraphView::numberOfEdges() const {

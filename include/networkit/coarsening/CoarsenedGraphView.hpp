@@ -30,6 +30,15 @@ public:
     CoarsenedGraphView(const Graph &originalGraph, const Partition &partition);
 
     /**
+     * Construct a coarsened graph view by coarsening an existing coarsened view.
+     * The resulting view still references the original graph and composes the
+     * original-node mapping directly.
+     * @param baseView Existing coarsened view
+     * @param partition Partition over the base view's supernodes
+     */
+    CoarsenedGraphView(const CoarsenedGraphView &baseView, const Partition &partition);
+
+    /**
      * Get the number of nodes (supernodes) in the coarsened view
      */
     count numberOfNodes() const { return numSupernodes; }
