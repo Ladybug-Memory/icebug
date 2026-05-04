@@ -45,16 +45,12 @@ CoarsenedGraphView::CoarsenedGraphView(const CoarsenedGraphView &baseView,
     nodeMapping.resize(originalGraph.upperNodeIdBound());
     supernodeToOriginal.resize(numSupernodes);
 
-    for (node baseSupernode = 0; baseSupernode < baseView.numberOfNodes(); ++baseSupernode) {
+    originalGraph.forNodes([&](node originalNode) {
+        const node baseSupernode = baseView.nodeMapping[originalNode];
         const node supernode = compactPartition[baseSupernode];
-        const auto &originalNodes = baseView.supernodeToOriginal[baseSupernode];
-        supernodeToOriginal[supernode].reserve(supernodeToOriginal[supernode].size()
-                                               + originalNodes.size());
-        for (node originalNode : originalNodes) {
-            nodeMapping[originalNode] = supernode;
-            supernodeToOriginal[supernode].push_back(originalNode);
-        }
-    }
+        nodeMapping[originalNode] = supernode;
+        supernodeToOriginal[supernode].push_back(originalNode);
+    });
 
     TRACE("Created layered CoarsenedGraphView with ", numSupernodes, " supernodes from ",
           baseView.numberOfNodes(), " base supernodes");
