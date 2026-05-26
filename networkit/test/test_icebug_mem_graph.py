@@ -5,21 +5,20 @@ import unittest
 
 import pyarrow as pa
 import networkit as nk
-from icebug_format import IcebugMemGraph, convert_arrow_tables_to_csr
+from icebug_format import IcebugMemGraph
 
 
-def _make_icebug_graph(edges, n_nodes):
+def _make_icebug_graph(edges, n_nodes, *, undirected=False):
     """Build an IcebugMemGraph from a list of (src, dst) tuples."""
     nodes = pa.table({"id": pa.array(list(range(n_nodes)), type=pa.int64())})
     rel = pa.table({
         "source": pa.array([e[0] for e in edges], type=pa.int64()),
         "target": pa.array([e[1] for e in edges], type=pa.int64()),
     })
-    return convert_arrow_tables_to_csr(
+    return IcebugMemGraph.from_arrow_tables(
         from_node_arrow_table=nodes,
-        to_node_arrow_table=nodes,
         rel_arrow_table=rel,
-        directed=True,
+        undirected=undirected,
     )
 
 
@@ -52,10 +51,7 @@ class TestFromIcebugMemGraph(unittest.TestCase):
 
     def test_empty_graph(self):
         """Graph with nodes but no edges."""
-        nodes = pa.table({"id": pa.array(list(range(5)), type=pa.int64())})
-        rel = pa.table({"source": pa.array([], type=pa.int64()),
-                        "target": pa.array([], type=pa.int64())})
-        mem = convert_arrow_tables_to_csr(nodes, nodes, rel)
+        mem = _make_icebug_graph([], n_nodes=5)
         G = nk.Graph.fromIcebugMemGraph(mem)
         self.assertEqual(G.numberOfNodes(), 5)
         self.assertEqual(G.numberOfEdges(), 0)
@@ -199,6 +195,55 @@ class TestFromIcebugMemGraph(unittest.TestCase):
         G = nk.Graph.fromIcebugMemGraph(mem, directed=True)
         self.assertEqual(G.numberOfNodes(), 3)
         self.assertEqual(G.numberOfEdges(), 3)
+
+
+    # ------------------------------------------------------------------
+    # directed=False tests (undirected community-detection use case)
+    # ------------------------------------------------------------------
+
+    def test_undirected_from_bidirectional_edges(self):
+        """directed=False on a graph built with undirected=True (which stores both (u,v)
+        and (v,u), interleaved by source node order) yields an undirected graph with the
+        correct edge count (each logical edge counted once)."""
+        mem = _make_icebug_graph([(0, 1), (1, 2), (0, 2)], n_nodes=3, undirected=True)
+        G = nk.Graph.fromIcebugMemGraph(mem, directed=False)
+
+        self.assertFalse(G.isDirected())
+        self.assertEqual(G.numberOfNodes(), 3)
+        # 3 logical undirected edges: (0,1), (1,2), (0,2)
+        self.assertEqual(G.numberOfEdges(), 3)
+
+    def test_undirected_neighbors(self):
+        """Neighbor lists are symmetric when directed=False.  The CSR stores both
+        directions interleaved by source, not in forward-then-reverse order."""
+        mem = _make_icebug_graph([(0, 1), (0, 2)], n_nodes=3, undirected=True)
+        G = nk.Graph.fromIcebugMemGraph(mem, directed=False)
+
+        self.assertFalse(G.isDirected())
+        self.assertEqual(sorted(G.iterNeighbors(0)), [1, 2])
+        self.assertEqual(sorted(G.iterNeighbors(1)), [0])
+        self.assertEqual(sorted(G.iterNeighbors(2)), [0])
+
+    def test_undirected_community_detection(self):
+        """PLM community detection runs correctly on an undirected graph built
+        from an IcebugMemGraph whose CSR has both directions stored."""
+        import networkit.community as nkc
+        mem = _make_icebug_graph(
+            [(0, 1), (1, 2), (0, 2)], n_nodes=3, undirected=True
+        )
+        G = nk.Graph.fromIcebugMemGraph(mem, directed=False)
+
+        plm = nkc.PLM(G)
+        plm.run()
+        partition = plm.getPartition()
+        self.assertEqual(partition.numberOfElements(), 3)
+        self.assertGreater(partition.numberOfSubsets(), 0)
+
+    def test_default_directed_still_true(self):
+        """Default behaviour (directed=True) is unchanged for backward compatibility."""
+        mem = _make_icebug_graph([(0, 1), (1, 2)], n_nodes=3)
+        G = nk.Graph.fromIcebugMemGraph(mem)
+        self.assertTrue(G.isDirected())
 
 
 if __name__ == "__main__":

@@ -444,6 +444,10 @@ gw.addEdge(0, 1)
 # Algorithms accept GraphW directly
 ```
 
+## Caveats
+- **GraphR is immutable**: Cannot call mutation methods on `GraphR` instances
+- **undirected graphs**: `GraphR` and `GraphW` handle undirected graphs by storing edges in both directions (symmetric storage)
+
 ## Known Issues and Fixes
 
 ### 1. GraphW Copy Constructor

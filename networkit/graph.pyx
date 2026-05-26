@@ -250,9 +250,9 @@ cdef class Graph:
 		return result
 
 	@classmethod
-	def fromIcebugMemGraph(cls, graph):
+	def fromIcebugMemGraph(cls, graph, bool_t directed=True):
 		"""
-		fromIcebugMemGraph(graph)
+		fromIcebugMemGraph(graph, directed=True)
 
 		Create a Graph from an :class:`icebug_format.IcebugMemGraph`.
 
@@ -264,10 +264,21 @@ cdef class Graph:
 		used instead.  The row-pointer column is always taken from the first
 		column of ``graph.indptr``.
 
+		``IcebugMemGraph`` is always stored as a directed graph, and simulates
+		undirected graphs by including both ``(u, v)`` and ``(v, u)`` in its
+		CSR arrays.  When *directed* is ``False``, this method passes
+		``directed=False`` to :meth:`fromCSR`, which interprets the doubly-stored
+		adjacency as a proper undirected graph.
+
 		Parameters
 		----------
 		graph : icebug_format.IcebugMemGraph
 			Arrow CSR graph representation
+		directed : bool, optional
+			Whether to interpret the graph as directed.  Pass ``False`` for
+			undirected graphs whose CSR already contains both ``(u, v)`` and
+			``(v, u)`` entries (the standard IcebugMemGraph convention).
+			Default: ``True``.
 
 		Returns
 		-------
@@ -288,22 +299,22 @@ cdef class Graph:
 				raise TypeError(
 					f"graph must be an IcebugMemGraph; missing required attribute '{attr}'"
 				)
-        
-        if not isinstance(graph.src, pa.Table):
+
+		if not isinstance(graph.src, pa.Table):
 			raise TypeError(
 				f"graph.src must be a pyarrow.Table, got {type(graph.src).__name__}"
 			)
-        
+
 		if not isinstance(graph.indices, pa.Table):
 			raise TypeError(
 				f"graph.indices must be a pyarrow.Table, got {type(graph.indices).__name__}"
 			)
-        
+		
 		if not isinstance(graph.indptr, pa.Table):
 			raise TypeError(
 				f"graph.indptr must be a pyarrow.Table, got {type(graph.indptr).__name__}"
 			)
-        
+		
 		if graph.indices.num_columns == 0:
 			raise ValueError("graph.indices must have at least one column")
 		if graph.indptr.num_columns == 0:
@@ -320,8 +331,7 @@ cdef class Graph:
 		# Always use the first column of indptr
 		out_indptr = graph.indptr.column(0).cast(pa.uint64())
 
-        # IcebugMemGraph is always directed
-		return cls.fromCSR(n, True, out_indices, out_indptr)
+		return cls.fromCSR(n, directed, out_indices, out_indptr)
 
 	def hasEdgeIds(self):
 		"""

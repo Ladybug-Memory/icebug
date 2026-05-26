@@ -90,20 +90,22 @@ If you only want to see in short how Icebug is used - the following example prov
     modularity              0.987243
     -------------------  -----------
 
-icebug also offers two ways to load a graph from CSR format enabling zero-copy loading of large graphs using Arrow tables
+Icebug also offers two ways to load a graph from CSR format enabling zero-copy loading of large graphs using Arrow tables
 
     >>> import pyarrow as pa
-    >>> from icebug_format import convert_arrow_tables_to_csr
+    >>> from icebug_format import IcebugMemGraph
     >>> nodes = pa.table({"id": pa.array([0, 1, 2], type=pa.int64())})
     >>> rels  = pa.table({"source": pa.array([0, 1, 2], type=pa.int64()),
     ...                   "target": pa.array([1, 2, 0], type=pa.int64())})
-    >>> mem = convert_arrow_tables_to_csr(nodes, nodes, rels, directed=True)
+    >>> mem = IcebugMemGraph.from_arrow_tables(nodes, nodes, rels, directed=True)
     >>> g = nk.graph.Graph.fromIcebugMemGraph(mem)
 
     # using fromCSR directly
     >>> indices = pa.table({"target": pa.array([1, 2, 0], type=pa.int64())})
     >>> indptr = pa.table({"row_ptr": pa.array([0, 1, 2, 3], type=pa.int64())})
     >>> g = nk.graph.Graph.fromCSR(3, True, indices, indptr)
+
+Note: Properties in IcebugMemGraph are pyarrow tables, so, node and edge tables could contain properties, whereas the fromCSR method only supports loading the graph structure, so no properties are supported.
 
 ## Install the C++ Core only
 
