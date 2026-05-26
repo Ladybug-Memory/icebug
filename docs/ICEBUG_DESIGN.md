@@ -235,7 +235,38 @@ g = nk.graph.Graph.fromCSR(3, False, indices, indptr)
 indices = pa.array([1, 2, 0], type=pa.uint64())
 indptr = pa.array([0, 2, 3, 3], type=pa.uint64())
 g = nk.graph.Graph.fromCSR(3, True, indices, indptr)
+
+# From an icebug_format.IcebugMemGraph (zero-copy, preferred high-level API)
+# IcebugMemGraph: {
+#   src: pyarrow.Table (src node table)
+#   indices: pyarrow.Table (edge targets)
+#   indptr: pyarrow.Table (row pointers)
+#   dest: pyarrow.Table (target node table) # not used in icebug
+# }
+g = nk.graph.Graph.fromIcebugMemGraph(icebug_mem_graph)
 ```
+
+### `fromIcebugMemGraph` Column Resolution
+
+`Graph.fromIcebugMemGraph(graph)` wraps `fromCSR` and resolves
+columns from the two Arrow tables as follows:
+
+| Parameter | Resolution rule |
+|-----------|----------------|
+| `out_indices` | `graph.indices.column('target')` if the column exists; otherwise the **first column** of `graph.indices` |
+| `out_indptr` | always the **first column** of `graph.indptr` |
+
+Both arrays are cast to `uint64` before being passed to `fromCSR`.
+
+**Required attributes on the input object:**
+
+* `src` – node table (used only to determine node count via `graph.src.num_rows`)
+* `indices` – a `pyarrow.Table` with at least one column
+* `indptr` – a `pyarrow.Table` with at least one column
+
+A `TypeError` is raised if any attribute is absent or if `indices`/`indptr`
+are not `pyarrow.Table` instances. A `ValueError` is raised if either table
+has no columns.
 
 ### Mutable Operations
 

@@ -37,7 +37,8 @@ classifiers = [
 dependencies = [
   "scipy",
   "numpy",
-  "pyarrow>=23.0.1,<24.0"
+  "pyarrow>=23.0.1,<24.0",
+  "icebug-format>0.1.0"
 ]
 
 [project.optional-dependencies]

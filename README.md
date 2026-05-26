@@ -75,7 +75,7 @@ To get an overview and learn about Icebug's different functions/classes, have a 
 
 We also provide a Binder-instance of our notebooks. To access this service, you can either click on the badge at the top or follow this [link][binder]. Disclaimer: Due to rebuilds of the underlying image, it can takes some time until your Binder instance is ready for usage.
 
-If you only want to see in short how Icebug is used - the following example provides a climpse at that. Here we generate a random hyperbolic graph with 100k nodes and compute its communities with the PLM method:
+If you only want to see in short how Icebug is used - the following example provides a glimpse at that. Here we generate a random hyperbolic graph with 100k nodes and compute its communities with the PLM method:
 
     >>> import networkit as nk
     >>> g = nk.generators.HyperbolicGenerator(1e5).generate()
@@ -89,6 +89,21 @@ If you only want to see in short how Icebug is used - the following example prov
     avg. community size    22.0459
     modularity              0.987243
     -------------------  -----------
+
+icebug also offers two ways to load a graph from CSR format enabling zero-copy loading of large graphs using Arrow tables
+
+    >>> import pyarrow as pa
+    >>> from icebug_format import convert_arrow_tables_to_csr
+    >>> nodes = pa.table({"id": pa.array([0, 1, 2], type=pa.int64())})
+    >>> rels  = pa.table({"source": pa.array([0, 1, 2], type=pa.int64()),
+    ...                   "target": pa.array([1, 2, 0], type=pa.int64())})
+    >>> mem = convert_arrow_tables_to_csr(nodes, nodes, rels, directed=True)
+    >>> g = nk.graph.Graph.fromIcebugMemGraph(mem)
+
+    # using fromCSR directly
+    >>> indices = pa.table({"target": pa.array([1, 2, 0], type=pa.int64())})
+    >>> indptr = pa.table({"row_ptr": pa.array([0, 1, 2, 3], type=pa.int64())})
+    >>> g = nk.graph.Graph.fromCSR(3, True, indices, indptr)
 
 ## Install the C++ Core only
 

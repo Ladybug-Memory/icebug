@@ -249,6 +249,80 @@ cdef class Graph:
 
 		return result
 
+	@classmethod
+	def fromIcebugMemGraph(cls, graph):
+		"""
+		fromIcebugMemGraph(graph)
+
+		Create a Graph from an :class:`icebug_format.IcebugMemGraph`.
+
+		Extracts the ``indices`` and ``indptr`` Arrow tables from *graph* and
+		delegates to :meth:`fromCSR` for zero-copy construction.
+
+		The neighbor column is resolved from ``graph.indices`` by preferring a
+		column named ``'target'``; if no such column exists the first column is
+		used instead.  The row-pointer column is always taken from the first
+		column of ``graph.indptr``.
+
+		Parameters
+		----------
+		graph : icebug_format.IcebugMemGraph
+			Arrow CSR graph representation
+
+		Returns
+		-------
+		Graph
+			A new Graph instance backed by the Arrow arrays from *graph*.
+
+		Raises
+		------
+		TypeError
+			If *graph* is missing a required attribute (``src``, ``indices``,
+			or ``indptr``), or if ``indices`` / ``indptr`` are not
+			:class:`pyarrow.Table` instances.
+		ValueError
+			If ``graph.indices`` or ``graph.indptr`` contain no columns.
+		"""
+		for attr in ('src', 'indices', 'indptr'):
+			if not hasattr(graph, attr):
+				raise TypeError(
+					f"graph must be an IcebugMemGraph; missing required attribute '{attr}'"
+				)
+        
+        if not isinstance(graph.src, pa.Table):
+			raise TypeError(
+				f"graph.src must be a pyarrow.Table, got {type(graph.src).__name__}"
+			)
+        
+		if not isinstance(graph.indices, pa.Table):
+			raise TypeError(
+				f"graph.indices must be a pyarrow.Table, got {type(graph.indices).__name__}"
+			)
+        
+		if not isinstance(graph.indptr, pa.Table):
+			raise TypeError(
+				f"graph.indptr must be a pyarrow.Table, got {type(graph.indptr).__name__}"
+			)
+        
+		if graph.indices.num_columns == 0:
+			raise ValueError("graph.indices must have at least one column")
+		if graph.indptr.num_columns == 0:
+			raise ValueError("graph.indptr must have at least one column")
+
+		n = graph.src.num_rows
+
+		# Prefer the 'target' column; fall back to the first column
+		if 'target' in graph.indices.column_names:
+			out_indices = graph.indices.column('target').cast(pa.uint64())
+		else:
+			out_indices = graph.indices.column(0).cast(pa.uint64())
+
+		# Always use the first column of indptr
+		out_indptr = graph.indptr.column(0).cast(pa.uint64())
+
+        # IcebugMemGraph is always directed
+		return cls.fromCSR(n, True, out_indices, out_indptr)
+
 	def hasEdgeIds(self):
 		"""
 		hasEdgeIds()
