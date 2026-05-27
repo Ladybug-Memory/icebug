@@ -18,7 +18,7 @@ def _make_icebug_graph(edges, n_nodes, *, undirected=False):
     return IcebugMemGraph.from_arrow_tables(
         from_node_arrow_table=nodes,
         rel_arrow_table=rel,
-        undirected=undirected,
+        add_reverse_edges=undirected,
     )
 
 
