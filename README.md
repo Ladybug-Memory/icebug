@@ -97,7 +97,7 @@ Icebug also offers two ways to load a graph from CSR format enabling zero-copy l
     >>> nodes = pa.table({"id": pa.array([0, 1, 2], type=pa.int64())})
     >>> rels  = pa.table({"source": pa.array([0, 1, 2], type=pa.int64()),
     ...                   "target": pa.array([1, 2, 0], type=pa.int64())})
-    >>> mem = IcebugMemGraph.from_arrow_tables(nodes, nodes, rels, directed=True)
+    >>> mem = IcebugMemGraph.from_arrow_tables(nodes, rels)
     >>> g = nk.graph.Graph.fromIcebugMemGraph(mem)
 
     # using fromCSR directly
