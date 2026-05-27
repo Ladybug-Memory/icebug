@@ -1,6 +1,8 @@
 # distutils: language=c++
 
 from cython.operator import dereference, preincrement
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from libcpp.algorithm cimport swap
 
 import numpy as np
@@ -288,11 +290,12 @@ cdef class Graph:
 		Raises
 		------
 		TypeError
-			If *graph* is missing a required attribute (``src``, ``indices``,
-			or ``indptr``), or if ``indices`` / ``indptr`` are not
+			If *graph* is missing a required attribute (``src``, ``dest``,
+			``indices``, or ``indptr``), or if these attributes are not
 			:class:`pyarrow.Table` instances.
 		ValueError
-			If ``graph.indices`` or ``graph.indptr`` contain no columns.
+			If ``graph.src`` and ``graph.dest`` differ, or if
+			``graph.indices`` or ``graph.indptr`` contain no columns.
 		"""
 		for attr in ('src', 'indices', 'indptr'):
 			if not hasattr(graph, attr):
@@ -314,6 +317,22 @@ cdef class Graph:
 			raise TypeError(
 				f"graph.indptr must be a pyarrow.Table, got {type(graph.indptr).__name__}"
 			)
+
+		if not hasattr(graph, 'dest'):
+			raise TypeError(
+				"graph must be an IcebugMemGraph; missing required attribute 'dest'"
+			)
+
+		if not isinstance(graph.dest, pa.Table):
+			raise TypeError(
+				f"graph.dest must be a pyarrow.Table, got {type(graph.dest).__name__}"
+			)
+
+		if not graph.src.equals(graph.dest):
+			raise ValueError(
+				"Graph.fromIcebugMemGraph only supports homogeneous graphs where "
+				"graph.src equals graph.dest"
+			)
 		
 		if graph.indices.num_columns == 0:
 			raise ValueError("graph.indices must have at least one column")
@@ -322,14 +341,31 @@ cdef class Graph:
 
 		n = graph.src.num_rows
 
+		def combine_chunks(chunked):
+			chunks = chunked.chunks
+			offsets = np.cumsum([0] + [len(c) for c in chunks])
+			out = np.empty(offsets[-1], dtype=np.uint64)
+
+			def copy_chunk(i):
+				out[offsets[i]:offsets[i + 1]] = chunks[i].to_numpy(zero_copy_only=False)
+
+			with ThreadPoolExecutor() as ex:
+				deque(ex.map(copy_chunk, range(len(chunks))), maxlen=0)
+
+			return pa.array(out, type=pa.uint64())
+
+		def table_column_as_uint64_array(table, column):
+			chunked = table.column(column).cast(pa.uint64())
+			return combine_chunks(chunked)
+
 		# Prefer the 'target' column; fall back to the first column
 		if 'target' in graph.indices.column_names:
-			out_indices = graph.indices.column('target').cast(pa.uint64())
+			out_indices = table_column_as_uint64_array(graph.indices, 'target')
 		else:
-			out_indices = graph.indices.column(0).cast(pa.uint64())
+			out_indices = table_column_as_uint64_array(graph.indices, 0)
 
 		# Always use the first column of indptr
-		out_indptr = graph.indptr.column(0).cast(pa.uint64())
+		out_indptr = table_column_as_uint64_array(graph.indptr, 0)
 
 		return cls.fromCSR(n, directed, out_indices, out_indptr)
 

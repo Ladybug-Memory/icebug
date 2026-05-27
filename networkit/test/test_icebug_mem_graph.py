@@ -111,6 +111,19 @@ class TestFromIcebugMemGraph(unittest.TestCase):
         with self.assertRaises(TypeError) as ctx:
             nk.Graph.fromIcebugMemGraph(FakeGraph())
         self.assertIn("indptr", str(ctx.exception))
+
+    def test_missing_dest_attribute_raises_type_error(self):
+        """An object missing 'dest' raises TypeError."""
+        nodes = pa.table({"id": pa.array([0, 1], type=pa.int64())})
+
+        class FakeGraph:
+            src = nodes
+            indices = pa.table({"target": pa.array([1], type=pa.uint64())})
+            indptr = pa.table({"ptr": pa.array([0, 1, 1], type=pa.uint64())})
+
+        with self.assertRaises(TypeError) as ctx:
+            nk.Graph.fromIcebugMemGraph(FakeGraph())
+        self.assertIn("dest", str(ctx.exception))
     
     def test_src_not_a_table_raises_type_error(self):
         """graph.src that is not a pa.Table raises TypeError."""
@@ -149,12 +162,42 @@ class TestFromIcebugMemGraph(unittest.TestCase):
             nk.Graph.fromIcebugMemGraph(FakeGraph())
         self.assertIn("indptr", str(ctx.exception))
 
+    def test_dest_not_a_table_raises_type_error(self):
+        """graph.dest that is not a pa.Table raises TypeError."""
+        nodes = pa.table({"id": pa.array([0, 1], type=pa.int64())})
+
+        class FakeGraph:
+            src = nodes
+            dest = [0, 1]  # wrong type
+            indices = pa.table({"target": pa.array([1], type=pa.uint64())})
+            indptr = pa.table({"ptr": pa.array([0, 1, 1], type=pa.uint64())})
+
+        with self.assertRaises(TypeError) as ctx:
+            nk.Graph.fromIcebugMemGraph(FakeGraph())
+        self.assertIn("dest", str(ctx.exception))
+
+    def test_heterogeneous_src_dest_raises_value_error(self):
+        """Separate source and destination node tables are rejected."""
+        src_nodes = pa.table({"id": pa.array([0, 1], type=pa.int64())})
+        dest_nodes = pa.table({"id": pa.array([10, 11], type=pa.int64())})
+        mem = IcebugMemGraph(
+            src=src_nodes,
+            dest=dest_nodes,
+            indices=pa.table({"target": pa.array([0, 1], type=pa.uint64())}),
+            indptr=pa.table({"ptr": pa.array([0, 1, 2], type=pa.uint64())}),
+        )
+
+        with self.assertRaises(ValueError) as ctx:
+            nk.Graph.fromIcebugMemGraph(mem)
+        self.assertIn("homogeneous", str(ctx.exception))
+
     def test_indices_empty_columns_raises_value_error(self):
         """graph.indices with no columns raises ValueError."""
         nodes = pa.table({"id": pa.array([0, 1, 2], type=pa.int64())})
 
         class FakeGraph:
             src = nodes
+            dest = nodes
             indices = pa.table({})   # no columns
             indptr = pa.table({"ptr": pa.array([0, 1, 2, 3], type=pa.uint64())})
 
@@ -168,6 +211,7 @@ class TestFromIcebugMemGraph(unittest.TestCase):
 
         class FakeGraph:
             src = nodes
+            dest = nodes
             indices = pa.table({"target": pa.array([1, 2, 0], type=pa.uint64())})
             indptr = pa.table({})  # no columns
 
@@ -195,6 +239,30 @@ class TestFromIcebugMemGraph(unittest.TestCase):
         G = nk.Graph.fromIcebugMemGraph(mem, directed=True)
         self.assertEqual(G.numberOfNodes(), 3)
         self.assertEqual(G.numberOfEdges(), 3)
+
+    def test_chunked_columns_are_combined(self):
+        """Chunked table columns are accepted."""
+        indices = pa.table({
+            "target": pa.chunked_array([
+                pa.array([1, 2], type=pa.uint64()),
+                pa.array([0], type=pa.uint64()),
+            ])
+        })
+        indptr = pa.table({
+            "ptr": pa.chunked_array([
+                pa.array([0, 1], type=pa.uint64()),
+                pa.array([2, 3], type=pa.uint64()),
+            ])
+        })
+        nodes = pa.table({"id": pa.array([0, 1, 2], type=pa.int64())})
+        mem = IcebugMemGraph(src=nodes, dest=nodes, indices=indices, indptr=indptr)
+
+        G = nk.Graph.fromIcebugMemGraph(mem, directed=True)
+        self.assertEqual(G.numberOfNodes(), 3)
+        self.assertEqual(G.numberOfEdges(), 3)
+        self.assertTrue(G.hasEdge(0, 1))
+        self.assertTrue(G.hasEdge(1, 2))
+        self.assertTrue(G.hasEdge(2, 0))
 
 
     # ------------------------------------------------------------------
