@@ -39,7 +39,7 @@ dependencies = [
   "duckdb",
   "scipy",
   "numpy",
-  "pyarrow>=23.0.1,<24.0",
+  "pyarrow>=24.0.0,<25.0",
   "icebug-format>=1.0.0",
   "pytest"
 ]
