@@ -1,8 +1,6 @@
 # distutils: language=c++
 
 from cython.operator import dereference, preincrement
-from collections import deque
-from concurrent.futures import ThreadPoolExecutor
 from libcpp.algorithm cimport swap
 
 import numpy as np
@@ -260,6 +258,9 @@ cdef class Graph:
 
 		Extracts the ``indices`` and ``indptr`` Arrow tables from *graph* and
 		delegates to :meth:`fromCSR` for zero-copy construction.
+		Zero-copy is preserved only when a resolved column is already a single
+		``uint64`` chunk; multi-chunk columns are combined and non-``uint64``
+		integer columns are cast before construction.
 
 		The neighbor column is resolved from ``graph.indices`` by preferring a
 		column named ``'target'``; if no such column exists the first column is
@@ -341,22 +342,20 @@ cdef class Graph:
 
 		n = graph.src.num_rows
 
-		def combine_chunks(chunked):
-			chunks = chunked.chunks
-			offsets = np.cumsum([0] + [len(c) for c in chunks])
-			out = np.empty(offsets[-1], dtype=np.uint64)
-
-			def copy_chunk(i):
-				out[offsets[i]:offsets[i + 1]] = chunks[i].to_numpy(zero_copy_only=False)
-
-			with ThreadPoolExecutor() as ex:
-				deque(ex.map(copy_chunk, range(len(chunks))), maxlen=0)
-
-			return pa.array(out, type=pa.uint64())
-
 		def table_column_as_uint64_array(table, column):
-			chunked = table.column(column).cast(pa.uint64())
-			return combine_chunks(chunked)
+			chunked = table.column(column)
+			if not (pa.types.is_integer(chunked.type) or pa.types.is_unsigned_integer(chunked.type)):
+				raise TypeError(
+					f"graph column '{column}' must contain integer values, got {chunked.type}"
+				)
+			if chunked.num_chunks == 1:
+				array = chunked.chunk(0)
+				if pa.types.is_uint64(array.type):
+					return array
+				return array.cast(pa.uint64())
+			if pa.types.is_uint64(chunked.type):
+				return chunked.combine_chunks()
+			return chunked.cast(pa.uint64()).combine_chunks()
 
 		# Prefer the 'target' column; fall back to the first column
 		if 'target' in graph.indices.column_names:

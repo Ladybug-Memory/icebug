@@ -256,7 +256,9 @@ columns from the two Arrow tables as follows:
 | `out_indices` | `graph.indices.column('target')` if the column exists; otherwise the **first column** of `graph.indices` |
 | `out_indptr` | always the **first column** of `graph.indptr` |
 
-Both arrays are cast to `uint64` before being passed to `fromCSR`.
+If a resolved column is already a single `uint64` chunk, it is passed through
+unchanged. Multi-chunk columns are combined, and non-`uint64` integer columns
+are cast to `uint64` before being passed to `fromCSR`.
 
 **Required attributes on the input object:**
 

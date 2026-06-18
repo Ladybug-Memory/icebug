@@ -106,6 +106,9 @@ Icebug also offers two ways to load a graph from CSR format enabling zero-copy l
     >>> g = nk.graph.Graph.fromCSR(3, True, indices, indptr)
 
 Note: Properties in IcebugMemGraph are pyarrow tables, so, node and edge tables could contain properties, whereas the fromCSR method only supports loading the graph structure, so no properties are supported.
+If the resolved CSR column is already a single `uint64` chunk, `fromIcebugMemGraph`
+keeps it zero-copy; chunked columns are combined and integer columns are cast to
+`uint64`, which allocates.
 
 ## Install the C++ Core only
 
