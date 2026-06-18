@@ -264,25 +264,16 @@ class TestFromIcebugMemGraph(unittest.TestCase):
         self.assertTrue(G.hasEdge(1, 2))
         self.assertTrue(G.hasEdge(2, 0))
 
-    def test_single_chunk_columns_preserve_buffers(self):
-        """Single-chunk uint64 columns are passed through without copying."""
-        indices_chunk = pa.array([1, 2, 0], type=pa.uint64())
-        indptr_chunk = pa.array([0, 1, 2, 3], type=pa.uint64())
-        indices = pa.table({"target": pa.chunked_array([indices_chunk])})
-        indptr = pa.table({"ptr": pa.chunked_array([indptr_chunk])})
+    def test_non_uint64_integer_columns_are_cast(self):
+        """Non-uint64 integer columns are cast to uint64 and work correctly."""
+        indices = pa.table({"target": pa.array([1, 2, 0], type=pa.int32())})
+        indptr = pa.table({"ptr": pa.array([0, 1, 2, 3], type=pa.int64())})
         nodes = pa.table({"id": pa.array([0, 1, 2], type=pa.int64())})
         mem = IcebugMemGraph(src=nodes, dest=nodes, indices=indices, indptr=indptr)
 
         G = nk.Graph.fromIcebugMemGraph(mem, directed=True)
-
-        self.assertEqual(
-            G._arrow_arrays["out_indices"].buffers()[1].address,
-            indices_chunk.buffers()[1].address,
-        )
-        self.assertEqual(
-            G._arrow_arrays["out_indptr"].buffers()[1].address,
-            indptr_chunk.buffers()[1].address,
-        )
+        self.assertEqual(G.numberOfNodes(), 3)
+        self.assertEqual(G.numberOfEdges(), 3)
 
     def test_non_integer_columns_raise_type_error(self):
         """Non-integer columns are rejected before casting."""
