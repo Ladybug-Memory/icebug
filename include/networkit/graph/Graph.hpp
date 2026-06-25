@@ -737,21 +737,6 @@ public:
     Graph(std::initializer_list<WeightedEdge> edges);
 
     /**
-     * Create a graph from CSR arrays for memory-efficient storage.
-     *
-     * @param n Number of nodes.
-     * @param directed If set to @c true, the graph will be directed.
-     * @param outIndices CSR indices array containing neighbor node IDs for outgoing edges
-     * @param outIndptr CSR indptr array containing offsets into outIndices for each node
-     * @param inIndices CSR indices array containing neighbor node IDs for incoming edges (directed
-     * only)
-     * @param inIndptr CSR indptr array containing offsets into inIndices for each node (directed
-     * only)
-     */
-    Graph(count n, bool directed, std::vector<node> outIndices, std::vector<index> outIndptr,
-          std::vector<node> inIndices = {}, std::vector<index> inIndptr = {});
-
-    /**
      * Create a graph as copy of @a other.
      * @param other The graph to copy.
      */

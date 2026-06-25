@@ -25,23 +25,6 @@ namespace NetworKit {
 class GraphR : public Graph {
 public:
     /**
-     * Create a graph from CSR arrays for memory-efficient storage.
-     *
-     * @param n Number of nodes.
-     * @param directed If set to @c true, the graph will be directed.
-     * @param outIndices CSR indices array containing neighbor node IDs for outgoing edges
-     * @param outIndptr CSR indptr array containing offsets into outIndices for each node
-     * @param inIndices CSR indices array containing neighbor node IDs for incoming edges (directed
-     * only)
-     * @param inIndptr CSR indptr array containing offsets into inIndices for each node (directed
-     * only)
-     */
-    GraphR(count n, bool directed, std::vector<node> outIndices, std::vector<index> outIndptr,
-           std::vector<node> inIndices = {}, std::vector<index> inIndptr = {})
-        : Graph(n, directed, std::move(outIndices), std::move(outIndptr), std::move(inIndices),
-                std::move(inIndptr)) {}
-
-    /**
      * Constructor that creates a graph from Arrow CSR arrays for zero-copy memory efficiency.
      * @param n Number of nodes.
      * @param directed If set to @c true, the graph will be directed.
