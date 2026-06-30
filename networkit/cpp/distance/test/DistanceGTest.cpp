@@ -97,24 +97,24 @@ TEST_F(DistanceGTest, testAStarInvalidSourceNode) {
     GraphW G(5);
     std::vector<double> distanceHeu = {1.0, 2.0, 3.0, 4.0, 5.0};
 
-    EXPECT_THROW({ AStar astar(G, distanceHeu, /*invalid_source*/ 6, /*target*/ 0); },
-                 std::runtime_error);
+    EXPECT_THROW(
+        { AStar astar(G, distanceHeu, /*invalid_source*/ 6, /*target*/ 0); }, std::runtime_error);
 }
 
 TEST_F(DistanceGTest, testAStarInvalidTargetNode) {
     GraphW G(5);
     std::vector<double> distanceHeu = {1.0, 2.0, 3.0, 4.0, 5.0};
 
-    EXPECT_THROW({ AStar astar(G, distanceHeu, /*source*/ 0, /*invalid_target*/ 6); },
-                 std::runtime_error);
+    EXPECT_THROW(
+        { AStar astar(G, distanceHeu, /*source*/ 0, /*invalid_target*/ 6); }, std::runtime_error);
 }
 
 TEST_F(DistanceGTest, testAStarConstructorThrowsMismatchHeuristicAndNodeCount) {
     GraphW G(5);
     std::vector<double> distanceHeu = {1.0, 2.0}; // size mismatch (2 instead of 5)
 
-    EXPECT_THROW({ AStar astar_bad(G, distanceHeu, /*source*/ 0, /*target*/ 1); },
-                 std::runtime_error);
+    EXPECT_THROW(
+        { AStar astar_bad(G, distanceHeu, /*source*/ 0, /*target*/ 1); }, std::runtime_error);
 }
 
 TEST_F(DistanceGTest, testAStar) {
@@ -189,10 +189,12 @@ TEST_F(DistanceGTest, testAStar) {
 TEST_F(DistanceGTest, testAlgebraicDistanceContructorThrowsForInvalidOmegaValues) {
     GraphW G(5, true, true);
 
-    EXPECT_THROW({ AlgebraicDistance AGD(G, 10UL, 30UL, /* invalid_omega*/ 1.1, 0UL, true); },
-                 std::invalid_argument);
-    EXPECT_THROW({ AlgebraicDistance AGD(G, 10UL, 30UL, /* invalid_omega*/ -0.3, 0UL, true); },
-                 std::invalid_argument);
+    EXPECT_THROW(
+        { AlgebraicDistance AGD(G, 10UL, 30UL, /* invalid_omega*/ 1.1, 0UL, true); },
+        std::invalid_argument);
+    EXPECT_THROW(
+        { AlgebraicDistance AGD(G, 10UL, 30UL, /* invalid_omega*/ -0.3, 0UL, true); },
+        std::invalid_argument);
 }
 
 TEST_F(DistanceGTest, testAlgebraicDistanceContructorThrowsForEdgecoresWithoutEdgeIds) {
@@ -751,8 +753,9 @@ TEST_P(DistanceGTest, testSPSPWithUnreachableTarget) {
 TEST_F(DistanceGTest, testMultiTargetBFSThrowsInvalidSourceWithTargetRange) {
     GraphW G(5);
     std::vector<node> targets = {0, 1, 2, 3};
-    EXPECT_THROW({ MultiTargetBFS astar(G, /*invalid_source*/ 6, targets.begin(), targets.end()); },
-                 std::runtime_error);
+    EXPECT_THROW(
+        { MultiTargetBFS astar(G, /*invalid_source*/ 6, targets.begin(), targets.end()); },
+        std::runtime_error);
 }
 
 TEST_F(DistanceGTest, testMultiTargetBFSThrowsWithOneInvalidTargetInTargetRange) {

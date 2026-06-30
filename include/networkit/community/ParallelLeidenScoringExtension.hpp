@@ -11,14 +11,16 @@
 
 namespace NetworKit {
 
-using ParallelLeidenCommunityScoreFunction =
-    double (*)(double cutWeight, double degree, double communityVolume, count subsetSize,
-               count communitySize, double gamma, double inverseGraphVolume);
+using ParallelLeidenCommunityScoreFunction = double (*)(double cutWeight, double degree,
+                                                        double communityVolume, count subsetSize,
+                                                        count communitySize, double gamma,
+                                                        double inverseGraphVolume);
 
-using ParallelLeidenRefineSetConditionFunction =
-    bool (*)(double cutWeight, double subsetVolume, count subsetSize, double targetVolume,
-             count targetSize, double sourceVolume, count sourceSize, double gamma,
-               double inverseGraphVolume);
+using ParallelLeidenRefineSetConditionFunction = bool (*)(double cutWeight, double subsetVolume,
+                                                          count subsetSize, double targetVolume,
+                                                          count targetSize, double sourceVolume,
+                                                          count sourceSize, double gamma,
+                                                          double inverseGraphVolume);
 
 } // namespace NetworKit
 
@@ -27,8 +29,8 @@ extern "C" {
 /**
  * Required: score a candidate community during the move phase.
  */
-double networkitParallelLeidenCommunityScore(double cutWeight, double degree, double communityVolume,
-                                             NetworKit::count subsetSize,
+double networkitParallelLeidenCommunityScore(double cutWeight, double degree,
+                                             double communityVolume, NetworKit::count subsetSize,
                                              NetworKit::count communitySize, double gamma,
                                              double inverseGraphVolume);
 
@@ -40,8 +42,7 @@ double networkitParallelLeidenCurrentCommunityThreshold(double cutWeight, double
                                                         double communityVolume,
                                                         NetworKit::count subsetSize,
                                                         NetworKit::count communitySize,
-                                                        double gamma,
-                                                        double inverseGraphVolume);
+                                                        double gamma, double inverseGraphVolume);
 
 /**
  * Optional: override the refine-phase R-set condition.
@@ -61,7 +62,7 @@ bool networkitParallelLeidenRefineTSetCondition(double cutWeight, double subsetV
                                                 NetworKit::count subsetSize, double targetVolume,
                                                 NetworKit::count targetSize, double sourceVolume,
                                                 NetworKit::count sourceSize, double gamma,
-                                                        double inverseGraphVolume);
+                                                double inverseGraphVolume);
 
 } // extern "C"
 

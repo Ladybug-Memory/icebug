@@ -14,8 +14,8 @@
 #include <limits>
 #include <memory>
 #include <mutex>
-#include <string>
 #include <omp.h>
+#include <string>
 #include <thread>
 #include <tlx/unused.hpp>
 #include <networkit/Globals.hpp>

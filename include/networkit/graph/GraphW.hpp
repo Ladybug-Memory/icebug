@@ -999,7 +999,7 @@ public:
     public:
         NeighborRange(const GraphW &G, node u) : G(&G), u(u) { assert(G.hasNode(u)); };
 
-        NeighborRange() : G(nullptr){};
+        NeighborRange() : G(nullptr) {};
 
         NeighborIterator begin() const {
             assert(G);
@@ -1037,7 +1037,7 @@ public:
     public:
         NeighborWeightRange(const GraphW &G, node u) : G(&G), u(u) { assert(G.hasNode(u)); };
 
-        NeighborWeightRange() : G(nullptr){};
+        NeighborWeightRange() : G(nullptr) {};
 
         NeighborWeightIterator begin() const {
             assert(G);

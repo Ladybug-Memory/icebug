@@ -156,5 +156,4 @@ CoarsenedGraphView::computeNeighbors(node supernode) const {
     return neighbors;
 }
 
-
 } /* namespace NetworKit */

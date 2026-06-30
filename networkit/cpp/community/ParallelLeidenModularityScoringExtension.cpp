@@ -10,32 +10,24 @@ extern "C" double networkitParallelLeidenCommunityScore(double cutWeight, double
                                                         double communityVolume,
                                                         NetworKit::count subsetSize,
                                                         NetworKit::count communitySize,
-                                                        double gamma,
-                                                        double inverseGraphVolume) {
+                                                        double gamma, double inverseGraphVolume) {
     (void)subsetSize;
     (void)communitySize;
     return cutWeight - gamma * degree * communityVolume * inverseGraphVolume;
 }
 
-extern "C" double networkitParallelLeidenCurrentCommunityThreshold(double cutWeight, double degree,
-                                                                   double communityVolume,
-                                                                   NetworKit::count subsetSize,
-                                                                   NetworKit::count communitySize,
-                                                                   double gamma,
-                                                                   double inverseGraphVolume) {
+extern "C" double networkitParallelLeidenCurrentCommunityThreshold(
+    double cutWeight, double degree, double communityVolume, NetworKit::count subsetSize,
+    NetworKit::count communitySize, double gamma, double inverseGraphVolume) {
     (void)subsetSize;
     (void)communitySize;
     return cutWeight - gamma * (communityVolume - degree) * degree * inverseGraphVolume;
 }
 
-extern "C" bool networkitParallelLeidenRefineRSetCondition(double cutWeight, double subsetVolume,
-                                                           NetworKit::count subsetSize,
-                                                           double targetVolume,
-                                                           NetworKit::count targetSize,
-                                                           double sourceVolume,
-                                                           NetworKit::count sourceSize,
-                                                           double gamma,
-                                                           double inverseGraphVolume) {
+extern "C" bool networkitParallelLeidenRefineRSetCondition(
+    double cutWeight, double subsetVolume, NetworKit::count subsetSize, double targetVolume,
+    NetworKit::count targetSize, double sourceVolume, NetworKit::count sourceSize, double gamma,
+    double inverseGraphVolume) {
     (void)subsetSize;
     (void)targetSize;
     (void)sourceVolume;
@@ -43,14 +35,10 @@ extern "C" bool networkitParallelLeidenRefineRSetCondition(double cutWeight, dou
     return cutWeight >= gamma * subsetVolume * targetVolume * inverseGraphVolume;
 }
 
-extern "C" bool networkitParallelLeidenRefineTSetCondition(double cutWeight, double subsetVolume,
-                                                           NetworKit::count subsetSize,
-                                                           double targetVolume,
-                                                           NetworKit::count targetSize,
-                                                           double sourceVolume,
-                                                           NetworKit::count sourceSize,
-                                                           double gamma,
-                                                           double inverseGraphVolume) {
+extern "C" bool networkitParallelLeidenRefineTSetCondition(
+    double cutWeight, double subsetVolume, NetworKit::count subsetSize, double targetVolume,
+    NetworKit::count targetSize, double sourceVolume, NetworKit::count sourceSize, double gamma,
+    double inverseGraphVolume) {
     (void)subsetSize;
     (void)targetSize;
     (void)sourceVolume;

@@ -4,9 +4,9 @@
  *  Memory-efficient implementation of ParallelLeiden using CoarsenedGraphView
  */
 
-#include <networkit/community/ParallelLeidenView.hpp>
 #include <cstdint>
 #include <cstdlib>
+#include <networkit/community/ParallelLeidenView.hpp>
 #ifndef _WIN32
 #include <dlfcn.h>
 #endif
@@ -101,8 +101,8 @@ void ParallelLeidenView::loadMoveScoringExtension(const std::string &sharedLibra
 #else
     void *handle = dlopen(sharedLibraryPath.c_str(), RTLD_NOW | RTLD_LOCAL);
     if (handle == nullptr) {
-        throw std::runtime_error("Failed to load ParallelLeidenView scoring extension '" +
-                                 sharedLibraryPath + "': " + dlerror());
+        throw std::runtime_error("Failed to load ParallelLeidenView scoring extension '"
+                                 + sharedLibraryPath + "': " + dlerror());
     }
 
     dlerror();
@@ -127,23 +127,23 @@ void ParallelLeidenView::loadMoveScoringExtension(const std::string &sharedLibra
     unloadMoveScoringExtension();
     scoringExtensionHandle_ = handle;
     communityScoreFunction_ = communityScore;
-    currentCommunityThresholdFunction_ = thresholdScore != nullptr ? thresholdScore
-                                                                   : &modularityThresholdScore;
+    currentCommunityThresholdFunction_ =
+        thresholdScore != nullptr ? thresholdScore : &modularityThresholdScore;
     dlerror();
     auto *refineRSet = reinterpret_cast<ParallelLeidenRefineSetConditionFunction>(
         dlsym(handle, "networkitParallelLeidenRefineRSetCondition"));
     const char *refineRSetError = dlerror();
-    refineRSetConditionFunction_ =
-        refineRSetError == nullptr && refineRSet != nullptr ? refineRSet
-                                                            : &modularityRefineRSetCondition;
+    refineRSetConditionFunction_ = refineRSetError == nullptr && refineRSet != nullptr
+                                       ? refineRSet
+                                       : &modularityRefineRSetCondition;
 
     dlerror();
     auto *refineTSet = reinterpret_cast<ParallelLeidenRefineSetConditionFunction>(
         dlsym(handle, "networkitParallelLeidenRefineTSetCondition"));
     const char *refineTSetError = dlerror();
-    refineTSetConditionFunction_ =
-        refineTSetError == nullptr && refineTSet != nullptr ? refineTSet
-                                                            : &modularityRefineTSetCondition;
+    refineTSetConditionFunction_ = refineTSetError == nullptr && refineTSet != nullptr
+                                       ? refineTSet
+                                       : &modularityRefineTSetCondition;
     scoringExtensionPath_ = sharedLibraryPath;
 #endif
 }
@@ -218,15 +218,14 @@ void ParallelLeidenView::run() {
             const double minGainMargin = moveStats.moved ? moveStats.gainMarginMin : 0.0;
             const double maxGainMargin = moveStats.moved ? moveStats.gainMarginMax : 0.0;
             const count candidateMoves = moveStats.moved + moveStats.marginalMovesRejected;
-            const double rejectedPct = candidateMoves
-                                           ? (100.0 * moveStats.marginalMovesRejected
-                                              / static_cast<double>(candidateMoves))
-                                           : 0.0;
+            const double rejectedPct = candidateMoves ? (100.0 * moveStats.marginalMovesRejected
+                                                         / static_cast<double>(candidateMoves))
+                                                      : 0.0;
             INFO("Inner iter ", innerIterations, ": moved ", moveStats.moved, " nodes, ",
                  result.numberOfSubsets(), " communities",
                  " | singleton moves=", moveStats.movedToSingleton,
-                 " | marginal rejected=", moveStats.marginalMovesRejected,
-                 " (", std::setprecision(4), rejectedPct, "%)",
+                 " | marginal rejected=", moveStats.marginalMovesRejected, " (",
+                 std::setprecision(4), rejectedPct, "%)",
                  " | avg gain margin=", std::setprecision(6), avgGainMargin,
                  " | min/max gain margin=", minGainMargin, "/", maxGainMargin);
 
@@ -247,11 +246,12 @@ void ParallelLeidenView::run() {
                 refined = parallelRefine(*currentGraph, refineMadeChanges);
             }
 
-            const bool zeroMoveAndRefinementMadeNoChanges = moveStats.moved == 0 && !refineMadeChanges;
+            const bool zeroMoveAndRefinementMadeNoChanges =
+                moveStats.moved == 0 && !refineMadeChanges;
 
             if (zeroMoveAndRefinementMadeNoChanges) {
                 INFO("Stopping inner loop at inner iteration ", innerIterations,
-                        ": local moving made zero moves and refinement made no changes.");
+                     ": local moving made zero moves and refinement made no changes.");
                 break;
             }
 
@@ -268,9 +268,8 @@ void ParallelLeidenView::run() {
                 Partition p(newCoarsenedView->numberOfNodes());
                 p.setUpperBound(result.upperBound());
 
-                currentCoarsenedView->parallelForNodes([&compactRefined, &p, this](node u) {
-                    p[compactRefined[u]] = result[u];
-                });
+                currentCoarsenedView->parallelForNodes(
+                    [&compactRefined, &p, this](node u) { p[compactRefined[u]] = result[u]; });
 
                 result = std::move(p);
                 currentCoarsenedView = newCoarsenedView;
@@ -449,10 +448,7 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                 }
 
                 if (requeuesPerNode[candidate].compare_exchange_weak(
-                        used,
-                        used + 1,
-                        std::memory_order_relaxed,
-                        std::memory_order_relaxed)) {
+                        used, used + 1, std::memory_order_relaxed, std::memory_order_relaxed)) {
                     return true;
                 }
 
@@ -486,7 +482,8 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                             pushNewNode(queuedNode);
                         } else {
                             std::uint8_t rollbackExpected = Queued;
-                            const bool resetToIdle = nodeState[queuedNode].compare_exchange_strong(rollbackExpected, Idle);
+                            const bool resetToIdle = nodeState[queuedNode].compare_exchange_strong(
+                                rollbackExpected, Idle);
                             assert(resetToIdle);
                             tlx::unused(resetToIdle);
                         }
@@ -514,14 +511,16 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
 
             if (!admitNodeRequeue(processedNode)) {
                 expected = Reprocess;
-                const bool resetToIdle = nodeState[processedNode].compare_exchange_strong(expected, Idle);
+                const bool resetToIdle =
+                    nodeState[processedNode].compare_exchange_strong(expected, Idle);
                 assert(resetToIdle);
                 tlx::unused(resetToIdle);
                 return;
             }
 
             expected = Reprocess;
-            const bool markedQueued = nodeState[processedNode].compare_exchange_strong(expected, Queued);
+            const bool markedQueued =
+                nodeState[processedNode].compare_exchange_strong(expected, Queued);
             assert(markedQueued);
             tlx::unused(markedQueued);
             pushNewNode(processedNode);
@@ -552,7 +551,8 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                 }
 
                 std::uint8_t expectedState = Queued;
-                const bool startedProcessing = nodeState[u].compare_exchange_strong(expectedState, Processing);
+                const bool startedProcessing =
+                    nodeState[u].compare_exchange_strong(expectedState, Processing);
                 assert(startedProcessing);
                 tlx::unused(startedProcessing);
 
@@ -665,7 +665,7 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
 #pragma omp atomic
                         communitySizes[currentCommunity] -= nodeMass;
                         changed = true;
-    
+
                         graph.forNeighborsOf(u, [&](node neighbor, edgeweight) {
                             if (neighbor != u) {
                                 scheduleNode(neighbor);
@@ -718,16 +718,14 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
     assert(waitingForNodes == tcount);
 
     const count totalMoved = std::accumulate(moved.begin(), moved.end(), (count)0);
-    
-    const count totalWorked =
-        std::accumulate(totalNodesPerThread.begin(), totalNodesPerThread.end(),
-                        static_cast<count>(0));
-    
-    const count totalRequeuesBlockedByNodeLimit =
-        std::accumulate(requeuesBlockedByNodeLimit.begin(),
-                        requeuesBlockedByNodeLimit.end(), static_cast<count>(0));
 
-    
+    const count totalWorked = std::accumulate(totalNodesPerThread.begin(),
+                                              totalNodesPerThread.end(), static_cast<count>(0));
+
+    const count totalRequeuesBlockedByNodeLimit =
+        std::accumulate(requeuesBlockedByNodeLimit.begin(), requeuesBlockedByNodeLimit.end(),
+                        static_cast<count>(0));
+
     if (Aux::Log::isLogLevelEnabled(Aux::Log::LogLevel::DEBUG)) {
         tlx::unused(totalWorked);
         DEBUG("Total worked: ", totalWorked, " Total moved: ", totalMoved,
@@ -738,9 +736,8 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
     stats.moved = totalMoved;
     stats.movedToSingleton =
         std::accumulate(movedToSingleton.begin(), movedToSingleton.end(), static_cast<count>(0));
-    stats.marginalMovesRejected = std::accumulate(marginalMovesRejected.begin(),
-                                                  marginalMovesRejected.end(),
-                                                  static_cast<count>(0));
+    stats.marginalMovesRejected = std::accumulate(
+        marginalMovesRejected.begin(), marginalMovesRejected.end(), static_cast<count>(0));
     stats.gainMarginSum = std::accumulate(gainMarginSum.begin(), gainMarginSum.end(), 0.0);
     if (totalMoved > 0) {
         for (int i = 0; i < omp_get_max_threads(); ++i) {
@@ -888,10 +885,9 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph, bool &refin
                     auto volC = refinedVolumes[C];
                     auto sizeC = refinedSizes[C];
                     if (delta > bestDelta
-                        && refineTSetCondition(cutCtoSminusC[C], volC, sizeC,
-                                               communityVolumes[S] - volC,
-                                               communitySizes[S] - sizeC, communityVolumes[S],
-                                               communitySizes[S])) {
+                        && refineTSetCondition(
+                            cutCtoSminusC[C], volC, sizeC, communityVolumes[S] - volC,
+                            communitySizes[S] - sizeC, communityVolumes[S], communitySizes[S])) {
                         bestDelta = delta;
                         bestC = C;
                         idx = j;
@@ -912,10 +908,9 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph, bool &refin
                             // cutWeights[Neighbor] is the weight of the edge between Node and
                             // Neighbor, since Neighbor was a singleton
                             const auto neighborCutWeightIt = cutWeights.find(neighbor);
-                            const double neighborCutWeight =
-                                neighborCutWeightIt == cutWeights.end()
-                                    ? 0.0
-                                    : neighborCutWeightIt->second;
+                            const double neighborCutWeight = neighborCutWeightIt == cutWeights.end()
+                                                                 ? 0.0
+                                                                 : neighborCutWeightIt->second;
                             cutWeights[neighborCommunity] += neighborCutWeight;
                             // Clear cutWeights entry beforehand, so we can "erase" bestC
                             // from the pointers vector by replacing it with "none"
@@ -1000,6 +995,7 @@ template Partition ParallelLeidenView::parallelRefine<Graph>(const Graph &graph)
 template Partition
 ParallelLeidenView::parallelRefine<CoarsenedGraphView>(const CoarsenedGraphView &graph);
 template Partition
-ParallelLeidenView::parallelRefine<CoarsenedGraphView>(const CoarsenedGraphView &graph, bool &refineMadeChanges);
+ParallelLeidenView::parallelRefine<CoarsenedGraphView>(const CoarsenedGraphView &graph,
+                                                       bool &refineMadeChanges);
 
 } // namespace NetworKit

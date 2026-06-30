@@ -89,7 +89,7 @@ private:
                        && (u > other.u || (u == other.u && v > other.v)));
         };
         weightedEdge(node u, node v, edgeweight attribute, edgeid eid = 0)
-            : attribute(attribute), u(u), v(v), eid(eid){};
+            : attribute(attribute), u(u), v(v), eid(eid) {};
     };
 
     const Graph *G;

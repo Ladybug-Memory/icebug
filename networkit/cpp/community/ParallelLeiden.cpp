@@ -1,5 +1,5 @@
-#include <networkit/community/ParallelLeiden.hpp>
 #include <cstdint>
+#include <networkit/community/ParallelLeiden.hpp>
 
 namespace NetworKit {
 ParallelLeiden::ParallelLeiden(const Graph &graph, int iterations, bool randomize, double gamma)

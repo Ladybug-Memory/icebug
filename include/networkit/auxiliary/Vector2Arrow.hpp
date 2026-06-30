@@ -5,8 +5,8 @@
  *      Author: Ian Chen (ianchen3)
  */
 
-#ifndef NETWORKIT_AUXILIARY_VECTOR2ARROW_HPP_
-#define NETWORKIT_AUXILIARY_VECTOR2ARROW_HPP_
+#ifndef NETWORKIT_AUXILIARY_VECTOR2_ARROW_HPP_
+#define NETWORKIT_AUXILIARY_VECTOR2_ARROW_HPP_
 
 #include <memory>
 #include <vector>
@@ -35,4 +35,4 @@ std::shared_ptr<Arr> vectorToArrow(std::vector<T> vec) {
 
 } // namespace Aux
 
-#endif
+#endif // NETWORKIT_AUXILIARY_VECTOR2_ARROW_HPP_

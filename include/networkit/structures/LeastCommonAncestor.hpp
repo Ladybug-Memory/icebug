@@ -8,8 +8,8 @@
 #ifndef NETWORKIT_STRUCTURES_LEAST_COMMON_ANCESTOR_HPP_
 #define NETWORKIT_STRUCTURES_LEAST_COMMON_ANCESTOR_HPP_
 
-#include <vector>
 #include <span>
+#include <vector>
 #include "networkit/auxiliary/RangeMinimumQuery.hpp"
 #include <networkit/Globals.hpp>
 #include <networkit/graph/Graph.hpp>
