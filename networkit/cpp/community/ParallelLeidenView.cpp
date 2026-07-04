@@ -177,8 +177,7 @@ void ParallelLeidenView::run() {
         changed = false;
         INFO("Using move gain epsilon=", std::setprecision(6), moveGainMarginEpsilon,
              " | max inner iterations=", maxInnerIterations,
-             " | max moves per node=", maxMovesPerNode,
-             " | vector oversize=", VECTOR_OVERSIZE,
+             " | max moves per node=", maxMovesPerNode, " | vector oversize=", VECTOR_OVERSIZE,
              " | min community reduction=", minCommunityReduction);
 
         // Start with the original graph
@@ -490,7 +489,8 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
             assert(expected == Reprocess);
 
             expected = Reprocess;
-            const bool markedQueued = nodeState[processedNode].compare_exchange_strong(expected, Queued);
+            const bool markedQueued =
+                nodeState[processedNode].compare_exchange_strong(expected, Queued);
             assert(markedQueued);
             tlx::unused(markedQueued);
 
@@ -522,7 +522,8 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                 }
 
                 std::uint8_t expectedState = Queued;
-                const bool startedProcessing = nodeState[u].compare_exchange_strong(expectedState, Processing);
+                const bool startedProcessing =
+                    nodeState[u].compare_exchange_strong(expectedState, Processing);
                 assert(startedProcessing);
                 tlx::unused(startedProcessing);
 
@@ -703,14 +704,14 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                                               totalNodesPerThread.end(), static_cast<count>(0));
 
     const count totalNodePassesSkippedByMoveLimit =
-        std::accumulate(nodePassesSkippedByMoveLimit.begin(),
-                        nodePassesSkippedByMoveLimit.end(), static_cast<count>(0));
+        std::accumulate(nodePassesSkippedByMoveLimit.begin(), nodePassesSkippedByMoveLimit.end(),
+                        static_cast<count>(0));
 
     if (Aux::Log::isLogLevelEnabled(Aux::Log::LogLevel::DEBUG)) {
         tlx::unused(totalWorked);
         DEBUG("Total worked: ", totalWorked, " Total moved: ", totalMoved,
-            " Moved to singleton community: ", singleton,
-            " Node passes skipped by move limit: ", totalNodePassesSkippedByMoveLimit);
+              " Moved to singleton community: ", singleton,
+              " Node passes skipped by move limit: ", totalNodePassesSkippedByMoveLimit);
     }
     MoveStats stats;
     stats.moved = totalMoved;

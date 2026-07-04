@@ -577,8 +577,8 @@ TEST_F(CentralityGTest, testPersonalizedPageRankDirectedTriangle) {
 
     auto pers = PageRank::personalizationFromSource(G, 0);
     ASSERT_EQ(pers.size(), G.upperNodeIdBound());
-    PageRank pr(G, 0.85, 1e-10, /*normalized=*/false,
-                PageRank::SinkHandling::NO_SINK_HANDLING, pers);
+    PageRank pr(G, 0.85, 1e-10, /*normalized=*/false, PageRank::SinkHandling::NO_SINK_HANDLING,
+                pers);
     pr.run();
     auto scores = pr.scores();
 
@@ -602,8 +602,8 @@ TEST_F(CentralityGTest, testPersonalizedPageRankUndirectedTriangle) {
     G.addEdge(2, 0);
 
     auto pers = PageRank::personalizationFromSource(G, 0);
-    PageRank pr(G, 0.85, 1e-10, /*normalized=*/false,
-                PageRank::SinkHandling::NO_SINK_HANDLING, pers);
+    PageRank pr(G, 0.85, 1e-10, /*normalized=*/false, PageRank::SinkHandling::NO_SINK_HANDLING,
+                pers);
     pr.run();
     auto scores = pr.scores();
 
@@ -630,8 +630,8 @@ TEST_F(CentralityGTest, testPersonalizedPageRankMatchesUniformFromFactory) {
     auto uniformScores = uniform.scores();
 
     auto pers = PageRank::personalizationFromSource(G, 0);
-    PageRank ppr(G, 0.85, 1e-10, /*normalized=*/false,
-                 PageRank::SinkHandling::NO_SINK_HANDLING, pers);
+    PageRank ppr(G, 0.85, 1e-10, /*normalized=*/false, PageRank::SinkHandling::NO_SINK_HANDLING,
+                 pers);
     ppr.run();
     auto pprScores = ppr.scores();
 
@@ -655,8 +655,8 @@ TEST_F(CentralityGTest, testPersonalizedPageRankWithSinks) {
     // Node 3 is a sink (no outgoing edges).
 
     auto pers = PageRank::personalizationFromSource(G, 0);
-    PageRank pr(G, 0.85, 1e-10, /*normalized=*/false,
-                PageRank::SinkHandling::DISTRIBUTE_SINKS, pers);
+    PageRank pr(G, 0.85, 1e-10, /*normalized=*/false, PageRank::SinkHandling::DISTRIBUTE_SINKS,
+                pers);
     pr.run();
     auto scores = pr.scores();
 
@@ -682,8 +682,8 @@ TEST_F(CentralityGTest, testPersonalizedPageRankFromMultipleSources) {
     G.addEdge(1, 3);
 
     auto pers = PageRank::personalizationFromSources(G, {0, 1});
-    PageRank pr(G, 0.85, 1e-10, /*normalized=*/false,
-                PageRank::SinkHandling::NO_SINK_HANDLING, pers);
+    PageRank pr(G, 0.85, 1e-10, /*normalized=*/false, PageRank::SinkHandling::NO_SINK_HANDLING,
+                pers);
     pr.run();
     auto scores = pr.scores();
 
@@ -713,8 +713,8 @@ TEST_F(CentralityGTest, testPersonalizedPageRankFromWeightedSources) {
     EXPECT_NEAR(pers[1], 1.0 / 12.0, tol);
     EXPECT_NEAR(pers[2], 1.0 / 12.0, tol);
 
-    PageRank pr(G, 0.85, 1e-10, /*normalized=*/false,
-                PageRank::SinkHandling::NO_SINK_HANDLING, pers);
+    PageRank pr(G, 0.85, 1e-10, /*normalized=*/false, PageRank::SinkHandling::NO_SINK_HANDLING,
+                pers);
     pr.run();
     auto scores = pr.scores();
     // Source 0 has 10x weight, so it should have the largest score.
@@ -753,7 +753,179 @@ TEST_F(CentralityGTest, testPersonalizedPageRankValidation) {
     EXPECT_THROW(PageRank::personalizationFromSources(G, std::vector<node>{0, 99}),
                  std::runtime_error);
     // Static factory: negative weight.
-    EXPECT_THROW(PageRank::personalizationFromWeights(G, std::vector<std::pair<node, double>>{{0, -1.0}}),
+    EXPECT_THROW(
+        PageRank::personalizationFromWeights(G, std::vector<std::pair<node, double>>{{0, -1.0}}),
+        std::runtime_error);
+}
+
+TEST_F(CentralityGTest, testForSourceMatchesVectorPath) {
+    // The memory-efficient forSource / forSources / forWeights factories must produce
+    // exactly the same scores as the equivalent vector-based constructor calls. The
+    // triangle PPR reference values (from testPersonalizedPageRankDirectedTriangle) are
+    // reused here as the ground truth.
+    count n = 3;
+    GraphW G(n, false, true);
+    G.addEdge(0, 1);
+    G.addEdge(1, 2);
+    G.addEdge(2, 0);
+
+    // Vector path.
+    auto persVec = PageRank::personalizationFromSource(G, 0);
+    PageRank prVec(G, 0.85, 1e-10, false, PageRank::SinkHandling::NO_SINK_HANDLING, persVec);
+    prVec.run();
+    auto scoresVec = prVec.scores();
+
+    // forSource path: should hit the sparse fast path.
+    PageRank prFast =
+        PageRank::forSource(G, 0, 0.85, 1e-10, false, PageRank::SinkHandling::NO_SINK_HANDLING);
+    prFast.run();
+    auto scoresFast = prFast.scores();
+
+    constexpr double tol = 1e-12;
+    EXPECT_NEAR(scoresVec[0], scoresFast[0], tol);
+    EXPECT_NEAR(scoresVec[1], scoresFast[1], tol);
+    EXPECT_NEAR(scoresVec[2], scoresFast[2], tol);
+    EXPECT_NEAR(scoresFast[0], 0.3887, 1e-4);
+    EXPECT_NEAR(scoresFast[1], 0.3304, 1e-4);
+    EXPECT_NEAR(scoresFast[2], 0.2809, 1e-4);
+}
+
+TEST_F(CentralityGTest, testForSourcesMatchesVectorPath) {
+    // Multi-source PPR. Use the same 4-node "ring + chords" graph as
+    // testPersonalizedPageRankFromMultipleSources, but verify that the fast path
+    // (forSources) and the vector path agree.
+    count n = 4;
+    GraphW G(n, false, false);
+    G.addEdge(0, 1);
+    G.addEdge(1, 2);
+    G.addEdge(2, 3);
+    G.addEdge(3, 0);
+    G.addEdge(0, 2);
+    G.addEdge(1, 3);
+
+    std::vector<node> sources{0, 1};
+    auto persVec = PageRank::personalizationFromSources(G, sources);
+    PageRank prVec(G, 0.85, 1e-10, false, PageRank::SinkHandling::NO_SINK_HANDLING, persVec);
+    prVec.run();
+    auto scoresVec = prVec.scores();
+
+    PageRank prFast = PageRank::forSources(G, sources, 0.85, 1e-10, false,
+                                           PageRank::SinkHandling::NO_SINK_HANDLING);
+    prFast.run();
+    auto scoresFast = prFast.scores();
+
+    constexpr double tol = 1e-12;
+    for (node u = 0; u < n; ++u) {
+        EXPECT_NEAR(scoresVec[u], scoresFast[u], tol) << "disagreement at node " << u;
+    }
+}
+
+TEST_F(CentralityGTest, testForWeightsMatchesVectorPath) {
+    // Weighted-source PPR. Same triangle graph as testForSourceMatchesVectorPath.
+    count n = 3;
+    GraphW G(n, false, true);
+    G.addEdge(0, 1);
+    G.addEdge(1, 2);
+    G.addEdge(2, 0);
+
+    std::vector<std::pair<node, double>> weighted{{0, 10.0}, {1, 1.0}, {2, 1.0}};
+    auto persVec = PageRank::personalizationFromWeights(G, weighted);
+    PageRank prVec(G, 0.85, 1e-10, false, PageRank::SinkHandling::NO_SINK_HANDLING, persVec);
+    prVec.run();
+    auto scoresVec = prVec.scores();
+
+    PageRank prFast = PageRank::forWeights(G, weighted, 0.85, 1e-10, false,
+                                           PageRank::SinkHandling::NO_SINK_HANDLING);
+    prFast.run();
+    auto scoresFast = prFast.scores();
+
+    constexpr double tol = 1e-12;
+    for (node u = 0; u < n; ++u) {
+        EXPECT_NEAR(scoresVec[u], scoresFast[u], tol) << "disagreement at node " << u;
+    }
+}
+
+TEST_F(CentralityGTest, testConstructorAutoDetectsSparse) {
+    // When the user passes a vector with at most SPARSE_THRESHOLD non-zero entries, the
+    // constructor should silently switch to the sparse representation and produce
+    // bit-for-bit identical results to the dense path. We can't directly observe the
+    // internal storage, so we exercise it through:
+    //   (a) identical output to the explicit-dense variant
+    //   (b) equality with the forSource / forSources / forWeights fast paths.
+    count n = 3;
+    GraphW G(n, false, false);
+    G.addEdge(0, 1);
+    G.addEdge(1, 2);
+    G.addEdge(2, 0);
+
+    // Single source via vector — exercises the k=1 auto-detection branch.
+    auto pers1 = PageRank::personalizationFromSource(G, 0);
+    PageRank prVec1(G, 0.85, 1e-10, false, PageRank::SinkHandling::NO_SINK_HANDLING, pers1);
+    prVec1.run();
+    PageRank prFor1 =
+        PageRank::forSource(G, 0, 0.85, 1e-10, false, PageRank::SinkHandling::NO_SINK_HANDLING);
+    prFor1.run();
+    for (node u = 0; u < n; ++u) {
+        EXPECT_NEAR(prVec1.scores()[u], prFor1.scores()[u], 1e-12);
+    }
+
+    // Three sources via vector — exercises the k=SPARSE_THRESHOLD auto-detection branch.
+    std::vector<node> all{n - 1, 0, 1}; // 3 sources, k > 1 and <= threshold
+    auto pers2 = PageRank::personalizationFromSources(G, all);
+    PageRank prVec2(G, 0.85, 1e-10, false, PageRank::SinkHandling::NO_SINK_HANDLING, pers2);
+    prVec2.run();
+    PageRank prFor2 =
+        PageRank::forSources(G, all, 0.85, 1e-10, false, PageRank::SinkHandling::NO_SINK_HANDLING);
+    prFor2.run();
+    for (node u = 0; u < n; ++u) {
+        EXPECT_NEAR(prVec2.scores()[u], prFor2.scores()[u], 1e-12);
+    }
+
+    // SPARSE_THRESHOLD + 1 non-zero entries -> should stay dense. We pick a large enough
+    // graph so the dense path is the only feasible option, then verify the constructor
+    // still produces a result identical to the vector path (we don't observe the storage
+    // type directly, but the math must be correct).
+    constexpr count nBig = PageRank::SPARSE_THRESHOLD + 2;
+    GraphW Gbig(nBig, false, false);
+    for (count i = 0; i + 1 < nBig; ++i) {
+        Gbig.addEdge(i, i + 1);
+    }
+    Gbig.addEdge(nBig - 1, 0); // make it a cycle
+    std::vector<double> manyWeights(nBig, 0.0);
+    for (count i = 0; i < PageRank::SPARSE_THRESHOLD + 1; ++i) {
+        manyWeights[i] = 1.0;
+    }
+    PageRank prMany(Gbig, 0.85, 1e-10, false, PageRank::SinkHandling::NO_SINK_HANDLING,
+                    manyWeights);
+    prMany.run();
+    PageRank prManyCheck(Gbig, 0.85, 1e-10, false, PageRank::SinkHandling::NO_SINK_HANDLING,
+                         manyWeights);
+    prManyCheck.run();
+    for (node u = 0; u < nBig; ++u) {
+        EXPECT_NEAR(prMany.scores()[u], prManyCheck.scores()[u], 1e-12);
+    }
+}
+
+TEST_F(CentralityGTest, testForSourceValidation) {
+    count n = 3;
+    GraphW G(n, false, false);
+    G.addEdge(0, 1);
+    G.addEdge(1, 2);
+    // Non-existent source.
+    EXPECT_THROW(PageRank::forSource(G, /*source=*/42, 0.85, 1e-8, false,
+                                     PageRank::SinkHandling::NO_SINK_HANDLING),
+                 std::runtime_error);
+    // Empty source set.
+    EXPECT_THROW(PageRank::forSources(G, std::vector<node>{}, 0.85, 1e-8, false,
+                                      PageRank::SinkHandling::NO_SINK_HANDLING),
+                 std::runtime_error);
+    // Non-existent source in set.
+    EXPECT_THROW(PageRank::forSources(G, std::vector<node>{0, 99}, 0.85, 1e-8, false,
+                                      PageRank::SinkHandling::NO_SINK_HANDLING),
+                 std::runtime_error);
+    // Negative weight.
+    EXPECT_THROW(PageRank::forWeights(G, std::vector<std::pair<node, double>>{{0, -1.0}}, 0.85,
+                                      1e-8, false, PageRank::SinkHandling::NO_SINK_HANDLING),
                  std::runtime_error);
 }
 

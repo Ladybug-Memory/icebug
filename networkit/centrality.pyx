@@ -2328,6 +2328,7 @@ cdef extern from "<networkit/centrality/PageRank.hpp>":
 
 	cdef cppclass _PageRank "NetworKit::PageRank" (_Centrality):
 		_PageRank(_Graph, double damp, double tol, bool_t normalized, _SinkHandling distributeSinks, vector[double] personalization) except +
+		_PageRank(_Graph, double damp, double tol, bool_t normalized, _SinkHandling distributeSinks, vector[pair[node, double]] sparse) except +
 		count numberOfIterations() except +
 		_Norm norm
 		count maxIterations
@@ -2337,6 +2338,12 @@ cdef extern from "<networkit/centrality/PageRank.hpp>":
 		vector[double] personalizationFromSources(_Graph, vector[node]) except +
 		@staticmethod
 		vector[double] personalizationFromWeights(_Graph, vector[pair[node, double]]) except +
+		@staticmethod
+		_PageRank forSource(_Graph, node, double, double, bool_t, _SinkHandling) except +
+		@staticmethod
+		_PageRank forSources(_Graph, vector[node], double, double, bool_t, _SinkHandling) except +
+		@staticmethod
+		_PageRank forWeights(_Graph, vector[pair[node, double]], double, double, bool_t, _SinkHandling) except +
 
 cdef class PageRank(Centrality):
 	"""
@@ -2386,12 +2393,19 @@ cdef class PageRank(Centrality):
 		(uniform teleportation 1/n, the standard PageRank).
 	"""
 
-	def __cinit__(self, Graph G, double damp=0.85, double tol=1e-8, bool_t normalized=False, distributeSinks=SinkHandling.NO_SINK_HANDLING, personalization=None):
+	def __cinit__(self, Graph G=None, double damp=0.85, double tol=1e-8, bool_t normalized=False, distributeSinks=SinkHandling.NO_SINK_HANDLING, personalization=None):
+		# `G=None` allows the forSource / forSources / forWeights static factories to
+		# allocate the object via `PageRank.__new__(PageRank)` and then directly set `self._this`
+		# to a C++ PageRank built with the sparse personalization representation. When `G` is
+		# None, `__cinit__` is a no-op and the static factory is responsible for fully
+		# initializing the instance.
+		if G is None:
+			return
 		cdef vector[double] pers
 		if personalization is not None:
 			pers = personalization
 		self._G = G
-		self._this = new _PageRank(dereference(G._this), damp, tol, normalized, distributeSinks, pers)
+		self._this = new _PageRank(dereference(G._this), damp, tol, normalized, <_SinkHandling>distributeSinks, pers)
 
 	@staticmethod
 	def personalizationFromSource(Graph G, source):
@@ -2472,6 +2486,132 @@ cdef class PageRank(Centrality):
 			entry.second = w
 			ws.push_back(entry)
 		return _PageRank.personalizationFromWeights(dereference(G._this), ws)
+
+	@staticmethod
+	def forSource(Graph G, source, double damp=0.85, double tol=1e-8, bool_t normalized=False, distributeSinks=SinkHandling.NO_SINK_HANDLING):
+		"""
+		forSource(G, source, damp=0.85, tol=1e-8, normalized=False, distributeSinks=SinkHandling.NoSinkHandling)
+
+		Memory-efficient single-source personalized PageRank (random walk with restart from
+		``source``). Avoids materializing the ``G.upperNodeIdBound()``-sized teleportation
+		vector entirely and uses a fast path in ``run()`` that touches only the
+		teleportation target; recommended for very large graphs.
+
+		Parameters
+		----------
+		G : networkit.Graph
+			Graph to be processed.
+		source : int
+			Node to teleport to (must exist in ``G``).
+		damp : float, optional
+			Damping factor (default 0.85).
+		tol : float, optional
+			Error tolerance for iteration (default 1e-8).
+		normalized : bool, optional
+			If True, apply post-run normalization (default False).
+		distributeSinks : networkit.centrality.SinkHandling, optional
+			How to handle sink nodes (default NO_SINK_HANDLING).
+
+		Returns
+		-------
+		networkit.centrality.PageRank
+			Configured PageRank instance; call ``run()`` to compute scores.
+		"""
+		if not G.hasNode(source):
+			raise RuntimeError("Personalization source node does not exist in the graph.")
+		cdef vector[pair[node, double]] spec
+		cdef pair[node, double] entry
+		entry.first = <node>source
+		entry.second = 1.0
+		spec.push_back(entry)
+		cdef PageRank pr = PageRank.__new__(PageRank)
+		pr._G = G
+		pr._this = new _PageRank(dereference(G._this), damp, tol, normalized, <_SinkHandling>distributeSinks, spec)
+		return pr
+
+	@staticmethod
+	def forSources(Graph G, sources, double damp=0.85, double tol=1e-8, bool_t normalized=False, distributeSinks=SinkHandling.NO_SINK_HANDLING):
+		"""
+		forSources(G, sources, damp=0.85, tol=1e-8, normalized=False, distributeSinks=SinkHandling.NoSinkHandling)
+
+		Memory-efficient k-source personalized PageRank with uniform teleportation over
+		``sources`` (each gets weight ``1 / |sources|``). Avoids materializing the full
+		``G.upperNodeIdBound()``-sized vector.
+
+		Parameters
+		----------
+		G : networkit.Graph
+			Graph to be processed.
+		sources : list of int
+			Non-empty set of teleportation targets.
+		damp, tol, normalized, distributeSinks :
+			See :py:meth:`forSource`.
+
+		Returns
+		-------
+		networkit.centrality.PageRank
+			Configured PageRank instance.
+		"""
+		if len(sources) == 0:
+			raise RuntimeError("Personalization source set must be non-empty.")
+		for s in sources:
+			if not G.hasNode(s):
+				raise RuntimeError("Personalization source node does not exist in the graph.")
+		cdef vector[node] src = sources
+		cdef vector[pair[node, double]] spec
+		cdef pair[node, double] entry
+		cdef double w = 1.0 / <double>src.size()
+		for s in src:
+			entry.first = s
+			entry.second = w
+			spec.push_back(entry)
+		cdef PageRank pr = PageRank.__new__(PageRank)
+		pr._G = G
+		pr._this = new _PageRank(dereference(G._this), damp, tol, normalized, <_SinkHandling>distributeSinks, spec)
+		return pr
+
+	@staticmethod
+	def forWeights(Graph G, weightedSources, double damp=0.85, double tol=1e-8, bool_t normalized=False, distributeSinks=SinkHandling.NO_SINK_HANDLING):
+		"""
+		forWeights(G, weightedSources, damp=0.85, tol=1e-8, normalized=False, distributeSinks=SinkHandling.NoSinkHandling)
+
+		Memory-efficient k-source personalized PageRank with positive per-source weights.
+		Weights are normalized to sum to one. Avoids materializing the full
+		``G.upperNodeIdBound()``-sized vector.
+
+		Parameters
+		----------
+		G : networkit.Graph
+			Graph to be processed.
+		weightedSources : list of (int, float)
+			Non-empty list of ``(node, weight)`` pairs with weight > 0.
+		damp, tol, normalized, distributeSinks :
+			See :py:meth:`forSource`.
+
+		Returns
+		-------
+		networkit.centrality.PageRank
+			Configured PageRank instance.
+		"""
+		if len(weightedSources) == 0:
+			raise RuntimeError("Personalization weighted source set must be non-empty.")
+		cdef vector[pair[node, double]] ws
+		cdef pair[node, double] entry
+		cdef node u
+		cdef double w
+		for pair_item in weightedSources:
+			u, w = pair_item
+			if not G.hasNode(u):
+				raise RuntimeError("Personalization source node does not exist in the graph.")
+			if w < 0.0:
+				raise RuntimeError("Personalization weight for node %d is negative (%g)." % (u, w))
+			entry.first = u
+			entry.second = w
+			ws.push_back(entry)
+		cdef PageRank pr = PageRank.__new__(PageRank)
+		pr._G = G
+		pr._this = new _PageRank(dereference(G._this), damp, tol, normalized, <_SinkHandling>distributeSinks, ws)
+		return pr
 
 	def numberOfIterations(self):
 		"""

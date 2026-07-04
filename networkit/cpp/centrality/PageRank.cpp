@@ -18,9 +18,11 @@ namespace NetworKit {
 
 namespace {
 
-// Validates and normalizes a user-supplied personalization vector. The returned vector has
-// length @a z and its entries sum to 1. Throws @c std::runtime_error on invalid input.
-std::vector<double> normalizePersonalization(const std::vector<double> &raw, count z) {
+// Validates a personalization vector in a single O(z) pass. On success, fills @a normalized
+// (must already have size z) with the input divided by its sum, and reports the count of
+// non-zero entries. Throws @c std::runtime_error on invalid input.
+void validateAndNormalizeInto(const std::vector<double> &raw, count z,
+                              std::vector<double> &normalized, count &nonZeroCount) {
     if (raw.size() < z) {
         std::ostringstream oss;
         oss << "Personalization vector has size " << raw.size()
@@ -28,25 +30,29 @@ std::vector<double> normalizePersonalization(const std::vector<double> &raw, cou
             << "; the vector must cover every node id.";
         throw std::runtime_error(oss.str());
     }
+    normalized.assign(z, 0.0);
     double sum = 0.0;
+    nonZeroCount = 0;
     for (count u = 0; u < z; ++u) {
         if (raw[u] < 0.0) {
             std::ostringstream oss;
             oss << "Personalization weight for node " << u << " is negative (" << raw[u] << ").";
             throw std::runtime_error(oss.str());
         }
-        sum += raw[u];
+        if (raw[u] > 0.0) {
+            normalized[u] = raw[u];
+            sum += raw[u];
+            ++nonZeroCount;
+        }
     }
     if (sum <= 0.0) {
         throw std::runtime_error(
             "Personalization vector sums to zero; at least one node must have a positive weight.");
     }
-    std::vector<double> p(z, 0.0);
     const double inv = 1.0 / sum;
     for (count u = 0; u < z; ++u) {
-        p[u] = raw[u] * inv;
+        normalized[u] *= inv;
     }
-    return p;
 }
 
 } // namespace
@@ -54,10 +60,104 @@ std::vector<double> normalizePersonalization(const std::vector<double> &raw, cou
 PageRank::PageRank(const Graph &G, double damp, double tol, bool normalized,
                    SinkHandling distributeSinks, std::vector<double> personalization)
     : Centrality(G, true), damp(damp), tol(tol), normalized(normalized),
-      distributeSinks(distributeSinks),
-      personalization(personalization.empty()
-                          ? std::vector<double>()
-                          : normalizePersonalization(personalization, G.upperNodeIdBound())) {}
+      distributeSinks(distributeSinks) {
+    if (personalization.empty()) {
+        // Uniform teleportation: leave both sparse and dense empty.
+        return;
+    }
+    const count z = G.upperNodeIdBound();
+    std::vector<double> normalizedP;
+    count nonZeroCount = 0;
+    validateAndNormalizeInto(personalization, z, normalizedP, nonZeroCount);
+
+    if (nonZeroCount <= SPARSE_THRESHOLD) {
+        // Build the sparse representation. Memory is O(k) instead of O(z).
+        sparse.reserve(nonZeroCount);
+        for (count u = 0; u < z; ++u) {
+            if (normalizedP[u] > 0.0) {
+                sparse.emplace_back(u, normalizedP[u]);
+            }
+        }
+    } else {
+        // Too many non-zero entries; keep the dense representation.
+        dense = std::move(normalizedP);
+    }
+}
+
+PageRank::PageRank(const Graph &G, double damp, double tol, bool normalized,
+                   SinkHandling distributeSinks, std::vector<std::pair<node, double>> sparseSpec)
+    : Centrality(G, true), damp(damp), tol(tol), normalized(normalized),
+      distributeSinks(distributeSinks), sparse(std::move(sparseSpec)) {}
+
+PageRank PageRank::forSource(const Graph &G, node source, double damp, double tol, bool normalized,
+                             SinkHandling distributeSinks) {
+    if (!G.hasNode(source)) {
+        throw std::runtime_error("Personalization source node does not exist in the graph.");
+    }
+    // Build a prvalue that the caller's storage is constructed into (C++17 guaranteed
+    // copy elision — PageRank is not movable).
+    std::vector<std::pair<node, double>> spec;
+    spec.emplace_back(source, 1.0);
+    return PageRank(G, damp, tol, normalized, distributeSinks, std::move(spec));
+}
+
+PageRank PageRank::forSources(const Graph &G, const std::vector<node> &sources, double damp,
+                              double tol, bool normalized, SinkHandling distributeSinks) {
+    if (sources.empty()) {
+        throw std::runtime_error("Personalization source set must be non-empty.");
+    }
+    for (node s : sources) {
+        if (!G.hasNode(s)) {
+            throw std::runtime_error("Personalization source node does not exist in the graph.");
+        }
+    }
+    std::vector<std::pair<node, double>> spec;
+    spec.reserve(sources.size());
+    const double w = 1.0 / static_cast<double>(sources.size());
+    for (node s : sources) {
+        spec.emplace_back(s, w);
+    }
+    return PageRank(G, damp, tol, normalized, distributeSinks, std::move(spec));
+}
+
+PageRank PageRank::forWeights(const Graph &G,
+                              const std::vector<std::pair<node, double>> &weightedSources,
+                              double damp, double tol, bool normalized,
+                              SinkHandling distributeSinks) {
+    if (weightedSources.empty()) {
+        throw std::runtime_error("Personalization weighted source set must be non-empty.");
+    }
+    for (const auto &entry : weightedSources) {
+        if (!G.hasNode(entry.first)) {
+            throw std::runtime_error("Personalization source node does not exist in the graph.");
+        }
+        if (entry.second < 0.0) {
+            std::ostringstream oss;
+            oss << "Personalization weight for node " << entry.first << " is negative ("
+                << entry.second << ").";
+            throw std::runtime_error(oss.str());
+        }
+    }
+    // Build a per-node weight vector and run the standard validator / normalizer. We can't
+    // skip this even though the inputs are already "weights" because we need to enforce
+    // sum > 0 and the non-negativity check.
+    std::vector<double> raw(G.upperNodeIdBound(), 0.0);
+    for (const auto &entry : weightedSources) {
+        raw[entry.first] = entry.second;
+    }
+    std::vector<double> normalizedP;
+    count nonZeroCount = 0;
+    validateAndNormalizeInto(raw, G.upperNodeIdBound(), normalizedP, nonZeroCount);
+
+    std::vector<std::pair<node, double>> spec;
+    spec.reserve(nonZeroCount);
+    for (count u = 0; u < G.upperNodeIdBound(); ++u) {
+        if (normalizedP[u] > 0.0) {
+            spec.emplace_back(u, normalizedP[u]);
+        }
+    }
+    return PageRank(G, damp, tol, normalized, distributeSinks, std::move(spec));
+}
 
 std::vector<double> PageRank::personalizationFromSource(const Graph &G, node source) {
     if (!G.hasNode(source)) {
@@ -106,25 +206,35 @@ PageRank::personalizationFromWeights(const Graph &G,
         p[entry.first] = entry.second;
     }
     // Reuse the validator / normalizer.
-    return normalizePersonalization(p, G.upperNodeIdBound());
+    std::vector<double> normalizedP;
+    count nonZeroCount = 0;
+    validateAndNormalizeInto(p, G.upperNodeIdBound(), normalizedP, nonZeroCount);
+    (void)nonZeroCount;
+    return normalizedP;
 }
 
 void PageRank::run() {
     Aux::SignalHandler handler;
     const auto n = G.numberOfNodes();
     const auto z = G.upperNodeIdBound();
+    const bool hasSparse = !sparse.empty();
+    const bool hasDense = !dense.empty();
+    const double teleportBase = 1.0 - damp;
 
-    // Per-node teleportation probability p[u], summing to 1. When the user did not request
-    // personalized PageRank we use the uniform distribution 1/n.
-    std::vector<double> personalizationProb;
-    if (personalization.empty()) {
-        personalizationProb.assign(n, 1.0 / static_cast<double>(n));
-    } else {
-        personalizationProb = personalization;
-    }
-
+    // Initialize scores from the personalization distribution. Sparse stores only the k
+    // non-zero entries, so the rest stay at zero; dense and uniform read from a single value
+    // (dense[u] or 1/n) per node.
     scoreData.resize(z, 0.0);
-    G.parallelForNodes([&](const node u) { scoreData[u] = personalizationProb[u]; });
+    if (hasDense) {
+        G.parallelForNodes([&](const node u) { scoreData[u] = dense[u]; });
+    } else if (hasSparse) {
+        for (const auto &entry : sparse) {
+            scoreData[entry.first] = entry.second;
+        }
+    } else {
+        const double uniformInit = 1.0 / static_cast<double>(n);
+        G.parallelForNodes([&](const node u) { scoreData[u] = uniformInit; });
+    }
     std::vector<double> pr = scoreData;
 
     std::vector<double> deg(z, 0.0);
@@ -132,6 +242,10 @@ void PageRank::run() {
 
     std::vector<node> sinks;
     if (G.isDirected() && ((distributeSinks == SinkHandling::DISTRIBUTE_SINKS) || normalized)) {
+        // Reserve the worst case (every node is a sink) so push_back never reallocates.
+        // In typical web-like graphs ~10-30% of nodes are sinks, so the over-allocation is
+        // modest and bounded by 8·n bytes.
+        sinks.reserve(n);
         G.forNodes([&](const node u) {
             if (G.degree(u) == 0) {
                 sinks.push_back(u);
@@ -161,28 +275,55 @@ void PageRank::run() {
         return G.parallelSumForNodes(sumL1Norm) <= tol;
     });
 
+    // Hot-loop body split into three specialized variants so the personalization cost is
+    // O(1) per node in the sparse case (a tight loop over k entries, k <= SPARSE_THRESHOLD)
+    // and the dense/uniform cases keep their original single-multiply form.
+    auto stepSparse = [&](const node u) {
+        pr[u] = 0.0;
+        G.forInEdgesOf(u, [&](const node, const node v, const edgeweight w) {
+            pr[u] += scoreData[v] * w / deg[v];
+        });
+        pr[u] *= damp;
+        for (const auto &entry : sparse) {
+            if (u == entry.first) {
+                pr[u] += teleportBase * entry.second;
+                break;
+            }
+        }
+    };
+    auto stepDense = [&](const node u) {
+        pr[u] = 0.0;
+        G.forInEdgesOf(u, [&](const node, const node v, const edgeweight w) {
+            pr[u] += scoreData[v] * w / deg[v];
+        });
+        pr[u] *= damp;
+        pr[u] += teleportBase * dense[u];
+    };
+    auto stepUniform = [&](const node u) {
+        pr[u] = 0.0;
+        G.forInEdgesOf(u, [&](const node, const node v, const edgeweight w) {
+            pr[u] += scoreData[v] * w / deg[v];
+        });
+        pr[u] *= damp;
+        pr[u] += teleportBase / static_cast<double>(n);
+    };
+
     bool isConverged = false;
     do {
         handler.assureRunning();
-        G.balancedParallelForNodes([&](const node u) {
-            pr[u] = 0.0;
-            G.forInEdgesOf(u, [&](const node u, const node v, const edgeweight w) {
-                // note: inconsistency in definition in Newman's book (Ch. 7) regarding
-                // directed graphs we follow the verbal description, which requires to
-                // sum over the incoming edges
-                pr[u] += scoreData[v] * w / deg[v];
-            });
-            pr[u] *= damp;
-            // Personalized teleportation: (1 - damp) * p[u]. For the default uniform case this
-            // collapses to (1 - damp) / n, recovering the original PageRank iteration.
-            pr[u] += (1.0 - damp) * personalizationProb[u];
-        });
+        if (hasSparse) {
+            G.balancedParallelForNodes(stepSparse);
+        } else if (hasDense) {
+            G.balancedParallelForNodes(stepDense);
+        } else {
+            G.balancedParallelForNodes(stepUniform);
+        }
 
         // For directed graphs sink-handling is needed to fulfill |pr| == 1 in each step. Otherwise
         // probability mass would be leaked, creating wrong results. For this, we redistribute
-        // each sink's mass to all nodes in proportion to the personalization distribution p.
-        // This is described amongst others in "PageRank revisited." by M. Brinkmeyer et al.
-        // (2005). For uniform p this is equivalent to distributing uniformly (1/n per node).
+        // each sink's mass in proportion to the personalization distribution p. With uniform p
+        // this is equivalent to distributing 1/n per node. With sparse p we touch only the k
+        // sources, so the cost is O(k) per iteration rather than O(n).
         if (G.isDirected() && ((distributeSinks == SinkHandling::DISTRIBUTE_SINKS) || normalized)) {
             double totalSinkPr = 0.0;
 #pragma omp parallel for reduction(+ : totalSinkPr)
@@ -190,8 +331,17 @@ void PageRank::run() {
                 totalSinkPr += scoreData[sinks[i]];
             }
             const double totalSinkContrib = damp * totalSinkPr;
-            G.balancedParallelForNodes(
-                [&](const node u) { pr[u] += totalSinkContrib * personalizationProb[u]; });
+            if (hasSparse) {
+                for (const auto &entry : sparse) {
+                    pr[entry.first] += totalSinkContrib * entry.second;
+                }
+            } else if (hasDense) {
+                G.balancedParallelForNodes(
+                    [&](const node u) { pr[u] += totalSinkContrib * dense[u]; });
+            } else {
+                G.balancedParallelForNodes(
+                    [&](const node u) { pr[u] += totalSinkContrib / static_cast<double>(n); });
+            }
         }
 
         ++iterations;

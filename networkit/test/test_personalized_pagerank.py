@@ -225,6 +225,115 @@ class TestPersonalizedPageRank(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             nk.centrality.PageRank.personalizationFromWeights(g, [(0, -1.0)])
 
+    # --- Memory-efficient fast-path static factories ---------------------
+
+    def test_for_source_matches_vector_path(self):
+        # The fast-path `forSource` factory must produce bit-for-bit identical
+        # scores to the equivalent vector-based construction.
+        g = _build_directed_triangle()
+        pers = nk.centrality.PageRank.personalizationFromSource(g, 0)
+        pr_vec = nk.centrality.PageRank(
+            g, damp=0.85, tol=1e-10,
+            distributeSinks=nk.centrality.SinkHandling.NoSinkHandling,
+            personalization=pers,
+        )
+        pr_vec.run()
+        pr_fast = nk.centrality.PageRank.forSource(
+            g, 0, damp=0.85, tol=1e-10,
+            distributeSinks=nk.centrality.SinkHandling.NoSinkHandling,
+        )
+        pr_fast.run()
+        for s_vec, s_fast in zip(pr_vec.scores(), pr_fast.scores()):
+            self.assertAlmostEqual(s_vec, s_fast, places=12)
+
+    def test_for_sources_matches_vector_path(self):
+        g = nk.Graph(4, weighted=False, directed=False)
+        for u, v in [(0, 1), (1, 2), (2, 3), (3, 0), (0, 2), (1, 3)]:
+            g.addEdge(u, v)
+
+        sources = [0, 1]
+        pers = nk.centrality.PageRank.personalizationFromSources(g, sources)
+        pr_vec = nk.centrality.PageRank(g, damp=0.85, tol=1e-10, personalization=pers)
+        pr_vec.run()
+        pr_fast = nk.centrality.PageRank.forSources(g, sources, damp=0.85, tol=1e-10)
+        pr_fast.run()
+        for s_vec, s_fast in zip(pr_vec.scores(), pr_fast.scores()):
+            self.assertAlmostEqual(s_vec, s_fast, places=12)
+
+    def test_for_weights_matches_vector_path(self):
+        g = _build_directed_triangle()
+        weighted = [(0, 10.0), (1, 1.0), (2, 1.0)]
+        pers = nk.centrality.PageRank.personalizationFromWeights(g, weighted)
+        pr_vec = nk.centrality.PageRank(g, damp=0.85, tol=1e-10, personalization=pers)
+        pr_vec.run()
+        pr_fast = nk.centrality.PageRank.forWeights(g, weighted, damp=0.85, tol=1e-10)
+        pr_fast.run()
+        # The fast path normalizes inside the sparse-representation builder using a
+        # slightly different summation order than the dense vector path, so a tolerance
+        # of 1e-10 (the same as the iteration tolerance) is the right level here.
+        for s_vec, s_fast in zip(pr_vec.scores(), pr_fast.scores()):
+            self.assertAlmostEqual(s_vec, s_fast, places=9)
+
+    def test_for_source_validation(self):
+        g = _build_undirected_triangle()
+        with self.assertRaises(RuntimeError):
+            nk.centrality.PageRank.forSource(g, 42)
+        with self.assertRaises(RuntimeError):
+            nk.centrality.PageRank.forSources(g, [])
+        with self.assertRaises(RuntimeError):
+            nk.centrality.PageRank.forSources(g, [0, 99])
+        with self.assertRaises(RuntimeError):
+            nk.centrality.PageRank.forWeights(g, [(0, -1.0)])
+
+    def test_for_source_runs_on_large_graph(self):
+        # The optimization is most useful on large graphs: a 200k-node graph with
+        # a single teleportation source would otherwise require allocating a 1.6 MB
+        # personalization vector on the Python side (plus the C++ copy). Verify
+        # that forSource runs to completion and produces the same sum-of-scores
+        # invariant as the dense path.
+        import random
+        random.seed(0)
+        n = 200_000
+        g = nk.Graph(n, weighted=False, directed=False)
+        for _ in range(n):
+            u = random.randrange(n)
+            v = random.randrange(n)
+            if u != v:
+                g.addEdge(u, v)
+
+        pr_fast = nk.centrality.PageRank.forSource(g, 0, damp=0.85, tol=1e-6)
+        pr_fast.run()
+        scores = pr_fast.scores()
+        self.assertAlmostEqual(sum(scores), 1.0, places=6)
+        # The source should have the largest score (teleportation bias).
+        self.assertEqual(max(range(len(scores)), key=lambda u: scores[u]), 0)
+
+    def test_constructor_auto_detects_sparse(self):
+        # A personalization vector with at most SPARSE_THRESHOLD non-zero entries
+        # is silently switched to the sparse representation by the constructor.
+        # We can only observe this indirectly: the result must match the explicit
+        # forSource / forSources fast paths bit-for-bit.
+        g = _build_directed_triangle()
+
+        # Single source via vector — k=1 should switch to sparse.
+        pers1 = nk.centrality.PageRank.personalizationFromSource(g, 0)
+        pr_vec = nk.centrality.PageRank(g, damp=0.85, tol=1e-10, personalization=pers1)
+        pr_vec.run()
+        pr_for = nk.centrality.PageRank.forSource(g, 0, damp=0.85, tol=1e-10)
+        pr_for.run()
+        for s_vec, s_for in zip(pr_vec.scores(), pr_for.scores()):
+            self.assertAlmostEqual(s_vec, s_for, places=12)
+
+        # Three sources via vector — k=3 should switch to sparse.
+        sources = [0, 1, 2]
+        pers2 = nk.centrality.PageRank.personalizationFromSources(g, sources)
+        pr_vec2 = nk.centrality.PageRank(g, damp=0.85, tol=1e-10, personalization=pers2)
+        pr_vec2.run()
+        pr_for2 = nk.centrality.PageRank.forSources(g, sources, damp=0.85, tol=1e-10)
+        pr_for2.run()
+        for s_vec, s_for in zip(pr_vec2.scores(), pr_for2.scores()):
+            self.assertAlmostEqual(s_vec, s_for, places=12)
+
 
 if __name__ == "__main__":
     unittest.main()
