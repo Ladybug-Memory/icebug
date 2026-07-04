@@ -564,6 +564,199 @@ TEST_P(CentralityGTest, testNormalizedPageRank) {
     doTest(PageRank::Norm::L2_NORM);
 }
 
+TEST_F(CentralityGTest, testPersonalizedPageRankDirectedTriangle) {
+    // Directed triangle 0 -> 1 -> 2 -> 0 with damp=0.85 and personalization
+    // p = (1, 0, 0). By symmetry pr[1] = 0.85 * pr[0] and pr[2] = 0.85^2 * pr[0],
+    // so pr[0] * (1 - 0.85^3) = 0.15 -> pr[0] ~= 0.3887, pr[1] ~= 0.3304,
+    // pr[2] ~= 0.2809 (sums to 1).
+    count n = 3;
+    GraphW G(n, /*weighted=*/false, /*directed=*/true);
+    G.addEdge(0, 1);
+    G.addEdge(1, 2);
+    G.addEdge(2, 0);
+
+    auto pers = PageRank::personalizationFromSource(G, 0);
+    ASSERT_EQ(pers.size(), G.upperNodeIdBound());
+    PageRank pr(G, 0.85, 1e-10, /*normalized=*/false,
+                PageRank::SinkHandling::NO_SINK_HANDLING, pers);
+    pr.run();
+    auto scores = pr.scores();
+
+    constexpr double tol = 1e-4;
+    EXPECT_NEAR(scores[0], 0.3887, tol);
+    EXPECT_NEAR(scores[1], 0.3304, tol);
+    EXPECT_NEAR(scores[2], 0.2809, tol);
+    EXPECT_NEAR(scores[0] + scores[1] + scores[2], 1.0, tol);
+}
+
+TEST_F(CentralityGTest, testPersonalizedPageRankUndirectedTriangle) {
+    // Undirected triangle 0-1-2-0 with damp=0.85 and personalization p = (1, 0, 0).
+    // By symmetry pr[1] = pr[2]. The steady state solves
+    //   pr[0] = 0.15 + 0.85 * pr[1]
+    //   pr[1] = 0.425 * (pr[0] + pr[1])
+    // giving pr[0] = 3.45/8.55 ~= 0.4035, pr[1] = pr[2] = 17/23 * pr[0] ~= 0.2982 (sums to 1).
+    count n = 3;
+    GraphW G(n, /*weighted=*/false, /*directed=*/false);
+    G.addEdge(0, 1);
+    G.addEdge(1, 2);
+    G.addEdge(2, 0);
+
+    auto pers = PageRank::personalizationFromSource(G, 0);
+    PageRank pr(G, 0.85, 1e-10, /*normalized=*/false,
+                PageRank::SinkHandling::NO_SINK_HANDLING, pers);
+    pr.run();
+    auto scores = pr.scores();
+
+    constexpr double tol = 1e-4;
+    EXPECT_NEAR(scores[0], 3.45 / 8.55, tol);
+    EXPECT_NEAR(scores[1], (17.0 / 23.0) * (3.45 / 8.55), tol);
+    EXPECT_NEAR(scores[2], (17.0 / 23.0) * (3.45 / 8.55), tol);
+    EXPECT_NEAR(scores[0] + scores[1] + scores[2], 1.0, tol);
+}
+
+TEST_F(CentralityGTest, testPersonalizedPageRankMatchesUniformFromFactory) {
+    // On a graph with no sinks, personalized PageRank from a single source with
+    // teleport probability 1 at that source should give a different answer than
+    // standard uniform PageRank (the source node receives more mass).
+    count n = 4;
+    GraphW G(n, false, false);
+    G.addEdge(0, 1);
+    G.addEdge(1, 2);
+    G.addEdge(2, 3);
+    G.addEdge(3, 0);
+
+    PageRank uniform(G, 0.85, 1e-10);
+    uniform.run();
+    auto uniformScores = uniform.scores();
+
+    auto pers = PageRank::personalizationFromSource(G, 0);
+    PageRank ppr(G, 0.85, 1e-10, /*normalized=*/false,
+                 PageRank::SinkHandling::NO_SINK_HANDLING, pers);
+    ppr.run();
+    auto pprScores = ppr.scores();
+
+    // Personalized PageRank should favor the source node (0) more strongly.
+    EXPECT_GT(pprScores[0], uniformScores[0] * 1.2);
+    // Both distributions should still sum to 1.
+    constexpr double tol = 1e-6;
+    EXPECT_NEAR(pprScores[0] + pprScores[1] + pprScores[2] + pprScores[3], 1.0, tol);
+    EXPECT_NEAR(uniformScores[0] + uniformScores[1] + uniformScores[2] + uniformScores[3], 1.0,
+                tol);
+}
+
+TEST_F(CentralityGTest, testPersonalizedPageRankWithSinks) {
+    // Personalized PageRank on a directed graph with a sink, with sink distribution
+    // enabled. The sink's mass is redistributed according to p, so this exercises
+    // the personalized sink-handling path.
+    count n = 4;
+    GraphW G(n, false, true);
+    G.addEdge(0, 1);
+    G.addEdge(1, 2);
+    // Node 3 is a sink (no outgoing edges).
+
+    auto pers = PageRank::personalizationFromSource(G, 0);
+    PageRank pr(G, 0.85, 1e-10, /*normalized=*/false,
+                PageRank::SinkHandling::DISTRIBUTE_SINKS, pers);
+    pr.run();
+    auto scores = pr.scores();
+
+    constexpr double tol = 1e-6;
+    EXPECT_NEAR(scores[0] + scores[1] + scores[2] + scores[3], 1.0, tol);
+    // The source node has the highest score.
+    EXPECT_GE(scores[0], scores[1]);
+    EXPECT_GE(scores[0], scores[2]);
+    EXPECT_GE(scores[0], scores[3]);
+}
+
+TEST_F(CentralityGTest, testPersonalizedPageRankFromMultipleSources) {
+    // personalizationFromSources should distribute mass uniformly across the
+    // sources; for a symmetric graph, the source nodes should share the highest
+    // scores and the non-sources should share lower scores.
+    count n = 4;
+    GraphW G(n, false, false);
+    G.addEdge(0, 1);
+    G.addEdge(1, 2);
+    G.addEdge(2, 3);
+    G.addEdge(3, 0);
+    G.addEdge(0, 2);
+    G.addEdge(1, 3);
+
+    auto pers = PageRank::personalizationFromSources(G, {0, 1});
+    PageRank pr(G, 0.85, 1e-10, /*normalized=*/false,
+                PageRank::SinkHandling::NO_SINK_HANDLING, pers);
+    pr.run();
+    auto scores = pr.scores();
+
+    // Sources 0 and 1 are connected to each other and to nodes 2 and 3; they
+    // should each have a strictly higher score than 2 and 3.
+    EXPECT_GT(scores[0], scores[2]);
+    EXPECT_GT(scores[1], scores[2]);
+    EXPECT_GT(scores[0], scores[3]);
+    EXPECT_GT(scores[1], scores[3]);
+    EXPECT_NEAR(scores[0] + scores[1] + scores[2] + scores[3], 1.0, 1e-6);
+}
+
+TEST_F(CentralityGTest, testPersonalizedPageRankFromWeightedSources) {
+    // personalizationFromWeights with a strong weight on a single source should
+    // put the bulk of the teleportation mass on that node.
+    count n = 3;
+    GraphW G(n, false, false);
+    G.addEdge(0, 1);
+    G.addEdge(1, 2);
+    G.addEdge(2, 0);
+
+    auto pers = PageRank::personalizationFromWeights(G, {{0, 10.0}, {1, 1.0}, {2, 1.0}});
+    ASSERT_EQ(pers.size(), G.upperNodeIdBound());
+    // Should be normalized: p[0] = 10/12, p[1] = p[2] = 1/12.
+    constexpr double tol = 1e-12;
+    EXPECT_NEAR(pers[0], 10.0 / 12.0, tol);
+    EXPECT_NEAR(pers[1], 1.0 / 12.0, tol);
+    EXPECT_NEAR(pers[2], 1.0 / 12.0, tol);
+
+    PageRank pr(G, 0.85, 1e-10, /*normalized=*/false,
+                PageRank::SinkHandling::NO_SINK_HANDLING, pers);
+    pr.run();
+    auto scores = pr.scores();
+    // Source 0 has 10x weight, so it should have the largest score.
+    EXPECT_GT(scores[0], scores[1]);
+    EXPECT_GT(scores[0], scores[2]);
+}
+
+TEST_F(CentralityGTest, testPersonalizedPageRankValidation) {
+    // Building PageRank with an invalid personalization vector must throw.
+    count n = 3;
+    GraphW G(n, false, false);
+    G.addEdge(0, 1);
+    G.addEdge(1, 2);
+
+    // Too small: missing entries for upper node ids.
+    std::vector<double> tooSmall(1, 1.0);
+    EXPECT_THROW(PageRank(G, 0.85, 1e-8, false, PageRank::SinkHandling::NO_SINK_HANDLING, tooSmall),
+                 std::runtime_error);
+
+    // Negative entry.
+    std::vector<double> negative(n, 0.0);
+    negative[0] = -1.0;
+    EXPECT_THROW(PageRank(G, 0.85, 1e-8, false, PageRank::SinkHandling::NO_SINK_HANDLING, negative),
+                 std::runtime_error);
+
+    // All zeros -> sum is zero.
+    std::vector<double> allZero(n, 0.0);
+    EXPECT_THROW(PageRank(G, 0.85, 1e-8, false, PageRank::SinkHandling::NO_SINK_HANDLING, allZero),
+                 std::runtime_error);
+
+    // Static factory: non-existent source.
+    EXPECT_THROW(PageRank::personalizationFromSource(G, /*source=*/42), std::runtime_error);
+    // Static factory: empty source set.
+    EXPECT_THROW(PageRank::personalizationFromSources(G, std::vector<node>{}), std::runtime_error);
+    // Static factory: non-existent source in set.
+    EXPECT_THROW(PageRank::personalizationFromSources(G, std::vector<node>{0, 99}),
+                 std::runtime_error);
+    // Static factory: negative weight.
+    EXPECT_THROW(PageRank::personalizationFromWeights(G, std::vector<std::pair<node, double>>{{0, -1.0}}),
+                 std::runtime_error);
+}
+
 TEST_F(CentralityGTest, testEigenvectorCentrality) {
     /* Graph:
      0    3   6

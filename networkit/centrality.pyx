@@ -2327,26 +2327,39 @@ class SinkHandling(object):
 cdef extern from "<networkit/centrality/PageRank.hpp>":
 
 	cdef cppclass _PageRank "NetworKit::PageRank" (_Centrality):
-		_PageRank(_Graph, double damp, double tol, bool_t normalized, _SinkHandling distributeSinks) except +
+		_PageRank(_Graph, double damp, double tol, bool_t normalized, _SinkHandling distributeSinks, vector[double] personalization) except +
 		count numberOfIterations() except +
 		_Norm norm
 		count maxIterations
+		@staticmethod
+		vector[double] personalizationFromSource(_Graph, node) except +
+		@staticmethod
+		vector[double] personalizationFromSources(_Graph, vector[node]) except +
+		@staticmethod
+		vector[double] personalizationFromWeights(_Graph, vector[pair[node, double]]) except +
 
 cdef class PageRank(Centrality):
-	""" 
-	PageRank(G, damp=0.85, tol=1e-9, normalized=False, distributeSinks=SinkHandling.NoSinkHandling)
-	
+	"""
+	PageRank(G, damp=0.85, tol=1e-8, normalized=False, distributeSinks=SinkHandling.NoSinkHandling, personalization=None)
+
 	Compute PageRank as node centrality measure. In the default mode this computation is in line
  	with the original paper "The PageRank citation ranking: Bringing order to the web." by L. Brin et al (1999).
  	In later publications ("PageRank revisited." by M. Brinkmeyer et al. (2005) amongst others) sink-node handling
- 	was added for directed graphs in order to comply with the theoretical assumptions by the underlying 
- 	Markov chain model. This can be activated by setting the matching parameter to true. By default 
+ 	was added for directed graphs in order to comply with the theoretical assumptions by the underlying
+ 	Markov chain model. This can be activated by setting the matching parameter to true. By default
  	this is disabled, since it is an addition to the original definition.
-	
+
  	Page-Rank values can also be normalized by post-processed according to "Comparing Apples and
  	Oranges: Normalized PageRank for Evolving Graphs" by Berberich et al. (2007). This decouples
  	the PageRank values from the size of the input graph. To enable this, set the matching parameter
  	to true. Note that, sink-node handling is automatically activated if normalization is used.
+
+	Personalized PageRank (also known as random walk with restart) is enabled by passing a
+	non-empty :code:`personalization` vector. The vector must have length
+	:code:`G.upperNodeIdBound()` and contain non-negative teleportation weights; it is
+	normalized internally so its entries sum to one. Use the static helpers
+	:code:`PageRank.personalizationFromSource`, :code:`personalizationFromSources` or
+	:code:`personalizationFromWeights` to build common vectors.
 
 	Parameter :code:`distributeSinks` can be one of the following:
 
@@ -2364,13 +2377,101 @@ cdef class PageRank(Centrality):
 	distributeSinks: networkit.centrality.SinkHandling, optional
 		Set to distribute PageRank values for sink nodes. Default: SinkHandling.NO_SINK_HANDLING
 	normalized : bool, optional
-		If the results should be normalized by the lower bound of scores. 
+		If the results should be normalized by the lower bound of scores.
 		This decouples the PageRank values from the size of the input graph. Default: False
+	personalization : list of float, optional
+		Teleportation weights for personalized PageRank. Length must be at least
+		:code:`G.upperNodeIdBound()`, every entry must be non-negative, and at least one
+		entry must be positive. The vector is normalized internally. Default: :code:`None`
+		(uniform teleportation 1/n, the standard PageRank).
 	"""
 
-	def __cinit__(self, Graph G, double damp=0.85, double tol=1e-8, bool_t normalized=False, distributeSinks=SinkHandling.NO_SINK_HANDLING):
+	def __cinit__(self, Graph G, double damp=0.85, double tol=1e-8, bool_t normalized=False, distributeSinks=SinkHandling.NO_SINK_HANDLING, personalization=None):
+		cdef vector[double] pers
+		if personalization is not None:
+			pers = personalization
 		self._G = G
-		self._this = new _PageRank(dereference(G._this), damp, tol, normalized, distributeSinks)
+		self._this = new _PageRank(dereference(G._this), damp, tol, normalized, distributeSinks, pers)
+
+	@staticmethod
+	def personalizationFromSource(Graph G, source):
+		"""
+		personalizationFromSource(G, source)
+
+		Build a personalization vector that teleports exclusively to a single ``source`` node.
+		The returned list has length ``G.upperNodeIdBound()`` and sums to one; pass it as the
+		``personalization`` argument of the :py:class:`PageRank` constructor to obtain
+		personalized PageRank with that source.
+
+		Parameters
+		----------
+		G : networkit.Graph
+			Graph the personalization vector is built for.
+		source : int
+			Node to teleport to.
+
+		Returns
+		-------
+		list of float
+			Personalization vector of size ``G.upperNodeIdBound()`` with a single non-zero entry.
+		"""
+		return _PageRank.personalizationFromSource(dereference(G._this), source)
+
+	@staticmethod
+	def personalizationFromSources(Graph G, sources):
+		"""
+		personalizationFromSources(G, sources)
+
+		Build a personalization vector that teleports uniformly to any node in ``sources``.
+		The returned list has length ``G.upperNodeIdBound()`` and sums to one.
+
+		Parameters
+		----------
+		G : networkit.Graph
+			Graph the personalization vector is built for.
+		sources : list of int
+			Nodes to teleport to (must be non-empty).
+
+		Returns
+		-------
+		list of float
+			Personalization vector of size ``G.upperNodeIdBound()`` with uniform non-zero
+			entries on the ``sources``.
+		"""
+		cdef vector[node] src = sources
+		return _PageRank.personalizationFromSources(dereference(G._this), src)
+
+	@staticmethod
+	def personalizationFromWeights(Graph G, weightedSources):
+		"""
+		personalizationFromWeights(G, weightedSources)
+
+		Build a personalization vector from a set of weighted source nodes. Weights must be
+		non-negative; nodes missing from ``weightedSources`` receive a weight of zero. The
+		returned list has length ``G.upperNodeIdBound()`` and sums to one.
+
+		Parameters
+		----------
+		G : networkit.Graph
+			Graph the personalization vector is built for.
+		weightedSources : list of (int, float)
+			Pairs of (node, weight). Must be non-empty.
+
+		Returns
+		-------
+		list of float
+			Personalization vector of size ``G.upperNodeIdBound()``.
+		"""
+		cdef vector[pair[node, double]] ws
+		cdef pair[node, double] entry
+		cdef node u
+		cdef double w
+		for pair_item in weightedSources:
+			u, w = pair_item
+			entry.first = u
+			entry.second = w
+			ws.push_back(entry)
+		return _PageRank.personalizationFromWeights(dereference(G._this), ws)
 
 	def numberOfIterations(self):
 		"""
