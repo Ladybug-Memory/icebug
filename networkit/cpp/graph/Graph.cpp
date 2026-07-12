@@ -298,13 +298,16 @@ bool Graph::hasEdgeCSR(node u, node v) const {
     auto end_idx = outEdgesCSRIndptr->Value(u + 1);
 
     // Binary search for neighbor v in sorted adjacency list
-    for (auto idx = start_idx; idx < end_idx; ++idx) {
-        auto neighbor = outEdgesCSRIndices->Value(idx);
-        if (neighbor == v) {
+    index low = start_idx, high = end_idx;
+    while (low < high) {
+        auto mid = low + (high - low) / 2;
+        auto neighbor = outEdgesCSRIndices->Value(mid);
+        if (neighbor < v) {
+            low = mid + 1;
+        } else if (neighbor > v) {
+            high = mid;
+        } else {
             return true;
-        }
-        if (neighbor > v) {
-            break; // assuming sorted neighbors
         }
     }
 
