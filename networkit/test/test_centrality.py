@@ -105,6 +105,92 @@ class TestCentrality(unittest.TestCase):
 			CLL = nk.centrality.CoreDecomposition(tmp)
 			CLL.run()
 			self.assertTrue(self.checkCovers(CL.getCover(),CLL.getCover()))
+
+	def assertParallelCoreMatchesReference(self, graph, use_sampling=True):
+		reference = nk.centrality.CoreDecomposition(
+			graph, normalized=False, enforceBucketQueueAlgorithm=True)
+		reference.run()
+		parallel = nk.centrality.ParallelCoreDecomposition(
+			graph, normalized=False, useSampling=use_sampling)
+		parallel.run()
+		self.assertListEqual(reference.scores(), parallel.scores())
+		self.assertEqual(reference.maxCoreNumber(), parallel.maxCoreNumber())
+		return parallel
+
+	def testParallelCoreDecompositionRandomGraphs(self):
+		for seed, probability in [(1, 0.01), (2, 0.05), (3, 0.2), (4, 0.6)]:
+			nk.setSeed(seed, False)
+			graph = nk.generators.ErdosRenyiGenerator(300, probability, False).generate()
+			self.assertParallelCoreMatchesReference(graph)
+
+	def testParallelCoreDecompositionHierarchicalBuckets(self):
+		graph = nk.generators.ErdosRenyiGenerator(520, 1.0, False).generate()
+		parallel = self.assertParallelCoreMatchesReference(graph)
+		self.assertEqual(parallel.maxCoreNumber(), 519)
+
+	def testParallelCoreDecompositionSampling(self):
+		graph = nk.Graph(25001)
+		for leaf in range(1, graph.numberOfNodes()):
+			graph.addEdge(0, leaf)
+		parallel = self.assertParallelCoreMatchesReference(graph)
+		self.assertEqual(parallel.numberOfRestarts(), 0)
+
+	def testParallelCoreDecompositionSamplingDenseBipartite(self):
+		high_degree_nodes = 20
+		low_degree_nodes = 20000
+		graph = nk.Graph(high_degree_nodes + low_degree_nodes)
+		for high_degree_node in range(high_degree_nodes):
+			for low_degree_node in range(high_degree_nodes, graph.numberOfNodes()):
+				graph.addEdge(high_degree_node, low_degree_node)
+		parallel = self.assertParallelCoreMatchesReference(graph)
+		self.assertEqual(parallel.maxCoreNumber(), high_degree_nodes)
+		self.assertEqual(parallel.numberOfRestarts(), 0)
+
+	def testParallelCoreDecompositionWithoutSampling(self):
+		nk.setSeed(5, False)
+		graph = nk.generators.ErdosRenyiGenerator(500, 0.15, False).generate()
+		parallel = self.assertParallelCoreMatchesReference(graph, use_sampling=False)
+		self.assertEqual(parallel.numberOfRestarts(), 0)
+
+	def testParallelCoreDecompositionGraphR(self):
+		import pyarrow as pa
+
+		indices = pa.array([1, 2, 0, 2, 0, 1, 3, 2], type=pa.uint64())
+		indptr = pa.array([0, 2, 4, 7, 8], type=pa.uint64())
+		graph = nk.Graph.fromCSR(4, False, indices, indptr)
+		parallel = self.assertParallelCoreMatchesReference(graph)
+		self.assertListEqual(parallel.scores(), [2.0, 2.0, 2.0, 1.0])
+
+	def testParallelCoreDecompositionGraphRSampling(self):
+		import pyarrow as pa
+
+		number_of_leaves = 25000
+		indices = pa.array(
+			list(range(1, number_of_leaves + 1)) + [0] * number_of_leaves,
+			type=pa.uint64())
+		indptr = pa.array(
+			[0, number_of_leaves]
+			+ list(range(number_of_leaves + 1, 2 * number_of_leaves + 1)),
+			type=pa.uint64())
+		graph = nk.Graph.fromCSR(number_of_leaves + 1, False, indices, indptr)
+		parallel = self.assertParallelCoreMatchesReference(graph)
+		self.assertEqual(parallel.maxCoreNumber(), 1)
+		self.assertEqual(parallel.numberOfRestarts(), 0)
+
+	def testParallelCoreDecompositionRejectsUnsupportedGraphs(self):
+		directed = nk.Graph(3, False, True)
+		with self.assertRaises(RuntimeError):
+			nk.centrality.ParallelCoreDecomposition(directed)
+
+		self_loop = nk.Graph(3)
+		self_loop.addEdge(0, 0)
+		with self.assertRaises(RuntimeError):
+			nk.centrality.ParallelCoreDecomposition(self_loop)
+
+		non_continuous = nk.Graph(3)
+		non_continuous.removeNode(1)
+		with self.assertRaises(RuntimeError):
+			nk.centrality.ParallelCoreDecomposition(non_continuous)
    
 	def testComplexPathsAllNodes(self):
 		CP = nk.centrality.ComplexPaths(self.L, 3)

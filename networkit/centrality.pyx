@@ -2276,6 +2276,56 @@ cdef class CoreDecomposition(Centrality):
 		"""
 		return (<_CoreDecomposition*>(self._this)).getNodeOrder()
 
+cdef extern from "<networkit/centrality/ParallelCoreDecomposition.hpp>":
+
+	cdef cppclass _ParallelCoreDecomposition "NetworKit::ParallelCoreDecomposition" (_Centrality):
+		_ParallelCoreDecomposition(_Graph, bool_t, bool_t) except +
+		_Cover getCover() except +
+		_Partition getPartition() except +
+		index maxCoreNumber() except +
+		count numberOfRestarts() except +
+
+cdef class ParallelCoreDecomposition(Centrality):
+	"""
+	ParallelCoreDecomposition(G, normalized=False, useSampling=True)
+
+	Computes an exact parallel k-core decomposition of an undirected graph using the SIGMOD 2025
+	online peeling algorithm with hierarchical buckets, high-degree sampling, and vertical
+	granularity control. If sampling validation detects an error, the algorithm restarts without
+	sampling to preserve exact results.
+
+	Parameters
+	----------
+	G : networkit.Graph
+		The undirected input graph. Node ids must be continuous and the graph may not contain
+		self-loops.
+	normalized : bool, optional
+		Divide each core number by the maximum degree. Default: False
+	useSampling : bool, optional
+		Use high-degree sampling to reduce atomic contention. Default: True
+	"""
+
+	def __cinit__(self, Graph G, bool_t normalized=False, bool_t useSampling=True):
+		self._G = G
+		self._this = new _ParallelCoreDecomposition(
+			dereference(G._this), normalized, useSampling)
+
+	def maxCoreNumber(self):
+		"""Return the maximum core number."""
+		return (<_ParallelCoreDecomposition*>(self._this)).maxCoreNumber()
+
+	def numberOfRestarts(self):
+		"""Return the number of sampling-error recovery restarts in the last run."""
+		return (<_ParallelCoreDecomposition*>(self._this)).numberOfRestarts()
+
+	def getCover(self):
+		"""Return the nested k-cores as a cover."""
+		return Cover().setThis((<_ParallelCoreDecomposition*>(self._this)).getCover())
+
+	def getPartition(self):
+		"""Return the k-shells as a partition."""
+		return Partition().setThis((<_ParallelCoreDecomposition*>(self._this)).getPartition())
+
 cdef extern from "<networkit/centrality/EigenvectorCentrality.hpp>":
 
 	cdef cppclass _EigenvectorCentrality "NetworKit::EigenvectorCentrality" (_Centrality):
@@ -3286,5 +3336,4 @@ cdef class ComplexPaths(Algorithm):
 
 		"""
 		return (<_ComplexPaths*>(self._this)).normalize()
-
 
