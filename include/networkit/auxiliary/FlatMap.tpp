@@ -62,13 +62,17 @@ void flat_map<Key, T>::merge_sorted_vectors(key_container_type &bk, mapped_conta
     difference_type w = static_cast<difference_type>(oldk + nnew) - 1;
     while (rj >= 0) {
         if (ri >= 0 && bk[rj] < c.keys[ri]) { // old is larger
-            c.keys[w] = std::move(c.keys[ri]);
-            c.values[w] = std::move(c.values[ri]);
+            if (w != ri) {
+                c.keys[w] = std::move(c.keys[ri]);
+                c.values[w] = std::move(c.values[ri]);
+            }
             --ri;
             --w;
         } else if (ri >= 0 && !(c.keys[ri] < bk[rj])) { // equal: old wins
-            c.keys[w] = std::move(c.keys[ri]);
-            c.values[w] = std::move(c.values[ri]);
+            if (w != ri) {
+                c.keys[w] = std::move(c.keys[ri]);
+                c.values[w] = std::move(c.values[ri]);
+            }
             --ri;
             --rj;
             --w;
