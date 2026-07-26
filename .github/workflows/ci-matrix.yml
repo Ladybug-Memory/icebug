@@ -181,6 +181,11 @@ jobs:
         if: matrix.os == 'linux'
         run: |
           uv sync --extra pytest
+          uv pip install -e ".[test]"
+          # https://github.com/apache/arrow/issues/50648
+          sys_libarrow=$(ldconfig -p | grep libarrow.so.2500 | awk '{print $NF}')
+          sudo apt remove libarrow2500 -y
+          sudo cp $(find .venv -name 'libarrow.so.2500') ${sys_libarrow}
           uv run pytest
         env:
           CMAKE_CXX_COMPILER_LAUNCHER: ccache
