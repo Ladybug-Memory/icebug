@@ -51,7 +51,9 @@ jobs:
           CIBW_BEFORE_ALL: |
             yum install -y epel-release || yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1).noarch.rpm
             yum install -y https://apache.jfrog.io/artifactory/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe)/apache-arrow-release-latest.rpm
-            yum install -y --enablerepo=epel arrow-devel arrow-compute-devel ccache
+            # Arrow 25.0.0 RPMs have a GPG key mismatch, so we use --nogpgcheck
+            # See https://github.com/apache/arrow/issues/50648
+            yum install -y --nogpgcheck --enablerepo=epel arrow-devel arrow-compute-devel ccache
             export CCACHE_DIR=/root/.ccache
             mkdir -p /tmp/nk_core_build /tmp/nk_core_install
             cmake -S {project} -B /tmp/nk_core_build \
@@ -134,7 +136,9 @@ jobs:
           CIBW_BEFORE_ALL: |
             yum install -y epel-release || yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1).noarch.rpm
             yum install -y https://apache.jfrog.io/artifactory/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe)/apache-arrow-release-latest.rpm
-            yum install -y --enablerepo=epel arrow-devel arrow-compute-devel ccache
+            # Arrow 25.0.0 RPMs have a GPG key mismatch, so we use --nogpgcheck
+            # See https://github.com/apache/arrow/issues/50648
+            yum install -y --nogpgcheck --enablerepo=epel arrow-devel arrow-compute-devel ccache
             export CCACHE_DIR=/root/.ccache
             mkdir -p /tmp/nk_core_build /tmp/nk_core_install
             cmake -S {project} -B /tmp/nk_core_build \
