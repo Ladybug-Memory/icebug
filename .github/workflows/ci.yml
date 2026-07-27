@@ -116,7 +116,7 @@ jobs:
       CXX: c++
     strategy:
       matrix:
-        os: ['13', 'latest'] # For macos-latest, the default image is arm based. So 13 = x86_64, latest = arm64
+        os: ['13', '15']
         build-configuration: ['full', 'full (native)']
     steps:
       - name: Install prerequisites
