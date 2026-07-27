@@ -199,7 +199,7 @@ jobs:
       matrix:
         buildplat:
         - [macos-15-intel, x86_64, '']
-        - [macos-latest, arm64, NETWORKIT_OSX_CROSSBUILD=ON]
+        - [macos-15, arm64, NETWORKIT_OSX_CROSSBUILD=ON]
     steps:
       - uses: actions/checkout@v4
         with:
