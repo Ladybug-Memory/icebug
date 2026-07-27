@@ -438,7 +438,7 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
         std::vector<index> pointers;
 
         auto moveLimitReached = [&](node candidate) {
-            return movesPerNode[candidate].load() >= maxMovesPerNode;
+            return movesPerNode[candidate].load() >= static_cast<unsigned int>(maxMovesPerNode);
         };
 
         auto pushNewNode = [&](node queuedNode) {
@@ -605,7 +605,7 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
 
                         const uint32_t previousMoves =
                             movesPerNode[u].fetch_add(1, std::memory_order_relaxed);
-                        assert(previousMoves < maxMovesPerNode);
+                        assert(previousMoves < static_cast<uint32_t>(maxMovesPerNode));
 
                         if (singletonMove) { // move node to empty community
                             singleton++;
@@ -707,8 +707,9 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
         std::accumulate(nodePassesSkippedByMoveLimit.begin(), nodePassesSkippedByMoveLimit.end(),
                         static_cast<count>(0));
 
+    tlx::unused(totalWorked);
+    tlx::unused(totalNodePassesSkippedByMoveLimit);
     if (Aux::Log::isLogLevelEnabled(Aux::Log::LogLevel::DEBUG)) {
-        tlx::unused(totalWorked);
         DEBUG("Total worked: ", totalWorked, " Total moved: ", totalMoved,
               " Moved to singleton community: ", singleton,
               " Node passes skipped by move limit: ", totalNodePassesSkippedByMoveLimit);

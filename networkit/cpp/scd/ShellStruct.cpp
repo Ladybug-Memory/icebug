@@ -59,7 +59,7 @@ static void append_to_csr(std::vector<Index> &indptr, std::vector<node> &indices
     std::vector<size_t> write_offsets(num_keys);
     Index current_offset = start_pos;
 
-    for (Index i = 0; i < num_keys; ++i) {
+    for (Index i = 0; i < static_cast<Index>(num_keys); ++i) {
         write_offsets[i] = current_offset;
         current_offset += counts[i];
         indptr.push_back(current_offset);
@@ -90,7 +90,7 @@ void ShellStruct::build(const std::shared_ptr<arrow::UInt64Array> &coredecomp) {
     index n = g->upperNodeIdBound();
 
     index max_k = 0;
-    for (node i = 0; i < coredecomp->length(); ++i)
+    for (node i = 0; i < static_cast<node>(coredecomp->length()); ++i)
         max_k = std::max(max_k, coredecomp->Value(i));
 
     std::vector<index> shell_indptr(max_k + 2, 0);
@@ -130,7 +130,7 @@ void ShellStruct::build(const std::shared_ptr<arrow::UInt64Array> &coredecomp) {
         std::vector<node> touched;
         forNeighborsOfSet<std::vector<node>>(
             *g, V_k,
-            [&](node v, node neighbor, std::vector<node> &local_touched) {
+            [&](node /*v*/, node neighbor, std::vector<node> &local_touched) {
                 index neighbor_k = coredecomp->Value(neighbor);
                 if (neighbor_k > k) {
                     node old_root = dsu.find(neighbor);
