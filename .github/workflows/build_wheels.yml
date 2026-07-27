@@ -279,10 +279,12 @@ jobs:
           path: ./wheelhouse/*cp314*.whl
           retention-days: ${{ env.ARTIFACT_RETENTION }}
 
-
   cpython-windows:
     name: 'Windows CPython (${{ matrix.cibw_archs }})'
     runs-on: windows-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
       matrix:
         cibw_archs: [amd64]
