@@ -63,7 +63,7 @@ cdef class EdgeSwitching(Algorithm):
 
 	def __cinit__(self, G, numberOfSwapsPerEdge = 10.0, degreePreservingShufflePreprocessing = True):
 		if isinstance(G, Graph):
-			self._this = new _EdgeSwitching(dereference((<Graph>G)._this), numberOfSwapsPerEdge, degreePreservingShufflePreprocessing)
+			self._this = new _EdgeSwitching(dereference((<Graph>G)._view()), numberOfSwapsPerEdge, degreePreservingShufflePreprocessing)
 		else:
 			raise RuntimeError("Parameter G has to be a graph")
 
@@ -72,7 +72,7 @@ cdef class EdgeSwitching(Algorithm):
 		(<_EdgeSwitching*>self._this).run()
 
 	def getGraph(self):
-		return Graph().setThis((<_EdgeSwitching*>self._this).getGraph())
+		return Graph().setThisFromGraphW((<_EdgeSwitching*>self._this).getGraph())
 
 	def getNumberOfAffectedEdges(self):
 		return (<_EdgeSwitching*>(self._this)).getNumberOfAffectedEdges()
@@ -127,7 +127,7 @@ cdef class EdgeSwitchingInPlace(Algorithm):
 			gw_wrapper._this = self._gw
 			self._localReference = gw_wrapper
 		elif isinstance(G, Graph):
-			self._gw = _GraphW(dereference((<Graph>G)._this))
+			self._gw = _GraphW(dereference((<Graph>G)._view()))
 			self._this = new _EdgeSwitchingInPlace(self._gw, numberOfSwitchesPerEdge)
 			(<Graph>G).setThisFromGraphW(self._gw)
 			self._localReference = G
@@ -234,7 +234,7 @@ cdef class GlobalCurveball(Algorithm):
 	"""
 	def __cinit__(self, G, number_of_global_rounds = 20, allowSelfLoops = False, degreePreservingShufflePreprocessing = True):
 		if isinstance(G, Graph):
-			self._this = new _GlobalCurveball(dereference((<Graph>G)._this), number_of_global_rounds, allowSelfLoops, degreePreservingShufflePreprocessing)
+			self._this = new _GlobalCurveball(dereference((<Graph>G)._view()), number_of_global_rounds, allowSelfLoops, degreePreservingShufflePreprocessing)
 		else:
 			raise RuntimeError("Parameter G has to be a graph")
 
@@ -249,7 +249,7 @@ cdef class GlobalCurveball(Algorithm):
 		networkit.Graph
 			The randomized graph.
 		"""
-		return Graph().setThis((<_GlobalCurveball*>self._this).getGraph())
+		return Graph().setThisFromGraphW((<_GlobalCurveball*>self._this).getGraph())
 
 cdef extern from "<networkit/randomization/CurveballUniformTradeGenerator.hpp>":
 
@@ -370,7 +370,7 @@ cdef class Curveball(Algorithm):
 	"""
 	def __cinit__(self, G):
 		if isinstance(G, Graph):
-			self._this = new _Curveball(dereference((<Graph>G)._this))
+			self._this = new _Curveball(dereference((<Graph>G)._view()))
 		else:
 			raise RuntimeError("Parameter G has to be a graph")
 
@@ -400,7 +400,7 @@ cdef class Curveball(Algorithm):
 		networkit.Graph
 			The randomized graph.
 		"""
-		return Graph().setThis((<_Curveball*>self._this).getGraph())
+		return Graph().setThisFromGraphW((<_Curveball*>self._this).getGraph())
 
 	def getNumberOfAffectedEdges(self):
 		"""
@@ -451,7 +451,7 @@ cdef class DegreePreservingShuffle(Algorithm):
 	"""
 	def __cinit__(self, G):
 		if isinstance(G, Graph):
-			self._this = new _DegreePreservingShuffle(dereference((<Graph>G)._this))
+			self._this = new _DegreePreservingShuffle(dereference((<Graph>G)._view()))
 		else:
 			raise RuntimeError("Parameter G has to be a graph")
 
@@ -466,7 +466,7 @@ cdef class DegreePreservingShuffle(Algorithm):
 		networkit.Graph
 			The randomized graph.
 		"""
-		return Graph().setThis((<_DegreePreservingShuffle*>self._this).getGraph())
+		return Graph().setThisFromGraphW((<_DegreePreservingShuffle*>self._this).getGraph())
 
 	def getPermutation(self):
 		"""

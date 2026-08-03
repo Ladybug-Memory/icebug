@@ -122,7 +122,7 @@ cdef class ConnectedComponents(ComponentDecomposition):
 	"""
 
 	def __cinit__(self,  Graph G):
-		self._this = new _ConnectedComponents(dereference(G._this))
+		self._this = new _ConnectedComponents(dereference(G._view()))
 
 	@staticmethod
 	def extractLargestConnectedComponent(Graph graph, bool_t compactGraph = False):
@@ -151,7 +151,7 @@ cdef class ConnectedComponents(ComponentDecomposition):
 			A graph that contains only the nodes inside the largest
 			connected component.
 		"""
-		return Graph().setThisFromGraphW(_ConnectedComponents.extractLargestConnectedComponent(dereference(graph._this), compactGraph))
+		return Graph().setThisFromGraphW(_ConnectedComponents.extractLargestConnectedComponent(dereference(graph._view()), compactGraph))
 
 cdef extern from "<networkit/components/ParallelConnectedComponents.hpp>":
 
@@ -177,7 +177,7 @@ cdef class ParallelConnectedComponents(ComponentDecomposition):
 	"""
 
 	def __cinit__(self,  Graph G, coarsening=True	):
-		self._this = new _ParallelConnectedComponents(dereference(G._this), coarsening)
+		self._this = new _ParallelConnectedComponents(dereference(G._view()), coarsening)
 
 cdef extern from "<networkit/components/StronglyConnectedComponents.hpp>":
 
@@ -197,7 +197,7 @@ cdef class StronglyConnectedComponents(ComponentDecomposition):
 	"""
 
 	def __cinit__(self, Graph G):
-		self._this = new _StronglyConnectedComponents(dereference(G._this))
+		self._this = new _StronglyConnectedComponents(dereference(G._view()))
 
 cdef extern from "<networkit/components/WeaklyConnectedComponents.hpp>":
 
@@ -217,7 +217,7 @@ cdef class WeaklyConnectedComponents(ComponentDecomposition):
 	"""
 
 	def __cinit__(self, Graph G):
-		self._this = new _WeaklyConnectedComponents(dereference(G._this))
+		self._this = new _WeaklyConnectedComponents(dereference(G._view()))
 
 cdef extern from "<networkit/components/BiconnectedComponents.hpp>":
 
@@ -243,7 +243,7 @@ cdef class BiconnectedComponents(Algorithm):
 	"""
 
 	def __cinit__(self, Graph G):
-		self._this = new _BiconnectedComponents(dereference(G._this))
+		self._this = new _BiconnectedComponents(dereference(G._view()))
 
 	def numberOfComponents(self):
 		"""
@@ -324,7 +324,7 @@ cdef class DynConnectedComponents(ComponentDecomposition, DynAlgorithm):
 	"""
 
 	def __cinit__(self, Graph G):
-		self._this = new _DynConnectedComponents(dereference(G._this))
+		self._this = new _DynConnectedComponents(dereference(G._view()))
 
 
 
@@ -346,5 +346,5 @@ cdef class DynWeaklyConnectedComponents(ComponentDecomposition, DynAlgorithm):
 	"""
 
 	def __cinit__(self, Graph G):
-		self._this = new _DynWeaklyConnectedComponents(dereference(G._this))
+		self._this = new _DynWeaklyConnectedComponents(dereference(G._view()))
 
