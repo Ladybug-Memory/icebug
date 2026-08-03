@@ -15,7 +15,7 @@
 #include <networkit/centrality/DynBetweennessOneNode.hpp>
 namespace NetworKit {
 
-DynBetweennessOneNode::DynBetweennessOneNode(Graph &G, node x) : G(G), x(x) {}
+DynBetweennessOneNode::DynBetweennessOneNode(const Graph &G, node x) : G(G), x(x) {}
 
 /**
  * Run method that stores a One shortest path for each node pair and stores shortest distances

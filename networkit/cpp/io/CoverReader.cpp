@@ -6,7 +6,7 @@
 
 namespace NetworKit {
 
-Cover CoverReader::read(std::string_view path, Graph &G) {
+Cover CoverReader::read(std::string_view path, const Graph &G) {
     std::ifstream file;
     file.open(path.data());
     if (!file.good()) {

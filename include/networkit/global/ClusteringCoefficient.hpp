@@ -27,15 +27,15 @@ public:
      * @note $$c(G) := \\frac{1}{n} \\sum_{u \\in V} c(u)$$
      * where $c(u) := \\frac{2 \\cdot |E(N(u))| }{\\deg(u) \\cdot ( \\deg(u) - 1)}$
      */
-    static double avgLocal(Graph &G, bool turbo = false);
+    static double avgLocal(const Graph &G, bool turbo = false);
     static double sequentialAvgLocal(const Graph &G);
-    static double approxAvgLocal(Graph &G, count trials);
+    static double approxAvgLocal(const Graph &G, count trials);
 
     /**
      * This calculates the global clustering coefficient
      */
-    static double exactGlobal(Graph &G);
-    static double approxGlobal(Graph &G, count trials);
+    static double exactGlobal(const Graph &G);
+    static double approxGlobal(const Graph &G, count trials);
 };
 
 } /* namespace NetworKit */

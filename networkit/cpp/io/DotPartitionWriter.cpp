@@ -5,7 +5,7 @@
 
 namespace NetworKit {
 
-std::map<index, double> DotPartitionWriter::createHueMap(Graph &graph, Partition &zeta) const {
+std::map<index, double> DotPartitionWriter::createHueMap(const Graph &graph, Partition &zeta) const {
     std::unordered_set<index> uniqueIds;
 
     graph.forNodes([&](node u) {
@@ -28,7 +28,7 @@ std::map<index, double> DotPartitionWriter::createHueMap(Graph &graph, Partition
     return clusterHueMap;
 }
 
-void DotPartitionWriter::write(Graph &graph, Partition &zeta, std::string_view path) const {
+void DotPartitionWriter::write(const Graph &graph, Partition &zeta, std::string_view path) const {
     std::ofstream file{path.data()};
 
     auto hueMap = this->createHueMap(graph, zeta);

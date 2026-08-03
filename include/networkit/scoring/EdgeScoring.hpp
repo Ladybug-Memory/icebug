@@ -20,10 +20,10 @@ template <typename T>
 class EdgeScoring {
 
 protected:
-    Graph *G;
+    const Graph *G;
 
 public:
-    EdgeScoring(Graph &G);
+    EdgeScoring(const Graph &G);
 
     virtual ~EdgeScoring();
 
@@ -33,7 +33,7 @@ public:
 };
 
 template <typename T>
-EdgeScoring<T>::EdgeScoring(Graph &G) {
+EdgeScoring<T>::EdgeScoring(const Graph &G) {
     this->G = &G;
 }
 
