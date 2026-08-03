@@ -277,10 +277,10 @@ private:
         index idx;
     }; // class IndexProxy
 public:
-    explicit Attribute(std::shared_ptr<AttributeStorage_type> ownedStorage = nullptr,
-                       const GraphType *graph = nullptr)
-        : ownedStorage{ownedStorage}, theGraph{graph},
-          valid{ownedStorage != nullptr && graph != nullptr} {}
+    Attribute() : ownedStorage{}, theGraph{}, valid{false} {}
+
+    explicit Attribute(std::shared_ptr<AttributeStorage_type> ownedStorage, GraphType graph)
+        : ownedStorage{ownedStorage}, theGraph{graph}, valid{ownedStorage != nullptr} {}
 
     Attribute(Attribute const &other)
         : ownedStorage{other.ownedStorage}, theGraph{other.theGraph}, valid{other.valid} {}
@@ -453,28 +453,34 @@ private:
     }
 
     std::weak_ptr<AttributeStorage_type> ownedStorage;
-    const GraphType *theGraph;
+    GraphType theGraph;
     bool valid;
 }; // class Attribute
 
 template <typename NodeOrEdge, typename GraphType>
 class AttributeMap {
     friend GraphType;
+    friend class GraphR;
     friend class GraphW;
-    const GraphType *theGraph;
+    template <typename>
+    friend class AttributedGraphBase;
+    /*
+     * A non-owning handle, not a pointer: the map lives inside the graph it describes, so there
+     * is no separate object to point at once the graph is held by value.
+     */
+    GraphType theGraph;
 
     std::unordered_map<std::string, std::shared_ptr<ASB<NodeOrEdge, GraphType>>> attrMap;
 
 public:
-    AttributeMap(const GraphType *g) : theGraph{g} { assert(theGraph != nullptr); }
+    AttributeMap(GraphType g) : theGraph{g} {}
 
     // do not allow copying of AttributeMap. There is a 1:1 relation to the Graph!
     AttributeMap(AttributeMap &) = delete;
     AttributeMap &operator=(const AttributeMap &) = delete;
 
     // copying is only allowed with a new graph pointer. This constructor copies all data.
-    AttributeMap(const AttributeMap &other, const GraphType *g) : theGraph(g) {
-        assert(theGraph != nullptr);
+    AttributeMap(const AttributeMap &other, GraphType g) : theGraph(g) {
         // manual copy is required here since the copy constructor for unordered_map would only copy
         // the shared_ptr and not the data
         for (auto &[key, value] : other.attrMap) {
@@ -486,6 +492,10 @@ public:
     // move operators
     AttributeMap(AttributeMap &&other) = default;
     AttributeMap &operator=(AttributeMap &&other) = default;
+
+    // moving the data onto a different graph, for when the owning graph is copied or moved
+    AttributeMap(AttributeMap &&other, GraphType g) noexcept
+        : theGraph(g), attrMap(std::move(other.attrMap)) {}
 
     auto find(std::string const &name) {
         auto it = attrMap.find(name);
