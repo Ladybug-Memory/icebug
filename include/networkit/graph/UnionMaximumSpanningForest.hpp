@@ -92,7 +92,7 @@ private:
             : attribute(attribute), u(u), v(v), eid(eid) {};
     };
 
-    const Graph *G;
+    Graph G;
     std::vector<weightedEdge> weightedEdges;
 
     GraphW umsf;
@@ -106,7 +106,7 @@ private:
 template <typename A>
 UnionMaximumSpanningForest::UnionMaximumSpanningForest(const Graph &G,
                                                        const std::vector<A> &attribute)
-    : G(&G), hasWeightedEdges(false), hasUMSF(false), hasAttribute(false) {
+    : G(G), hasWeightedEdges(false), hasUMSF(false), hasAttribute(false) {
     if (!G.hasEdgeIds()) {
         throw std::runtime_error("Error: Edges of G must be indexed for using edge attributes");
     }
