@@ -116,7 +116,7 @@ cdef class BarabasiAlbertGenerator(StaticGraphGenerator):
 
 	def __cinit__(self, count k, count nMax, n0=0, bool_t sequential=True):
 		if isinstance(n0, Graph):
-			self._this = new _BarabasiAlbertGenerator(k, nMax, dereference((<Graph>n0)._this), sequential)
+			self._this = new _BarabasiAlbertGenerator(k, nMax, dereference((<Graph>n0)._view()), sequential)
 		else:
 			self._this = new _BarabasiAlbertGenerator(k, nMax, <count>n0, sequential)
 
@@ -588,7 +588,7 @@ cdef class HyperbolicGenerator(StaticGraphGenerator):
 		T : float, optional
 			Edges are added for nodes closer to each other than threshold T. Default: 0.0
 		"""
-		return Graph(0).setThis((<_HyperbolicGenerator*>(self._this)).generate(angles, radii, R, T))
+		return Graph(0).setThisFromGraphW((<_HyperbolicGenerator*>(self._this)).generate(angles, radii, R, T))
 
 	@classmethod
 	def fit(cls, Graph G, scale=1):
@@ -663,7 +663,7 @@ cdef class PowerlawDegreeSequence:
 
 	def __cinit__(self, minDeg, count maxDeg = 0, double gamma = -2):
 		if isinstance(minDeg, Graph):
-			self._this = new _PowerlawDegreeSequence(dereference((<Graph>minDeg)._this))
+			self._this = new _PowerlawDegreeSequence(dereference((<Graph>minDeg)._view()))
 		else:
 			try:
 				self._this = new _PowerlawDegreeSequence(<vector[double]?>minDeg)

@@ -101,7 +101,7 @@ cdef class ApproximatePageRank:
 
 	def __cinit__(self, Graph G not None, double alpha, double epsilon):
 		self._G = G
-		self._this = new _ApproximatePageRank(dereference(G._this), alpha, epsilon)
+		self._this = new _ApproximatePageRank(dereference(G._view()), alpha, epsilon)
 
 	def __dealloc__(self):
 		if self._this != NULL:
@@ -153,7 +153,7 @@ cdef class PageRankNibble(SelectiveCommunityDetector):
 	"""
 	def __cinit__(self, Graph G, double alpha, double epsilon):
 		self._G = G
-		self._this = new _PageRankNibble(dereference(G._this), alpha, epsilon)
+		self._this = new _PageRankNibble(dereference(G._view()), alpha, epsilon)
 
 cdef extern from "<networkit/scd/GCE.hpp>":
 
@@ -176,7 +176,7 @@ cdef class GCE(SelectiveCommunityDetector):
 	"""
 	def __cinit__(self, Graph G, quality):
 		self._G = G
-		self._this = new _GCE(dereference(G._this), stdstring(quality))
+		self._this = new _GCE(dereference(G._view()), stdstring(quality))
 
 cdef extern from "<networkit/scd/CliqueDetect.hpp>":
 	cdef cppclass _CliqueDetect "NetworKit::CliqueDetect"(_SelectiveCommunityDetector):
@@ -210,7 +210,7 @@ cdef class CliqueDetect(SelectiveCommunityDetector):
 	"""
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _CliqueDetect(dereference(G._this))
+		self._this = new _CliqueDetect(dereference(G._view()))
 
 cdef extern from "<networkit/scd/LFMLocal.hpp>":
 
@@ -246,7 +246,7 @@ cdef class LFMLocal(SelectiveCommunityDetector):
 	"""
 	def __cinit__(self, Graph G, double alpha = 1.0):
 		self._G = G
-		self._this = new _LFMLocal(dereference(G._this), alpha)
+		self._this = new _LFMLocal(dereference(G._view()), alpha)
 
 cdef extern from "<networkit/scd/CombinedSCD.hpp>":
 	cdef cppclass _CombinedSCD "NetworKit::CombinedSCD"(_SelectiveCommunityDetector):
@@ -260,7 +260,7 @@ cdef class CombinedSCD(SelectiveCommunityDetector):
 		self._G = G
 		self._first = first
 		self._second = second
-		self._this = new _CombinedSCD(dereference(G._this), dereference(first._this), dereference(second._this))
+		self._this = new _CombinedSCD(dereference(G._view()), dereference(first._this), dereference(second._this))
 
 cdef extern from "<networkit/scd/SCDGroundTruthComparison.hpp>":
 	cdef cppclass _SCDGroundTruthComparison "NetworKit::SCDGroundTruthComparison"(_Algorithm):
@@ -320,7 +320,7 @@ cdef class SCDGroundTruthComparison(Algorithm):
 		self._found = found
 		self._G = G
 		self._groundTruth = groundTruth
-		self._this = new _SCDGroundTruthComparison(dereference(G._this), groundTruth._this, self._found, ignoreSeeds)
+		self._this = new _SCDGroundTruthComparison(dereference(G._view()), groundTruth._this, self._found, ignoreSeeds)
 
 	def getIndividualJaccard(self):
 		"""
@@ -446,7 +446,7 @@ cdef class SetConductance(Algorithm):
 	def __cinit__(self, Graph G not None, set[node] community):
 		self._community = community
 		self._G = G
-		self._this = new _SetConductance(dereference(G._this), self._community)
+		self._this = new _SetConductance(dereference(G._view()), self._community)
 
 	def getConductance(self):
 		"""
@@ -486,7 +486,7 @@ cdef class RandomBFS(SelectiveCommunityDetector):
 	def __cinit__(self, Graph G, Cover C):
 		self._G = G
 		self._C = C
-		self._this = new _RandomBFS(dereference(G._this), C._this)
+		self._this = new _RandomBFS(dereference(G._view()), C._this)
 
 cdef extern from "<networkit/scd/TwoPhaseL.hpp>":
 
@@ -513,7 +513,7 @@ cdef class TwoPhaseL(SelectiveCommunityDetector):
 	"""
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _TwoPhaseL(dereference(G._this))
+		self._this = new _TwoPhaseL(dereference(G._view()))
 
 cdef extern from "<networkit/scd/LocalTightnessExpansion.hpp>":
 
@@ -544,7 +544,7 @@ cdef class LocalTightnessExpansion(SelectiveCommunityDetector):
 	"""
 	def __cinit__(self, Graph G, double alpha = 1.0):
 		self._G = G
-		self._this = new _LocalTightnessExpansion(dereference(G._this), alpha)
+		self._this = new _LocalTightnessExpansion(dereference(G._view()), alpha)
 
 cdef extern from "<networkit/scd/TCE.hpp>":
 
@@ -568,7 +568,7 @@ cdef class TCE(SelectiveCommunityDetector):
 	"""
 	def __cinit__(self, Graph G, bool_t refine = True, bool_t useJaccard = False):
 		self._G = G
-		self._this = new _TCE(dereference(G._this), refine, useJaccard)
+		self._this = new _TCE(dereference(G._view()), refine, useJaccard)
 
 cdef extern from "<networkit/scd/LocalT.hpp>":
 	cdef cppclass _LocalT "NetworKit::LocalT"(_SelectiveCommunityDetector):
@@ -594,7 +594,7 @@ cdef class LocalT(SelectiveCommunityDetector):
 	"""
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _LocalT(dereference(G._this))
+		self._this = new _LocalT(dereference(G._view()))
 
 cdef extern from "<networkit/scd/ShellStruct.hpp>":
 	cdef cppclass _ShellStruct "NetworKit::ShellStruct"(_SelectiveCommunityDetector):
@@ -622,7 +622,7 @@ cdef class ShellStruct(SelectiveCommunityDetector):
 	"""
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _ShellStruct(dereference(G._this))
+		self._this = new _ShellStruct(dereference(G._view()))
 
 	def build(self):
 		"""

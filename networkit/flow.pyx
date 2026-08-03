@@ -43,7 +43,7 @@ cdef class EdmondsKarp(Algorithm):
 
 	def __cinit__(self, Graph graph not None, node source, node sink):
 		self._graph = graph # store reference of graph for memory management, so the graph is not deallocated before this object
-		self._this = new _EdmondsKarp(dereference(graph._this), source, sink)
+		self._this = new _EdmondsKarp(dereference(graph._view()), source, sink)
 
 	def getMaxFlow(self):
 		"""

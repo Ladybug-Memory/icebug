@@ -64,7 +64,7 @@ cdef class LinkPredictor:
 		newGraph : networkit.Graph
 			The graph to work on.
    		"""
-		self._this.setGraph(dereference(newGraph._this))
+		self._this.setGraph(dereference(newGraph._view()))
 
 	def run(self, node u, node v):
 		""" 
@@ -161,7 +161,7 @@ cdef class KatzIndex(LinkPredictor):
 		if G is None:
 			self._this = new _KatzIndex(maxPathLength, dampingValue)
 		else:
-			self._this = new _KatzIndex(dereference(G._this), maxPathLength, dampingValue)
+			self._this = new _KatzIndex(dereference(G._view()), maxPathLength, dampingValue)
 
 cdef extern from "<networkit/linkprediction/CommonNeighborsIndex.hpp>":
 
@@ -185,7 +185,7 @@ cdef class CommonNeighborsIndex(LinkPredictor):
 		if G is None:
 			self._this = new _CommonNeighborsIndex()
 		else:
-			self._this = new _CommonNeighborsIndex(dereference(G._this))
+			self._this = new _CommonNeighborsIndex(dereference(G._view()))
 
 cdef extern from "<networkit/linkprediction/PreferentialAttachmentIndex.hpp>":
 
@@ -212,7 +212,7 @@ cdef class PreferentialAttachmentIndex(LinkPredictor):
 		if G is None:
 			self._this = new _PreferentialAttachmentIndex()
 		else:
-			self._this = new _PreferentialAttachmentIndex(dereference(G._this))
+			self._this = new _PreferentialAttachmentIndex(dereference(G._view()))
 
 cdef extern from "<networkit/linkprediction/JaccardIndex.hpp>":
 
@@ -238,7 +238,7 @@ cdef class JaccardIndex(LinkPredictor):
 		if G is None:
 			self._this = new _JaccardIndex()
 		else:
-			self._this = new _JaccardIndex(dereference(G._this))
+			self._this = new _JaccardIndex(dereference(G._view()))
 
 cdef extern from "<networkit/linkprediction/AdamicAdarIndex.hpp>":
 
@@ -265,7 +265,7 @@ cdef class AdamicAdarIndex(LinkPredictor):
 		if G is None:
 			self._this = new _AdamicAdarIndex()
 		else:
-			self._this = new _AdamicAdarIndex(dereference(G._this))
+			self._this = new _AdamicAdarIndex(dereference(G._view()))
 
 cdef extern from "<networkit/linkprediction/UDegreeIndex.hpp>":
 
@@ -289,7 +289,7 @@ cdef class UDegreeIndex(LinkPredictor):
 		if G is None:
 			self._this = new _UDegreeIndex()
 		else:
-			self._this = new _UDegreeIndex(dereference(G._this))
+			self._this = new _UDegreeIndex(dereference(G._view()))
 
 cdef extern from "<networkit/linkprediction/VDegreeIndex.hpp>":
 
@@ -313,7 +313,7 @@ cdef class VDegreeIndex(LinkPredictor):
 		if G is None:
 			self._this = new _VDegreeIndex()
 		else:
-			self._this = new _VDegreeIndex(dereference(G._this))
+			self._this = new _VDegreeIndex(dereference(G._view()))
 
 cdef extern from "<networkit/linkprediction/AlgebraicDistanceIndex.hpp>":
 
@@ -346,7 +346,7 @@ cdef class AlgebraicDistanceIndex(LinkPredictor):
 		if G is None:
 			self._this = new _AlgebraicDistanceIndex(numberSystems, numberIterations, omega, norm)
 		else:
-			self._this = new _AlgebraicDistanceIndex(dereference(G._this), numberSystems, numberIterations, omega, norm)
+			self._this = new _AlgebraicDistanceIndex(dereference(G._view()), numberSystems, numberIterations, omega, norm)
 
 	def preprocess(self):
 		""" 
@@ -385,7 +385,7 @@ cdef class NeighborhoodDistanceIndex(LinkPredictor):
 		if G is None:
 			self._this = new _NeighborhoodDistanceIndex()
 		else:
-			self._this = new _NeighborhoodDistanceIndex(dereference(G._this))
+			self._this = new _NeighborhoodDistanceIndex(dereference(G._view()))
 
 cdef extern from "<networkit/linkprediction/TotalNeighborsIndex.hpp>":
 
@@ -412,7 +412,7 @@ cdef class TotalNeighborsIndex(LinkPredictor):
 		if G is None:
 			self._this = new _TotalNeighborsIndex()
 		else:
-			self._this = new _TotalNeighborsIndex(dereference(G._this))
+			self._this = new _TotalNeighborsIndex(dereference(G._view()))
 
 cdef extern from "<networkit/linkprediction/NeighborsMeasureIndex.hpp>":
 
@@ -439,7 +439,7 @@ cdef class NeighborsMeasureIndex(LinkPredictor):
 		if G is None:
 			self._this = new _NeighborsMeasureIndex()
 		else:
-			self._this = new _NeighborsMeasureIndex(dereference(G._this))
+			self._this = new _NeighborsMeasureIndex(dereference(G._view()))
 
 cdef extern from "<networkit/linkprediction/SameCommunityIndex.hpp>":
 
@@ -463,7 +463,7 @@ cdef class SameCommunityIndex(LinkPredictor):
 		if G is None:
 			self._this = new _SameCommunityIndex()
 		else:
-			self._this = new _SameCommunityIndex(dereference(G._this))
+			self._this = new _SameCommunityIndex(dereference(G._view()))
 
 cdef extern from "<networkit/linkprediction/AdjustedRandIndex.hpp>":
 
@@ -487,7 +487,7 @@ cdef class AdjustedRandIndex(LinkPredictor):
 		if G is None:
 			self._this = new _AdjustedRandIndex()
 		else:
-			self._this = new _AdjustedRandIndex(dereference(G._this))
+			self._this = new _AdjustedRandIndex(dereference(G._view()))
 
 cdef extern from "<networkit/linkprediction/ResourceAllocationIndex.hpp>":
 
@@ -514,7 +514,7 @@ cdef class ResourceAllocationIndex(LinkPredictor):
 		if G is None:
 			self._this = new _ResourceAllocationIndex()
 		else:
-			self._this = new _ResourceAllocationIndex(dereference(G._this))
+			self._this = new _ResourceAllocationIndex(dereference(G._view()))
 
 cdef extern from "<networkit/linkprediction/RandomLinkSampler.hpp>" namespace "NetworKit::RandomLinkSampler":
 
@@ -546,7 +546,7 @@ cdef class RandomLinkSampler:
 		networkit.Graph
 			A graph that contains the given percentage of links from G.
 		"""
-		return Graph().setThisFromGraphW(byPercentage(dereference(G._this), percentage))
+		return Graph().setThisFromGraphW(byPercentage(dereference(G._view()), percentage))
 
 	@staticmethod
 	def byCount(Graph G, count numLinks):
@@ -569,7 +569,7 @@ cdef class RandomLinkSampler:
 		networkit.Graph
 			A graph that contains the given number of links from G.
 		"""
-		return Graph().setThisFromGraphW(byCount(dereference(G._this), numLinks))
+		return Graph().setThisFromGraphW(byCount(dereference(G._view()), numLinks))
 
 cdef extern from "<networkit/linkprediction/EvaluationMetric.hpp>":
 
@@ -620,7 +620,7 @@ cdef class EvaluationMetric:
 		newTestGraph : networkit.Graph
 			New graph to use as ground truth.
 		"""
-		self._this.setTestGraph(dereference(newTestGraph._this))
+		self._this.setTestGraph(dereference(newTestGraph._view()))
 
 	def getCurve(self, vector[pair[pair[node, node], double]] predictions, count numThresholds = 1000):
 		""" 
@@ -694,7 +694,7 @@ cdef class ROCMetric(EvaluationMetric):
 		if testGraph is None:
 			self._this = new _ROCMetric()
 		else:
-			self._this = new _ROCMetric(dereference(testGraph._this))
+			self._this = new _ROCMetric(dereference(testGraph._view()))
 
 cdef extern from "<networkit/linkprediction/PrecisionRecallMetric.hpp>":
 
@@ -720,7 +720,7 @@ cdef class PrecisionRecallMetric(EvaluationMetric):
 		if testGraph is None:
 			self._this = new _PrecisionRecallMetric()
 		else:
-			self._this = new _PrecisionRecallMetric(dereference(testGraph._this))
+			self._this = new _PrecisionRecallMetric(dereference(testGraph._view()))
 
 cdef extern from "<networkit/linkprediction/MissingLinksFinder.hpp>":
 
@@ -748,7 +748,7 @@ cdef class MissingLinksFinder:
 	cdef _MissingLinksFinder* _this
 
 	def __cinit__(self, Graph G):
-		self._this = new _MissingLinksFinder(dereference(G._this))
+		self._this = new _MissingLinksFinder(dereference(G._view()))
 
 	def __dealloc__(self):
 		del self._this
@@ -831,7 +831,7 @@ cdef class NeighborhoodUtility:
 		list(int)
 			A list containing all the nodes in the neighboorhood-union of u and v.
 		"""
-		return getNeighborsUnion(dereference(G._this), u, v)
+		return getNeighborsUnion(dereference(G._view()), u, v)
 
 	@staticmethod
 	def getCommonNeighbors(Graph G, node u, node v):
@@ -854,7 +854,7 @@ cdef class NeighborhoodUtility:
 		list(int)
 			A list containing the node-ids of all common neighbors of u and v.
 		"""
-		return getCommonNeighbors(dereference(G._this), u, v)
+		return getCommonNeighbors(dereference(G._view()), u, v)
 
 cdef extern from "<networkit/linkprediction/LinkThresholder.hpp>" namespace "NetworKit::LinkThresholder":
 

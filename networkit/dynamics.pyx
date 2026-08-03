@@ -282,7 +282,7 @@ cdef class GraphDifference(Algorithm):
 		# Handle both Graph and GraphW types
 		if isinstance(G1, GraphW):
 			self._G1 = Graph(0)
-			self._G1._this = make_shared[_GraphW]((<GraphW>G1)._this)
+			self._G1._seatW(make_shared[_GraphW]((<GraphW>G1)._this))
 		elif isinstance(G1, Graph):
 			self._G1 = G1
 		else:
@@ -290,13 +290,13 @@ cdef class GraphDifference(Algorithm):
 
 		if isinstance(G2, GraphW):
 			self._G2 = Graph(0)
-			self._G2._this = make_shared[_GraphW]((<GraphW>G2)._this)
+			self._G2._seatW(make_shared[_GraphW]((<GraphW>G2)._this))
 		elif isinstance(G2, Graph):
 			self._G2 = G2
 		else:
 			raise TypeError("GraphDifference expects Graph or GraphW instances")
 
-		self._this = new _GraphDifference(dereference(self._G1._this), dereference(self._G2._this))
+		self._this = new _GraphDifference(dereference(self._G1._view()), dereference(self._G2._view()))
 
 	def getEdits(self):
 		"""
@@ -426,15 +426,12 @@ cdef class GraphUpdater:
 	cdef object _G
 
 	def __cinit__(self, G):
-		cdef _GraphW* gw = NULL
 		self._G = G
 		if isinstance(G, GraphW):
 			self._this = new _GraphUpdater((<GraphW>G)._this)
 		elif isinstance(G, Graph):
-			gw = <_GraphW*>((<Graph>G)._this.get())
-			if gw == NULL:
-				raise TypeError("GraphUpdater requires a writable graph (GraphW)")
-			self._this = new _GraphUpdater(dereference(gw))
+			# Raises if the graph is read-only; GraphUpdater writes to it.
+			self._this = new _GraphUpdater(dereference((<Graph>G)._mutable()))
 		else:
 			raise TypeError("GraphUpdater expects a Graph or GraphW instance")
 

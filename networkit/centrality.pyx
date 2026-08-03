@@ -13,7 +13,7 @@ from .base cimport _Algorithm, Algorithm
 from .dynbase cimport _DynAlgorithm
 from .dynbase import DynAlgorithm
 from .dynamics cimport _GraphEvent, GraphEvent
-from .graph cimport _Graph, Graph
+from .graph cimport _Graph, Graph, _GraphW
 from .structures cimport _Cover, Cover, _Partition, Partition, count, index, node, edgeweight
 from networkit.algebraic import adjacencyEigenvector, PageRankMatrix, symmetricEigenvectors
 
@@ -158,7 +158,7 @@ cdef class Betweenness(Centrality):
 
 	def __cinit__(self, Graph G, normalized=False, computeEdgeCentrality=False):
 		self._G = G
-		self._this = new _Betweenness(dereference(G._this), normalized, computeEdgeCentrality)
+		self._this = new _Betweenness(dereference(G._view()), normalized, computeEdgeCentrality)
 
 
 	def edgeScores(self):
@@ -211,7 +211,7 @@ cdef class ApproxBetweenness(Centrality):
 
 	def __cinit__(self, Graph G, epsilon=0.01, delta=0.1, universalConstant=1.0):
 		self._G = G
-		self._this = new _ApproxBetweenness(dereference(G._this), epsilon, delta, universalConstant)
+		self._this = new _ApproxBetweenness(dereference(G._view()), epsilon, delta, universalConstant)
 
 	def numberOfSamples(self):
 		return (<_ApproxBetweenness*>(self._this)).numberOfSamples()
@@ -249,7 +249,7 @@ cdef class EstimateBetweenness(Centrality):
 
 	def __cinit__(self, Graph G, nSamples, normalized=False, parallel=False):
 		self._G = G
-		self._this = new _EstimateBetweenness(dereference(G._this), nSamples, normalized, parallel)
+		self._this = new _EstimateBetweenness(dereference(G._view()), nSamples, normalized, parallel)
 
 cdef extern from "<networkit/centrality/KadabraBetweenness.hpp>":
 
@@ -318,7 +318,7 @@ cdef class KadabraBetweenness(Algorithm):
 
 	def __cinit__(self, Graph G, err = 0.01, delta = 0.1, deterministic = False, k = 0,
 				  unionSample = 0, startFactor = 100):
-		self._this = new _KadabraBetweenness(dereference(G._this), err, delta, deterministic, k, unionSample,
+		self._this = new _KadabraBetweenness(dereference(G._view()), err, delta, deterministic, k, unionSample,
 										   startFactor)
 
 	def ranking(self):
@@ -429,7 +429,7 @@ cdef class DynBetweenness(Algorithm, DynAlgorithm):
 
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _DynBetweenness(dereference(G._this))
+		self._this = new _DynBetweenness(dereference(G._view()))
 
 	def scores(self):
 		""" 
@@ -516,7 +516,7 @@ cdef class DynApproxBetweenness(Algorithm, DynAlgorithm):
 
 	def __cinit__(self, Graph G, epsilon=0.01, delta=0.1, storePredecessors = True, universalConstant=1.0):
 		self._G = G
-		self._this = new _DynApproxBetweenness(dereference(G._this), epsilon, delta, storePredecessors, universalConstant)
+		self._this = new _DynApproxBetweenness(dereference(G._view()), epsilon, delta, storePredecessors, universalConstant)
 
 	def scores(self):
 		""" 
@@ -605,7 +605,7 @@ cdef class DynBetweennessOneNode(Algorithm, DynAlgorithm):
 
 	def __cinit__(self, Graph G, node):
 		self._G = G
-		self._this = new _DynBetweennessOneNode(dereference(G._this), node)
+		self._this = new _DynBetweennessOneNode(dereference(G._view()), node)
 
 	# this is necessary so that the C++ object gets properly garbage collected
 	def __dealloc__(self):
@@ -719,9 +719,9 @@ cdef class Closeness(Centrality):
 	def __cinit__(self, Graph G, normalized, third):
 		self._G = G
 		if isinstance(third, int):
-			self._this = new _Closeness(dereference(G._this), normalized, <_ClosenessVariant> third)
+			self._this = new _Closeness(dereference(G._view()), normalized, <_ClosenessVariant> third)
 		elif isinstance(third, bool):
-			self._this = new _Closeness(dereference(G._this), normalized, <bool_t> third)
+			self._this = new _Closeness(dereference(G._view()), normalized, <bool_t> third)
 		else:
 			raise Exception("Error: the third parameter must be either a bool or a ClosenessVariant")
 
@@ -782,7 +782,7 @@ cdef class ApproxCloseness(Centrality):
 
 	def __cinit__(self, Graph G, nSamples, epsilon=0.1, normalized=False, _ClosenessType type=ClosenessType.OUTBOUND):
 		self._G = G
-		self._this = new _ApproxCloseness(dereference(G._this), nSamples, epsilon, normalized, type)
+		self._this = new _ApproxCloseness(dereference(G._view()), nSamples, epsilon, normalized, type)
 
 	def getSquareErrorEstimates(self):
 		""" 
@@ -827,7 +827,7 @@ cdef class DegreeCentrality(Centrality):
 
 	def __cinit__(self, Graph G, bool_t normalized=False, bool_t outDeg = True, bool_t ignoreSelfLoops=True):
 		self._G = G
-		self._this = new _DegreeCentrality(dereference(G._this), normalized, outDeg, ignoreSelfLoops)
+		self._this = new _DegreeCentrality(dereference(G._view()), normalized, outDeg, ignoreSelfLoops)
 
 cdef extern from "<networkit/centrality/HarmonicCloseness.hpp>":
 
@@ -855,7 +855,7 @@ cdef class HarmonicCloseness(Centrality):
 
 	def __cinit__(self, Graph G, normalized=True):
 		self._G = G
-		self._this = new _HarmonicCloseness(dereference(G._this), normalized)
+		self._this = new _HarmonicCloseness(dereference(G._view()), normalized)
 
 cdef extern from "<networkit/centrality/TopCloseness.hpp>":
 
@@ -902,7 +902,7 @@ cdef class TopCloseness(Algorithm):
 
 	def __cinit__(self,  Graph G, k=1, first_heu=True, sec_heu=True):
 		self._G = G
-		self._this = new _TopCloseness(dereference(G._this), k, first_heu, sec_heu)
+		self._this = new _TopCloseness(dereference(G._view()), k, first_heu, sec_heu)
 
 	def topkNodesList(self, includeTrail=False):
 		""" 
@@ -1006,7 +1006,7 @@ cdef class TopHarmonicCloseness(Algorithm):
 
 	def __cinit__(self,  Graph G, k=1, useNBbound=False):
 		self._G = G
-		self._this = new _TopHarmonicCloseness(dereference(G._this), k, useNBbound)
+		self._this = new _TopHarmonicCloseness(dereference(G._view()), k, useNBbound)
 
 	def topkNodesList(self, includeTrail=False):
 		"""
@@ -1107,7 +1107,7 @@ cdef class DynTopHarmonicCloseness(Algorithm, DynAlgorithm):
 
 	def __cinit__(self,  Graph G, k=1, useBFSbound=False):
 		self._G = G
-		self._this = new _DynTopHarmonicCloseness(dereference(G._this), k, useBFSbound)
+		self._this = new _DynTopHarmonicCloseness(dereference(G._view()), k, useBFSbound)
 
 	def ranking(self, includeTrail = False):
 		""" 
@@ -1201,7 +1201,7 @@ cdef class LocalPartitionCoverage(Centrality):
 	def __cinit__(self, Graph G not None, Partition P not None):
 		self._G = G
 		self._P = P
-		self._this = new _LocalPartitionCoverage(dereference(G._this), P._this)
+		self._this = new _LocalPartitionCoverage(dereference(G._view()), P._this)
 
 cdef extern from "<networkit/centrality/GroupDegree.hpp>":
 
@@ -1238,7 +1238,7 @@ cdef class GroupDegree(Algorithm):
 
 	def __cinit__(self, Graph G, k = 1, countGroupNodes = True):
 		self._G = G
-		self._this = new _GroupDegree(dereference(G._this), k, countGroupNodes)
+		self._this = new _GroupDegree(dereference(G._view()), k, countGroupNodes)
 
 	def groupMaxDegree(self):
 		"""
@@ -1371,7 +1371,7 @@ cdef class GedWalk(Algorithm):
 			gs = GreedyStrategy.LAZY, spectralDelta = 0.5):
 
 		self._G = G
-		self._this = new _GedWalk(dereference(G._this), k, epsilon, alpha, bs, gs, spectralDelta)
+		self._this = new _GedWalk(dereference(G._view()), k, epsilon, alpha, bs, gs, spectralDelta)
 
 	def __dealloc__(self):
 		if self._this is not NULL:
@@ -1458,7 +1458,7 @@ cdef class ApproxGroupBetweenness(Algorithm):
 
 	def __cinit__(self, Graph G, groupSize, epsilon):
 		self._G = G
-		self._this = new _ApproxGroupBetweenness(dereference(G._this), groupSize, epsilon)
+		self._this = new _ApproxGroupBetweenness(dereference(G._view()), groupSize, epsilon)
 
 	def groupMaxBetweenness(self):
 		"""
@@ -1522,7 +1522,7 @@ cdef class GroupCloseness(Algorithm):
 
 	def __cinit__(self,  Graph G, k=1, H=0):
 		self._G = G
-		self._this = new _GroupCloseness(dereference(G._this), k, H)
+		self._this = new _GroupCloseness(dereference(G._view()), k, H)
 
 	def groupMaxCloseness(self):
 		"""
@@ -1611,7 +1611,7 @@ cdef class GroupClosenessGrowShrink(Algorithm):
 
 	def __cinit__(self, Graph G, group, extended = False, insertions = 0):
 		self._G = G
-		self._this = new _GroupClosenessGrowShrink(dereference(G._this), group, extended, insertions)
+		self._this = new _GroupClosenessGrowShrink(dereference(G._view()), group, extended, insertions)
 
 	def groupMaxCloseness(self):
 		"""
@@ -1668,7 +1668,7 @@ cdef class GroupClosenessLocalSwaps(Algorithm):
 
 	def __cinit__(self, Graph G, group, maxSwaps = 0):
 		self._G = G
-		self._this = new _GroupClosenessLocalSwaps(dereference(G._this), group, maxSwaps)
+		self._this = new _GroupClosenessLocalSwaps(dereference(G._view()), group, maxSwaps)
 
 	def groupMaxCloseness(self):
 		"""
@@ -1731,7 +1731,7 @@ cdef class GroupHarmonicCloseness(Algorithm):
 
 	def __cinit__(self, Graph G, k = 1):
 		self._G = G
-		self._this = new _GroupHarmonicCloseness(dereference(G._this), k)
+		self._this = new _GroupHarmonicCloseness(dereference(G._view()), k)
 
 	def groupMaxHarmonicCloseness(self):
 		"""
@@ -1766,7 +1766,7 @@ cdef class GroupHarmonicCloseness(Algorithm):
 			The group-harmonic score of the input group.
 		"""
 		return _GroupHarmonicCloseness.scoreOfGroup[vector[node].iterator](
-				dereference(graph._this), inputGroup.begin(), inputGroup.end())
+				dereference(graph._view()), inputGroup.begin(), inputGroup.end())
 
 cdef extern from "<networkit/centrality/GroupClosenessLocalSearch.hpp>":
 	cdef cppclass _GroupClosenessLocalSearch "NetworKit::GroupClosenessLocalSearch"(_Algorithm):
@@ -1808,15 +1808,15 @@ cdef class GroupClosenessLocalSearch(Algorithm):
 
 	def __cinit__(self, Graph G not None, group, runGrowShrink, maxIterations):
 		self._G = G
-		self._this = new _GroupClosenessLocalSearch(dereference(G._this), group, runGrowShrink, maxIterations)
+		self._this = new _GroupClosenessLocalSearch(dereference(G._view()), group, runGrowShrink, maxIterations)
 
 	def __cinit__(self, Graph G not None, group, runGrowShrink):
 		self._G = G
-		self._this = new _GroupClosenessLocalSearch(dereference(G._this), group, runGrowShrink)
+		self._this = new _GroupClosenessLocalSearch(dereference(G._view()), group, runGrowShrink)
 
 	def __cinit__(self, Graph G not None, group):
 		self._G = G
-		self._this = new _GroupClosenessLocalSearch(dereference(G._this), group)
+		self._this = new _GroupClosenessLocalSearch(dereference(G._view()), group)
 
 	def groupMaxCloseness(self):
 		"""
@@ -1869,7 +1869,7 @@ cdef class KPathCentrality(Centrality):
 
 	def __cinit__(self, Graph G, alpha=0.2, k=0):
 		self._G = G
-		self._this = new _KPathCentrality(dereference(G._this), alpha, k)
+		self._this = new _KPathCentrality(dereference(G._view()), alpha, k)
 
 cdef extern from "<networkit/centrality/KatzCentrality.hpp>" namespace "NetworKit":
 
@@ -1913,7 +1913,7 @@ cdef class KatzCentrality(Centrality):
 
 	def __cinit__(self, Graph G, alpha=0, beta=0.1, tol=1e-8):
 		self._G = G
-		self._this = new _KatzCentrality(dereference(G._this), alpha, beta, tol)
+		self._this = new _KatzCentrality(dereference(G._view()), alpha, beta, tol)
 
 	property edgeDirection:
 		"""
@@ -1959,7 +1959,7 @@ cdef class DynKatzCentrality(Centrality):
 
 	def __cinit__(self, Graph G, k, groupOnly=False, tolerance=1e-9):
 		self._G = G
-		self._this = new _DynKatzCentrality(dereference(G._this), k, groupOnly, tolerance)
+		self._this = new _DynKatzCentrality(dereference(G._view()), k, groupOnly, tolerance)
 
 	def top(self, n=0):
 		""" 
@@ -2046,7 +2046,7 @@ cdef class LocalClusteringCoefficient(Centrality):
 
 	def __cinit__(self, Graph G, bool_t turbo = False):
 		self._G = G
-		self._this = new _LocalClusteringCoefficient(dereference(G._this), turbo)
+		self._this = new _LocalClusteringCoefficient(dereference(G._view()), turbo)
 
 cdef extern from "<networkit/centrality/LocalSquareClusteringCoefficient.hpp>":
 
@@ -2068,7 +2068,7 @@ cdef class LocalSquareClusteringCoefficient(Centrality):
 
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _LocalSquareClusteringCoefficient(dereference(G._this))
+		self._this = new _LocalSquareClusteringCoefficient(dereference(G._view()))
 
 
 cdef extern from "<networkit/centrality/Sfigality.hpp>":
@@ -2091,7 +2091,7 @@ cdef class Sfigality(Centrality):
 
 	def __cinit__(self, Graph G):
 		self._G = G
-		self._this = new _Sfigality(dereference(G._this))
+		self._this = new _Sfigality(dereference(G._view()))
 
 cdef extern from "<networkit/centrality/PermanenceCentrality.hpp>":
 
@@ -2120,7 +2120,7 @@ cdef class PermanenceCentrality(Algorithm):
 	cdef Partition _P
 
 	def __cinit__(self, Graph G, Partition P):
-		self._this = new _PermanenceCentrality(dereference(G._this), P._this)
+		self._this = new _PermanenceCentrality(dereference(G._view()), P._this)
 		self._G = G
 		self._P = P
 
@@ -2189,7 +2189,7 @@ cdef class LaplacianCentrality(Centrality):
 
 	def __cinit__(self, Graph G, normalized = False):
 		self._G = G
-		self._this = new _LaplacianCentrality(dereference(G._this), normalized)
+		self._this = new _LaplacianCentrality(dereference(G._view()), normalized)
 
 cdef extern from "<networkit/centrality/CoreDecomposition.hpp>":
 
@@ -2222,7 +2222,7 @@ cdef class CoreDecomposition(Centrality):
 
 	def __cinit__(self, Graph G, bool_t normalized=False, bool_t enforceBucketQueueAlgorithm=False, bool_t storeNodeOrder = False):
 		self._G = G
-		self._this = new _CoreDecomposition(dereference(G._this), normalized, enforceBucketQueueAlgorithm, storeNodeOrder)
+		self._this = new _CoreDecomposition(dereference(G._view()), normalized, enforceBucketQueueAlgorithm, storeNodeOrder)
 
 	def maxCoreNumber(self):
 		""" 
@@ -2300,7 +2300,7 @@ cdef class EigenvectorCentrality(Centrality):
 
 	def __cinit__(self, Graph G, double tol=1e-9):
 		self._G = G
-		self._this = new _EigenvectorCentrality(dereference(G._this), tol)
+		self._this = new _EigenvectorCentrality(dereference(G._view()), tol)
 
 cdef extern from "<networkit/centrality/PageRank.hpp>" namespace "NetworKit::PageRank":
 
@@ -2405,7 +2405,7 @@ cdef class PageRank(Centrality):
 		if personalization is not None:
 			pers = personalization
 		self._G = G
-		self._this = new _PageRank(dereference(G._this), damp, tol, normalized, <_SinkHandling>distributeSinks, pers)
+		self._this = new _PageRank(dereference(G._view()), damp, tol, normalized, <_SinkHandling>distributeSinks, pers)
 
 	@staticmethod
 	def personalizationFromSource(Graph G, source):
@@ -2429,7 +2429,7 @@ cdef class PageRank(Centrality):
 		list of float
 			Personalization vector of size ``G.upperNodeIdBound()`` with a single non-zero entry.
 		"""
-		return _PageRank.personalizationFromSource(dereference(G._this), source)
+		return _PageRank.personalizationFromSource(dereference(G._view()), source)
 
 	@staticmethod
 	def personalizationFromSources(Graph G, sources):
@@ -2453,7 +2453,7 @@ cdef class PageRank(Centrality):
 			entries on the ``sources``.
 		"""
 		cdef vector[node] src = sources
-		return _PageRank.personalizationFromSources(dereference(G._this), src)
+		return _PageRank.personalizationFromSources(dereference(G._view()), src)
 
 	@staticmethod
 	def personalizationFromWeights(Graph G, weightedSources):
@@ -2485,7 +2485,7 @@ cdef class PageRank(Centrality):
 			entry.first = u
 			entry.second = w
 			ws.push_back(entry)
-		return _PageRank.personalizationFromWeights(dereference(G._this), ws)
+		return _PageRank.personalizationFromWeights(dereference(G._view()), ws)
 
 	@staticmethod
 	def forSource(Graph G, source, double damp=0.85, double tol=1e-8, bool_t normalized=False, distributeSinks=SinkHandling.NO_SINK_HANDLING):
@@ -2526,7 +2526,7 @@ cdef class PageRank(Centrality):
 		spec.push_back(entry)
 		cdef PageRank pr = PageRank.__new__(PageRank)
 		pr._G = G
-		pr._this = new _PageRank(dereference(G._this), damp, tol, normalized, <_SinkHandling>distributeSinks, spec)
+		pr._this = new _PageRank(dereference(G._view()), damp, tol, normalized, <_SinkHandling>distributeSinks, spec)
 		return pr
 
 	@staticmethod
@@ -2567,7 +2567,7 @@ cdef class PageRank(Centrality):
 			spec.push_back(entry)
 		cdef PageRank pr = PageRank.__new__(PageRank)
 		pr._G = G
-		pr._this = new _PageRank(dereference(G._this), damp, tol, normalized, <_SinkHandling>distributeSinks, spec)
+		pr._this = new _PageRank(dereference(G._view()), damp, tol, normalized, <_SinkHandling>distributeSinks, spec)
 		return pr
 
 	@staticmethod
@@ -2610,7 +2610,7 @@ cdef class PageRank(Centrality):
 			ws.push_back(entry)
 		cdef PageRank pr = PageRank.__new__(PageRank)
 		pr._G = G
-		pr._this = new _PageRank(dereference(G._this), damp, tol, normalized, <_SinkHandling>distributeSinks, ws)
+		pr._this = new _PageRank(dereference(G._view()), damp, tol, normalized, <_SinkHandling>distributeSinks, ws)
 		return pr
 
 	def numberOfIterations(self):
@@ -2684,7 +2684,7 @@ cdef class SpanningEdgeCentrality(Algorithm):
 	cdef Graph _G
 	def __cinit__(self,  Graph G, double tol = 0.1):
 		self._G = G
-		self._this = new _SpanningEdgeCentrality(dereference(G._this), tol)
+		self._this = new _SpanningEdgeCentrality(dereference(G._view()), tol)
 
 	def runApproximation(self):
 		""" 
@@ -2752,7 +2752,7 @@ cdef class ApproxElectricalCloseness(Centrality):
 
 	def __cinit__(self, Graph G, double eps = 0.1, double kappa = 0.3):
 		self._G = G
-		self._this = new _ApproxElectricalCloseness(dereference(G._this), eps, kappa)
+		self._this = new _ApproxElectricalCloseness(dereference(G._view()), eps, kappa)
 
 	def getDiagonal(self):
 		"""
@@ -2825,7 +2825,7 @@ cdef class ForestCentrality(Centrality):
 
 	def __cinit__(self, Graph G, node root, double eps = 0.1, double kappa = 0.3):
 		self._G = G
-		self._this = new _ForestCentrality(dereference(G._this), root, eps, kappa)
+		self._this = new _ForestCentrality(dereference(G._view()), root, eps, kappa)
 
 	def getDiagonal(self):
 		"""
@@ -2865,7 +2865,7 @@ cdef class ApproxSpanningEdge(Algorithm):
 
 	def __cinit__(self, Graph G, double eps = 0.1):
 		self._G = G
-		self._this = new _ApproxSpanningEdge(dereference(G._this), eps)
+		self._this = new _ApproxSpanningEdge(dereference(G._view()), eps)
 
 	def scores(self):
 		"""
@@ -3191,7 +3191,7 @@ cdef extern from "<networkit/centrality/ComplexPaths.hpp>":
 		vector[double] getPLci() except +
 		void normalize() except +
 		vector[node] getAdopters() except +
-		_Graph &getComplexGraph() except +
+		_GraphW getComplexGraph() except +
 
 cdef class ComplexPaths(Algorithm):
 	""" 
@@ -3232,7 +3232,7 @@ cdef class ComplexPaths(Algorithm):
 		if mode=="singleNode":
 			mode=ComplexPathMode.SINGLE_NODE
 		self._G = G
-		self._this = new _ComplexPaths(dereference(G._this), threshold, mode, start)
+		self._this = new _ComplexPaths(dereference(G._view()), threshold, mode, start)
 
 	def getPLci(self):
 		""" 
@@ -3260,7 +3260,7 @@ cdef class ComplexPaths(Algorithm):
 		-------
 		Graph	
 		"""
-		return Graph().setThis((<_ComplexPaths*>(self._this)).getComplexGraph())
+		return Graph().setThisFromGraphW((<_ComplexPaths*>(self._this)).getComplexGraph())
 
 	def getAdopters(self):
 		"""
