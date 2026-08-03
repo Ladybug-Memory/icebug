@@ -94,7 +94,7 @@ bool isOneClustering(const Graph &G, const Partition &zeta);
  * @param eta Partition, which contains information about clusters in the graph
  * @return True if both partitions are the same, False if not
  */
-bool equalClusterings(const Partition &zeta, const Partition &eta, Graph &G);
+bool equalClusterings(const Partition &zeta, const Partition &eta, const Graph &G);
 
 } // namespace GraphClusteringTools
 

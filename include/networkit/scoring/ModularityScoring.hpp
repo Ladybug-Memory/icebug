@@ -29,7 +29,7 @@ public:
      *
      * Do not modify the graph while using this instance of ModularityScoring.
      */
-    ModularityScoring(Graph &G, double gTotalEdgeWeight = 0.0);
+    ModularityScoring(const Graph &G, double gTotalEdgeWeight = 0.0);
 
     /** Default destructor */
     ~ModularityScoring() override = default;
@@ -52,7 +52,7 @@ public:
 };
 
 template <typename T>
-ModularityScoring<T>::ModularityScoring(Graph &G, double gTotalEdgeWeight)
+ModularityScoring<T>::ModularityScoring(const Graph &G, double gTotalEdgeWeight)
     : EdgeScoring<T>(G), totalEdgeWeight(gTotalEdgeWeight) {
     if (gTotalEdgeWeight == 0.0) {
         this->totalEdgeWeight = this->G->totalEdgeWeight();

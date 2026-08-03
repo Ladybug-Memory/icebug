@@ -103,7 +103,7 @@ double ClusteringCoefficient::sequentialAvgLocal(const Graph &G) {
     return coefficient / size;
 }
 
-double ClusteringCoefficient::avgLocal(Graph &G, bool turbo) {
+double ClusteringCoefficient::avgLocal(const Graph &G, bool turbo) {
     WARN("DEPRECATED: use centrality.LocalClusteringCoefficient and take average");
     LocalClusteringCoefficient lcc(G, turbo);
     lcc.run();
@@ -127,7 +127,7 @@ double ClusteringCoefficient::avgLocal(Graph &G, bool turbo) {
     return sum / (double)size;
 }
 
-double ClusteringCoefficient::approxAvgLocal(Graph &G, const count trials) {
+double ClusteringCoefficient::approxAvgLocal(const Graph &G, const count trials) {
 
     double triangles = 0;
     for (count k = 0; k < trials; ++k) {
@@ -161,7 +161,7 @@ double ClusteringCoefficient::approxAvgLocal(Graph &G, const count trials) {
     return triangles / (double)trials;
 }
 
-double ClusteringCoefficient::exactGlobal(Graph &G) {
+double ClusteringCoefficient::exactGlobal(const Graph &G) {
     count z = G.upperNodeIdBound();
     // triangles including node u (every triangle is counted six times)
     std::vector<count> triangles(z);
@@ -206,7 +206,7 @@ double ClusteringCoefficient::exactGlobal(Graph &G) {
     return cc;
 }
 
-double ClusteringCoefficient::approxGlobal(Graph &G, const count trials) {
+double ClusteringCoefficient::approxGlobal(const Graph &G, const count trials) {
     count z = G.upperNodeIdBound();
 
     // Calculate prefix sum over the nodes where each node v counts deg(v)*(deg(v)-1) times
