@@ -332,7 +332,7 @@ TEST_P(DistanceGTest, testIncompleteDijkstra) {
             dists.begin(), dists.end(), [](const edgeweight dist) { return dist != infdist; });
 
         const std::vector<node> sources({source});
-        IncompleteDijkstra iDij(&G, sources);
+        IncompleteDijkstra iDij(&G.asGraph(), sources);
 
         for (count i = 0; i < reachable; ++i) {
             EXPECT_TRUE(iDij.hasNext());
