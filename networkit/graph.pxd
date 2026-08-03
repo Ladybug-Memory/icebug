@@ -81,8 +81,9 @@ cdef extern from "<networkit/graph/Graph.hpp>":
 		edgeweight weight
 
 	cdef cppclass _Graph "NetworKit::Graph":
-		# Graph is now abstract - cannot be instantiated directly
-		# Use GraphW or GraphR instead
+		# A non-owning handle. Copyable and default-constructible, but it does not own a graph
+		# and carries only reads; mutation and attribute attachment go through the concrete type.
+		_Graph() except +
 		bool_t hasEdgeIds() except +
 		edgeid edgeId(node, node) except +
 		count numberOfNodes() except +
@@ -116,28 +117,45 @@ cdef extern from "<networkit/graph/Graph.hpp>":
 		_InNeighborRange inNeighborRange(node u) except +
 		_OutNeighborWeightRange weightNeighborRange(node u) except +
 		_InNeighborWeightRange weightInNeighborRange(node u) except +
-		_NodeIntAttribute attachNodeIntAttribute(string) except +
-		_NodeDoubleAttribute attachNodeDoubleAttribute(string) except +
-		_NodeStringAttribute attachNodeStringAttribute(string) except +
-		_NodeIntAttribute getNodeIntAttribute(string) except +
-		_NodeDoubleAttribute getNodeDoubleAttribute(string) except +
-		_NodeStringAttribute getNodeStringAttribute(string) except +
-		void detachNodeAttribute(string) except +
-		_EdgeIntAttribute attachEdgeIntAttribute(string) except +
-		_EdgeDoubleAttribute attachEdgeDoubleAttribute(string) except +
-		_EdgeStringAttribute attachEdgeStringAttribute(string) except +
-		_EdgeIntAttribute getEdgeIntAttribute(string) except +
-		_EdgeDoubleAttribute getEdgeDoubleAttribute(string) except +
-		_EdgeStringAttribute getEdgeStringAttribute(string) except +
-		void detachEdgeAttribute(string) except +
 
 cdef extern from "<networkit/graph/GraphW.hpp>":
-	cdef cppclass _GraphW "NetworKit::GraphW" (_Graph):
+	# No longer derives from _Graph: the concrete graphs and the handle are unrelated types.
+	# Reads that need a _Graph go through asGraph(), which yields a handle onto this graph.
+	cdef cppclass _GraphW "NetworKit::GraphW":
 		_GraphW() except +
+		const _Graph& asGraph() noexcept
+		_NodeAttrMap& nodeAttributes() noexcept
+		_EdgeAttrMap& edgeAttributes() noexcept
 		_GraphW(count, bool_t, bool_t, bool_t) except +
 		_GraphW(const _Graph& other) except +
 		_GraphW(const _Graph& other, bool_t, bool_t, bool_t) except +
 		_GraphW(const _GraphW& other) except +
+		bool_t hasEdgeIds() except +
+		edgeid edgeId(node, node) except +
+		count numberOfNodes() except +
+		count numberOfEdges() except +
+		index upperNodeIdBound() except +
+		index upperEdgeIdBound() except +
+		count degree(node u) except +
+		count degreeIn(node u) except +
+		count degreeOut(node u) except +
+		double weightedDegree(node u, bool_t) except +
+		double weightedDegreeIn(node u, bool_t) except +
+		bool_t isIsolated(node u) except +
+		bool_t hasNode(node u) except +
+		bool_t hasEdge(node u, node v) except +
+		edgeweight weight(node u, node v) except +
+		void forEdges[Callback](Callback c) except +
+		void forNodes[Callback](Callback c) except +
+		void forNodePairs[Callback](Callback c) except +
+		void forNodesInRandomOrder[Callback](Callback c) except +
+		void forEdgesOf[Callback](node u, Callback c) except +
+		void forInEdgesOf[Callback](node u, Callback c) except +
+		bool_t isWeighted() except +
+		bool_t isDirected() except +
+		edgeweight totalEdgeWeight() except +
+		count numberOfSelfLoops() except +
+		bool_t checkConsistency() except +
 		void indexEdges(bool_t force) except +
 		node addNode() except +
 		node addNodes(node) except +
@@ -153,11 +171,51 @@ cdef extern from "<networkit/graph/GraphW.hpp>":
 		void swapEdge(node s1, node t1, node s2, node t2) except +
 		void compactEdges() except +
 		void sortEdges() except +
+		_NodeIntAttribute attachNodeIntAttribute(string) except +
+		_NodeDoubleAttribute attachNodeDoubleAttribute(string) except +
+		_NodeStringAttribute attachNodeStringAttribute(string) except +
+		_NodeIntAttribute getNodeIntAttribute(string) except +
+		_NodeDoubleAttribute getNodeDoubleAttribute(string) except +
+		_NodeStringAttribute getNodeStringAttribute(string) except +
+		void detachNodeAttribute(string) except +
+		_EdgeIntAttribute attachEdgeIntAttribute(string) except +
+		_EdgeDoubleAttribute attachEdgeDoubleAttribute(string) except +
+		_EdgeStringAttribute attachEdgeStringAttribute(string) except +
+		_EdgeIntAttribute getEdgeIntAttribute(string) except +
+		_EdgeDoubleAttribute getEdgeDoubleAttribute(string) except +
+		_EdgeStringAttribute getEdgeStringAttribute(string) except +
+		void detachEdgeAttribute(string) except +
 
 cdef extern from "<networkit/graph/GraphR.hpp>":
-	cdef cppclass _GraphR "NetworKit::GraphR" (_Graph):
+	cdef cppclass _GraphR "NetworKit::GraphR":
 		_GraphR(count n, bool_t directed, shared_ptr[UInt64Array] outIndices, shared_ptr[UInt64Array] outIndptr, shared_ptr[UInt64Array] inIndices, shared_ptr[UInt64Array] inIndptr, shared_ptr[DoubleArray] outWeights, shared_ptr[DoubleArray] inWeights) except +
 		_GraphR(const _GraphR& other) except +
+		const _Graph& asGraph() noexcept
+		_NodeAttrMap& nodeAttributes() noexcept
+		_EdgeAttrMap& edgeAttributes() noexcept
+
+cdef extern from "<networkit/graph/Graph.hpp>" namespace "NetworKit":
+	# Parameterized on the handle rather than on the concrete graph, so every arm's attribute
+	# maps have this one type. Reaching an attribute therefore never depends on which arm is
+	# in hand. The templated attach/get are spelled out per value type because Cython cannot
+	# overload on return type.
+	cdef cppclass _NodeAttrMap "NetworKit::AttributeMap<NetworKit::PerNode, NetworKit::Graph>":
+		_NodeIntAttribute    attachInt    "attach<int>"         (const string&) except +
+		_NodeDoubleAttribute attachDouble "attach<double>"      (const string&) except +
+		_NodeStringAttribute attachString "attach<std::string>" (const string&) except +
+		_NodeIntAttribute    getInt       "get<int>"            (const string&) except +
+		_NodeDoubleAttribute getDouble    "get<double>"         (const string&) except +
+		_NodeStringAttribute getString    "get<std::string>"    (const string&) except +
+		void detach(const string&) except +
+
+	cdef cppclass _EdgeAttrMap "NetworKit::AttributeMap<NetworKit::PerEdge, NetworKit::Graph>":
+		_EdgeIntAttribute    attachInt    "attach<int>"         (const string&) except +
+		_EdgeDoubleAttribute attachDouble "attach<double>"      (const string&) except +
+		_EdgeStringAttribute attachString "attach<std::string>" (const string&) except +
+		_EdgeIntAttribute    getInt       "get<int>"            (const string&) except +
+		_EdgeDoubleAttribute getDouble    "get<double>"         (const string&) except +
+		_EdgeStringAttribute getString    "get<std::string>"    (const string&) except +
+		void detach(const string&) except +
 
 cdef extern from "<networkit/graph/Graph.hpp>":
 	cdef cppclass _NodeIterator "NetworKit::Graph::NodeIterator":
@@ -344,9 +402,22 @@ cdef extern from "<networkit/graph/Graph.hpp>":
 		void swap(_EdgeStringAttribute& other)
 
 cdef class Graph:
-	cdef shared_ptr[_Graph] _this  # Polymorphic: can hold GraphW or GraphR
+	# Which concrete graph is held is resolved once, by a seat, and cached here; no method below
+	# branches on it. _owner keeps that graph alive and is the only field that knows its type,
+	# via the deleter shared_ptr retains through the erasure.
+	cdef shared_ptr[void] _owner
+	# Held by value: extension objects never move, so algorithms may store its address, and it
+	# outlives them because every wrapper keeps a reference to this Graph.
+	cdef _Graph _handle
+	cdef _NodeAttrMap *_nodeAttrs
+	cdef _EdgeAttrMap *_edgeAttrs
+	cdef _GraphW *_w  # non-NULL exactly when this graph can be written
 	cdef dict _arrow_arrays
-	cdef setThis(self, _Graph& other)
+	cdef _seatW(self, shared_ptr[_GraphW] g)
+	cdef _seatR(self, shared_ptr[_GraphR] g)
+	cdef const _Graph* _view(self) noexcept nogil
+	cdef _GraphW* _mutable(self) except NULL
+	cdef setThis(self, const _Graph& other)
 	cdef setThisFromGraphW(self, _GraphW& other)
 
 cdef class GraphW:
@@ -357,43 +428,37 @@ cdef class NodeIntAttribute:
 	cdef _NodeIntAttribute _this
 	cdef _NodeIntAttribute._AttributeIterator _iter
 	cdef _NodeIntAttribute._AttributeIterator _stopiter
-	cdef _Graph* _G
-	cdef setThis(self, _NodeIntAttribute& other, _Graph* graph)
+	cdef setThis(self, _NodeIntAttribute& other)
 
 cdef class NodeDoubleAttribute:
 	cdef _NodeDoubleAttribute _this
 	cdef _NodeDoubleAttribute._AttributeIterator _iter
 	cdef _NodeDoubleAttribute._AttributeIterator _stopiter
-	cdef _Graph* _G
-	cdef setThis(self, _NodeDoubleAttribute& other, _Graph* graph)
+	cdef setThis(self, _NodeDoubleAttribute& other)
 
 cdef class NodeStringAttribute:
 	cdef _NodeStringAttribute _this
 	cdef _NodeStringAttribute._AttributeIterator _iter
 	cdef _NodeStringAttribute._AttributeIterator _stopiter
-	cdef _Graph* _G
-	cdef setThis(self, _NodeStringAttribute& other, _Graph* graph)
+	cdef setThis(self, _NodeStringAttribute& other)
 
 cdef class EdgeIntAttribute:
 	cdef _EdgeIntAttribute _this
 	cdef _EdgeIntAttribute._AttributeIterator _iter
 	cdef _EdgeIntAttribute._AttributeIterator _stopiter
-	cdef _Graph* _G
-	cdef setThis(self, _EdgeIntAttribute& other, _Graph* graph)
+	cdef setThis(self, _EdgeIntAttribute& other)
 
 cdef class EdgeDoubleAttribute:
 	cdef _EdgeDoubleAttribute _this
 	cdef _EdgeDoubleAttribute._AttributeIterator _iter
 	cdef _EdgeDoubleAttribute._AttributeIterator _stopiter
-	cdef _Graph* _G
-	cdef setThis(self, _EdgeDoubleAttribute& other, _Graph* graph)
+	cdef setThis(self, _EdgeDoubleAttribute& other)
 
 cdef class EdgeStringAttribute:
 	cdef _EdgeStringAttribute _this
 	cdef _EdgeStringAttribute._AttributeIterator _iter
 	cdef _EdgeStringAttribute._AttributeIterator _stopiter
-	cdef _Graph* _G
-	cdef setThis(self, _EdgeStringAttribute& other, _Graph* graph)
+	cdef setThis(self, _EdgeStringAttribute& other)
 
 cdef extern from "<networkit/graph/SpanningForest.hpp>":
 
