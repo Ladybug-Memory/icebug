@@ -5,6 +5,7 @@
  *      Author: cls
  */
 
+#include <array>
 #include <iomanip>
 #include <iostream>
 #include <random>
