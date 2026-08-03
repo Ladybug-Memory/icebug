@@ -45,7 +45,7 @@ cdef class EpidemicSimulationSEIR(Algorithm):
 	cdef Graph G
 	def __cinit__(self, Graph G, count tMax, double transP=0.5, count eTime=2, count iTime=7, node zero=none):
 		self.G = G
-		self._this = new _EpidemicSimulationSEIR(dereference(G._this), tMax, transP, eTime, iTime, zero)
+		self._this = new _EpidemicSimulationSEIR(dereference(G._view()), tMax, transP, eTime, iTime, zero)
 
 	def getData(self):
 		"""

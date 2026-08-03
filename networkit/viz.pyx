@@ -243,9 +243,9 @@ cdef class MaxentStress (GraphLayoutAlgorithm):
 			pointCoordinates.push_back(p)
 
 		if (coordinates.size() != 0):
-			self._this = new _MaxentStress(dereference(G._this), dim, pointCoordinates, k, tolerance, linearSolverType, fastComputation, graphDistance)
+			self._this = new _MaxentStress(dereference(G._view()), dim, pointCoordinates, k, tolerance, linearSolverType, fastComputation, graphDistance)
 		else:
-			self._this = new _MaxentStress(dereference(G._this), dim, k, tolerance, linearSolverType, fastComputation, graphDistance)
+			self._this = new _MaxentStress(dereference(G._view()), dim, k, tolerance, linearSolverType, fastComputation, graphDistance)
 
 	def __dealloc__(self):
 		del self._this
@@ -432,7 +432,7 @@ cdef class PivotMDS (GraphLayoutAlgorithm):
 	"""
 
 	def __cinit__(self, Graph G, count dim, count numberOfPivots):
-		self._this = new _PivotMDS(dereference(G._this), dim, numberOfPivots)
+		self._this = new _PivotMDS(dereference(G._view()), dim, numberOfPivots)
 
 	def __dealloc__(self):
 		del self._this

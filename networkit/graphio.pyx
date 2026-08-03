@@ -80,7 +80,7 @@ cdef class GraphReader:
 
 		with nogil:
 			result = move(self._this.read(cpath)) # extra move in order to avoid copying the internal variable that is used by Cython
-		return Graph(0).setThis(result)
+		return Graph(0).setThisFromGraphW(result)
 
 cdef extern from "<networkit/io/GraphReader.hpp>" namespace "NetworKit::GraphReader":
 
@@ -137,7 +137,7 @@ cdef class GraphWriter:
 		assert path != None
 		cdef string c_path = stdstring(path)
 		with nogil:
-			self._this.write(dereference(G._this), c_path)
+			self._this.write(dereference(G._view()), c_path)
 		return self
 
 cdef extern from "<networkit/io/METISGraphReader.hpp>":
@@ -188,7 +188,7 @@ cdef class NetworkitBinaryReader(GraphReader):
 		"""
 		cdef _GraphW result
 		result = move((<_NetworkitBinaryReader*>(self._this)).readFromBuffer(state))
-		return Graph(0).setThis(result)
+		return Graph(0).setThisFromGraphW(result)
 
 cdef extern from "<networkit/io/NetworkitBinaryWriter.hpp>":
 	cdef cppclass _NetworkitBinaryWriter "NetworKit::NetworkitBinaryWriter" (_GraphWriter):
@@ -219,7 +219,7 @@ cdef class NetworkitBinaryWriter(GraphWriter):
 		G : networkit.Graph
 			The input graph.
 		"""
-		return (<_NetworkitBinaryWriter*>(self._this)).writeToBuffer(dereference(G._this))
+		return (<_NetworkitBinaryWriter*>(self._this)).writeToBuffer(dereference(G._view()))
 
 cdef extern from "<networkit/io/GraphToolBinaryReader.hpp>":
 
@@ -289,7 +289,7 @@ cdef class ThrillGraphBinaryReader(GraphReader):
 		with nogil:
 			result = move((<_ThrillGraphBinaryReader*>(self._this)).read(c_paths)) # extra move in order to avoid copying the internal variable that is used by Cython
 
-		return Graph(0).setThis(result)
+		return Graph(0).setThisFromGraphW(result)
 
 cdef extern from "<networkit/io/ThrillGraphBinaryWriter.hpp>":
 
@@ -901,7 +901,7 @@ cdef class SNAPEdgeListPartitionReader:
 		cdef unordered_map[node,node] cNodeMap
 		for (key,val) in nodeMap:
 			cNodeMap[key] = val
-		return Cover().setThis(self._this.read(stdstring(path), cNodeMap, dereference(G._this)))
+		return Cover().setThis(self._this.read(stdstring(path), cNodeMap, dereference(G._view())))
 
 cdef extern from "<networkit/io/CoverReader.hpp>":
 
@@ -931,7 +931,7 @@ cdef class CoverReader:
 	cdef _CoverReader _this
 
 	def read(self, path, Graph G):
-		return Cover().setThis(self._this.read(stdstring(path), dereference(G._this)))
+		return Cover().setThis(self._this.read(stdstring(path), dereference(G._view())))
 
 cdef extern from "<networkit/io/CoverWriter.hpp>":
 
@@ -1004,7 +1004,7 @@ cdef class EdgeListCoverReader:
 		networkit.Cover
 			Cover of graph.
 		"""
-		return Cover().setThis(self._this.read(stdstring(path), dereference(G._this)))
+		return Cover().setThis(self._this.read(stdstring(path), dereference(G._view())))
 
 cdef extern from "<networkit/io/MTXGraphReader.hpp>":
 
