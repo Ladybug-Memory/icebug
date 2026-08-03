@@ -52,7 +52,7 @@ void ParallelLeiden::run() {
             mappings.emplace_back(std::move(map));
             result = std::move(p);
             std::swap(temp, coarse);
-            currentGraph = &coarse;
+            currentGraph = &coarse.asGraph();
         } while (true);
         flattenPartition();
         INFO("Leiden iteration done, took ", totalTime.elapsedTag(), "so far");
