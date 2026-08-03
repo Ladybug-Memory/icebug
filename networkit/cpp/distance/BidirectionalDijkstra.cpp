@@ -5,6 +5,7 @@
  *      Author: Eugenio Angriman <angrimae@hu-berlin.de>
  */
 
+#include <deque>
 #include <limits>
 
 #include <networkit/distance/BidirectionalDijkstra.hpp>
