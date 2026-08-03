@@ -8,7 +8,23 @@
 #ifndef NETWORKIT_GRAPH_GRAPH_R_HPP_
 #define NETWORKIT_GRAPH_GRAPH_R_HPP_
 
-#include <networkit/graph/Graph.hpp>
+#include <cassert>
+#include <memory>
+#include <ranges>
+#include <stdexcept>
+#include <utility>
+#include <vector>
+
+#include <arrow/api.h>
+
+#include <networkit/Globals.hpp>
+#include <networkit/graph/AttributedGraphBase.hpp>
+#include <networkit/graph/EdgeIterators.hpp>
+#include <networkit/graph/GraphConcepts.hpp>
+#include <networkit/graph/GraphIterationMixin.hpp>
+#include <networkit/graph/GraphTypes.hpp>
+#include <networkit/graph/NeighborIterators.hpp>
+#include <networkit/graph/NodeIterators.hpp>
 
 namespace NetworKit {
 
@@ -22,8 +38,51 @@ namespace NetworKit {
  *
  * For graphs that require mutation (adding/removing nodes or edges), use GraphW instead.
  */
-class GraphR : public Graph {
+class GraphR final : public GraphIterationMixin<GraphR>, public AttributedGraphBase<GraphR> {
+    count n, m, storedNumberOfSelfLoops;
+    node z;
+    count t;
+    bool weighted, directed;
+
+    std::shared_ptr<arrow::UInt64Array> outEdgesCSRIndices, outEdgesCSRIndptr;
+    std::shared_ptr<arrow::UInt64Array> inEdgesCSRIndices, inEdgesCSRIndptr;
+    std::shared_ptr<arrow::DoubleArray> outEdgesCSRWeights, inEdgesCSRWeights;
+
+    template <bool Weighted>
+    static auto neighborsAt(const std::shared_ptr<arrow::UInt64Array> &indptr,
+                            const std::shared_ptr<arrow::UInt64Array> &indices,
+                            const std::shared_ptr<arrow::DoubleArray> &weights, node u) {
+        const auto start = indptr->Value(u);
+        const auto deg = indptr->Value(u + 1) - start;
+        const node *first = reinterpret_cast<const node *>(indices->raw_values()) + start;
+
+        if constexpr (Weighted) {
+            assert(weights != nullptr);
+            const edgeweight *firstWeight = weights->raw_values() + start;
+            return std::ranges::subrange(NeighborWeightIter(first, firstWeight),
+                                        NeighborWeightIter(first + deg, firstWeight + deg));
+        } else {
+            return std::ranges::subrange(NeighborIter(first), NeighborIter(first + deg));
+        }
+    }
+
 public:
+    /// CSR has no notion of a deleted node: every id in [0, n) exists for the graph's lifetime.
+    static constexpr bool alwaysContiguousNodeIds = true;
+
+    /// The CSR constructor requires sorted adjacency, so lookups may binary-search.
+    static constexpr bool alwaysSortedNeighborhoods = true;
+
+    using NeighborIter = NeighborIteratorBase<const node *>;
+    using NeighborWeightIter = NeighborWeightIteratorBase<const node *, const edgeweight *>;
+
+    using NodeIterator = NodeIteratorBase<GraphR>;
+    using NodeRange = NodeRangeBase<GraphR>;
+    using EdgeIterator = EdgeTypeIterator<GraphR, Edge>;
+    using EdgeWeightIterator = EdgeTypeIterator<GraphR, WeightedEdge>;
+    using EdgeRange = EdgeTypeRange<GraphR, Edge>;
+    using EdgeWeightRange = EdgeTypeRange<GraphR, WeightedEdge>;
+
     /**
      * Constructor that creates a graph from Arrow CSR arrays for zero-copy memory efficiency.
      * @param n Number of nodes.
@@ -43,73 +102,128 @@ public:
            std::shared_ptr<arrow::UInt64Array> inIndices = nullptr,
            std::shared_ptr<arrow::UInt64Array> inIndptr = nullptr,
            std::shared_ptr<arrow::DoubleArray> outWeights = nullptr,
-           std::shared_ptr<arrow::DoubleArray> inWeights = nullptr)
-        : Graph(n, directed, std::move(outIndices), std::move(outIndptr), std::move(inIndices),
-                std::move(inIndptr), std::move(outWeights), std::move(inWeights)) {}
+           std::shared_ptr<arrow::DoubleArray> inWeights = nullptr);
 
-    /**
-     * Copy constructor
-     */
-    GraphR(const GraphR &other) : Graph(other) {}
+    GraphR(const GraphR &) = default;
+    GraphR(GraphR &&) noexcept = default;
+    GraphR &operator=(const GraphR &) = default;
+    GraphR &operator=(GraphR &&) noexcept = default;
+    ~GraphR() = default;
 
-    /**
-     * Move constructor
-     */
-    GraphR(GraphR &&other) noexcept : Graph(std::move(other)) {}
+    /* GLOBAL PROPERTIES */
 
-    /**
-     * Copy assignment
-     */
-    GraphR &operator=(const GraphR &other) {
-        Graph::operator=(other);
-        return *this;
-    }
+    count numberOfNodes() const noexcept { return n; }
+    count numberOfEdges() const noexcept { return m; }
+    count numberOfSelfLoops() const noexcept { return storedNumberOfSelfLoops; }
+    index upperNodeIdBound() const noexcept { return z; }
+    bool isEmpty() const noexcept { return !n; }
+    bool isWeighted() const noexcept { return weighted; }
+    bool isDirected() const noexcept { return directed; }
+    count time() const noexcept { return t; }
 
-    /**
-     * Move assignment
-     */
-    GraphR &operator=(GraphR &&other) noexcept {
-        Graph::operator=(std::move(other));
-        return *this;
-    }
+    /// CSR carries no edge ids; see edgeId().
+    bool hasEdgeIds() const noexcept { return false; }
+    index upperEdgeIdBound() const noexcept { return 0; }
 
-    /** Default destructor */
-    ~GraphR() override = default;
+    bool getKeepEdgesSorted() const noexcept { return alwaysSortedNeighborhoods; }
+    bool getMaintainCompactEdges() const noexcept { return true; }
+    bool hasSortedNeighborhoods() const noexcept { return alwaysSortedNeighborhoods; }
 
-    // Implement pure virtual methods from Graph base class
+    bool checkConsistency() const;
 
-    count degree(node v) const override;
-    count degreeIn(node v) const override;
-    bool isIsolated(node v) const override;
+    /* NODE AND EDGE PROPERTIES */
+
+    bool hasNode(node v) const noexcept { return v < z; }
+    bool hasEdge(node u, node v) const;
+    count degree(node v) const;
+    count degreeIn(node v) const;
+    count degreeOut(node v) const { return degree(v); }
+    bool isIsolated(node v) const;
 
     /**
      * Return edge weight of edge {@a u,@a v}. Returns 0 if edge does not
      * exist. If weights are provided during construction, returns the actual
      * edge weight; otherwise returns defaultEdgeWeight (1.0).
-     *
-     * @param u Endpoint of edge.
-     * @param v Endpoint of edge.
-     * @return Edge weight of edge {@a u,@a v} or 0 if edge does not exist.
      */
-    edgeweight weight(node u, node v) const override;
+    edgeweight weight(node u, node v) const;
 
-    edgeid edgeId(node u, node v) const override;
+    /// Always throws: the CSR constructor assigns no edge ids.
+    edgeid edgeId(node u, node v) const;
+    std::pair<node, node> edgeById(index id) const;
 
-    node getIthNeighbor(Unsafe, node u, index i) const override;
-    edgeweight getIthNeighborWeight(node u, index i) const override;
-    node getIthNeighbor(node u, index i) const override;
-    node getIthInNeighbor(node u, index i) const override;
-    std::pair<node, edgeweight> getIthNeighborWithWeight(node u, index i) const override;
-    std::pair<node, edgeid> getIthNeighborWithId(node u, index i) const override;
+    /* INDEXED NEIGHBOR ACCESS */
 
-protected:
-    std::vector<node> getNeighborsVector(node u, bool inEdges = false) const override;
+    index indexOfNeighbor(node u, node v) const { return indexInOutEdgeArray(u, v); }
+    index indexInInEdgeArray(node v, node u) const;
+    index indexInOutEdgeArray(node u, node v) const;
+
+    node getIthNeighbor(Unsafe, node u, index i) const;
+    node getIthNeighbor(node u, index i) const;
+    node getIthInNeighbor(node u, index i) const;
+    edgeweight getIthNeighborWeight(node u, index i) const;
+    edgeweight getIthNeighborWeight(Unsafe, node u, index i) const {
+        return getIthNeighborWeight(u, i);
+    }
+    std::pair<node, edgeweight> getIthNeighborWithWeight(node u, index i) const;
+    std::pair<node, edgeweight> getIthNeighborWithWeight(Unsafe, node u, index i) const {
+        return getIthNeighborWithWeight(u, i);
+    }
+    /// Always throws: the CSR constructor assigns no edge ids.
+    std::pair<node, edgeid> getIthNeighborWithId(node u, index i) const;
+
+    std::vector<node> getNeighborsVector(node u, bool inEdges = false) const;
     std::pair<std::vector<node>, std::vector<edgeweight>>
-    getNeighborsWithWeightsVector(node u, bool inEdges = false) const override;
+    getNeighborsWithWeightsVector(node u, bool inEdges = false) const;
 
-    index indexInInEdgeArray(node v, node u) const override;
-    index indexInOutEdgeArray(node u, node v) const override;
+    /* RANGES */
+
+    NodeRange nodeRange() const noexcept { return NodeRange(*this); }
+    EdgeRange edgeRange() const noexcept { return EdgeRange(*this); }
+    EdgeWeightRange edgeWeightRange() const noexcept { return EdgeWeightRange(*this); }
+
+    /**
+     * The out-neighbors of @a u, as a range over the CSR arrays. The range borrows this graph's
+     * Arrow buffers and must not outlive it.
+     *
+     * @tparam Weighted select the (node, weight) payload. Requires isWeighted(); an unweighted
+     * graph has no weight array, and callers that want a synthesized weight iterate the
+     * unweighted range and read neighborWeight() off the node.
+     */
+    template <bool Weighted>
+    auto outNeighbors(node u) const {
+        return neighborsAt<Weighted>(outEdgesCSRIndptr, outEdgesCSRIndices, outEdgesCSRWeights, u);
+    }
+
+    /// The in-neighbors of @a u. On an undirected graph these are the out-neighbors.
+    template <bool Weighted>
+    auto inNeighbors(node u) const {
+        if (!directed) {
+            return outNeighbors<Weighted>(u);
+        }
+        return neighborsAt<Weighted>(inEdgesCSRIndptr, inEdgesCSRIndices, inEdgesCSRWeights, u);
+    }
+
+    auto neighborRange(node u) const { return outNeighbors<false>(u); }
+    auto weightNeighborRange(node u) const { return outNeighbors<true>(u); }
+    auto inNeighborRange(node u) const { return inNeighbors<false>(u); }
+    auto weightInNeighborRange(node u) const { return inNeighbors<true>(u); }
+
+private:
+    /// The slot of edge (@a u, @a v) in @a indices, or none. Bisects; adjacency is sorted.
+    index findInAdjacency(const std::shared_ptr<arrow::UInt64Array> &indptr,
+                          const std::shared_ptr<arrow::UInt64Array> &indices, node u,
+                          node v) const;
+    count degreeCSR(node u, bool incoming = false) const;
+    std::pair<const node *, count> getCSROutNeighbors(node u) const;
+    std::pair<const node *, count> getCSRInNeighbors(node u) const;
+
 };
+
+static_assert(GraphLike<GraphR>);
+static_assert(std::derived_from<GraphR, AttributedGraphBase<GraphR>>);
+static_assert(!IndexedGraph<GraphR>, "CSR carries no edge ids; see GraphR::edgeId.");
+static_assert(!MutableGraph<GraphR>);
+static_assert(GraphR::alwaysContiguousNodeIds);
 
 } // namespace NetworKit
 

@@ -1,21 +1,49 @@
 #ifndef NETWORKIT_GRAPH_GRAPH_W_HPP_
 #define NETWORKIT_GRAPH_GRAPH_W_HPP_
 
+#include <cassert>
+#include <memory>
+#include <ranges>
 #include <set>
-#include <networkit/graph/Graph.hpp>
+#include <stdexcept>
+#include <utility>
+#include <vector>
+
+#include <networkit/Globals.hpp>
+#include <networkit/auxiliary/ArrayTools.hpp>
+#include <networkit/graph/AttributedGraphBase.hpp>
+#include <networkit/graph/EdgeIterators.hpp>
+#include <networkit/graph/GraphConcepts.hpp>
+#include <networkit/graph/GraphIterationMixin.hpp>
+#include <networkit/graph/GraphTypes.hpp>
+#include <networkit/graph/NeighborIterators.hpp>
+#include <networkit/graph/NodeIterators.hpp>
+
+#include <tlx/define/deprecated.hpp>
 
 namespace NetworKit {
 
 /**
  * @ingroup graph
- * A writable graph that extends Graph with mutation operations.
- * This class provides all read operations from Graph plus write operations
- * like addNode, addEdge, removeNode, removeEdge, etc.
+ * A mutable graph: nodes and edges can be added and removed.
  *
- * GraphW uses traditional vector-based adjacency lists for mutable operations,
- * while the base Graph class uses memory-efficient Arrow CSR arrays.
+ * GraphW stores adjacency as vectors of vectors, which is what makes mutation cheap. Use GraphR
+ * for read-only analysis of large graphs, where CSR is far more compact.
  */
-class GraphW final : public Graph {
+class GraphW final : public GraphIterationMixin<GraphW>, public AttributedGraphBase<GraphW> {
+    count n, m, storedNumberOfSelfLoops;
+    node z;
+    count t;
+    bool weighted, directed;
+
+    edgeid omega;
+    bool edgesIndexed;
+    bool maintainCompactEdges = false;
+    bool maintainSortedEdges = false;
+    edgeid deletedID;
+
+    //!< exists[v] is true if node v has not been removed from the graph
+    std::vector<bool> exists;
 
 protected:
     // Vector-based adjacency data structures for mutable operations
@@ -41,9 +69,39 @@ public:
      * Check for invalid graph states for vector-based graphs.
      * @return False if the graph is in invalid state.
      */
-    bool checkConsistency() const override;
+    bool checkConsistency() const;
 
 private:
+    template <bool Weighted>
+    static auto neighborsAt(const std::vector<std::vector<node>> &edges,
+                            const std::vector<std::vector<edgeweight>> &weights, node u) {
+        if constexpr (Weighted) {
+            assert(u < weights.size());
+            return std::ranges::subrange(
+                NeighborWeightIter(edges[u].begin(), weights[u].begin()),
+                NeighborWeightIter(edges[u].end(), weights[u].end()));
+        } else {
+            return std::ranges::subrange(NeighborIter(edges[u].begin()),
+                                        NeighborIter(edges[u].end()));
+        }
+    }
+
+    template <bool Weighted>
+    static auto indexedNeighborsAt(const std::vector<std::vector<node>> &edges,
+                                   const std::vector<std::vector<edgeweight>> &weights,
+                                   const std::vector<std::vector<edgeid>> &ids, node u) {
+        assert(u < ids.size());
+        if constexpr (Weighted) {
+            assert(u < weights.size());
+            return std::ranges::subrange(
+                NeighborWeightIdIter(edges[u].begin(), weights[u].begin(), ids[u].begin()),
+                NeighborWeightIdIter(edges[u].end(), weights[u].end(), ids[u].end()));
+        } else {
+            return std::ranges::subrange(NeighborIdIter(edges[u].begin(), ids[u].begin()),
+                                        NeighborIdIter(edges[u].end(), ids[u].end()));
+        }
+    }
+
     /**
      * Initialize vector-based data structures based on graph properties
      */
@@ -59,6 +117,114 @@ private:
     }
 
 public:
+    using NodeIterator = NodeIteratorBase<GraphW>;
+    using NodeRange = NodeRangeBase<GraphW>;
+    using EdgeIterator = EdgeTypeIterator<GraphW, Edge>;
+    using EdgeWeightIterator = EdgeTypeIterator<GraphW, WeightedEdge>;
+    using EdgeRange = EdgeTypeRange<GraphW, Edge>;
+    using EdgeWeightRange = EdgeTypeRange<GraphW, WeightedEdge>;
+
+    /* GLOBAL PROPERTIES */
+
+    count numberOfNodes() const noexcept { return n; }
+    count numberOfEdges() const noexcept { return m; }
+    count numberOfSelfLoops() const noexcept { return storedNumberOfSelfLoops; }
+    index upperNodeIdBound() const noexcept { return z; }
+    index upperEdgeIdBound() const noexcept { return omega; }
+    bool isEmpty() const noexcept { return !n; }
+    bool isWeighted() const noexcept { return weighted; }
+    bool isDirected() const noexcept { return directed; }
+    bool hasEdgeIds() const noexcept { return edgesIndexed; }
+    bool getKeepEdgesSorted() const noexcept { return maintainSortedEdges; }
+    bool getMaintainCompactEdges() const noexcept { return maintainCompactEdges; }
+    count time() const noexcept { return t; }
+    void timeStep() { ++t; }
+
+    /* NODE AND EDGE PROPERTIES */
+
+    bool hasNode(node v) const noexcept { return (v < z) && exists[v]; }
+    count degreeOut(node v) const { return degree(v); }
+    std::pair<node, node> edgeById(index id) const {
+        std::pair<node, node> result{none, none};
+        bool found = false;
+
+        forNodesWhile([&] { return !found; },
+                      [&](node u) {
+                          forNeighborsOf(u, [&](node v) {
+                              if (!this->isDirected() && v < u)
+                                  return;
+                              auto uvId = edgeId(u, v);
+                              if (uvId == id) {
+                                  found = true;
+                                  result = std::make_pair(u, v);
+                              }
+                          });
+                      });
+
+        return result;
+    }
+    index indexOfNeighbor(node u, node v) const { return indexInOutEdgeArray(u, v); }
+
+    /* RANGES */
+
+    NodeRange nodeRange() const noexcept { return NodeRange(*this); }
+    EdgeRange edgeRange() const noexcept { return EdgeRange(*this); }
+    EdgeWeightRange edgeWeightRange() const noexcept { return EdgeWeightRange(*this); }
+
+    using NeighborIter = NeighborIteratorBase<std::vector<node>::const_iterator>;
+    using NeighborWeightIter =
+        NeighborWeightIteratorBase<std::vector<node>::const_iterator,
+                                   std::vector<edgeweight>::const_iterator>;
+    using NeighborWeightIdIter =
+        NeighborWeightIdIteratorBase<std::vector<node>::const_iterator,
+                                     std::vector<edgeweight>::const_iterator,
+                                     std::vector<edgeid>::const_iterator>;
+    using NeighborIdIter = NeighborWeightIteratorBase<std::vector<node>::const_iterator,
+                                                      std::vector<edgeid>::const_iterator>;
+
+    /// Honest at runtime: true only when the caller asked for edges to be kept sorted.
+    bool hasSortedNeighborhoods() const noexcept { return getKeepEdgesSorted(); }
+
+    /**
+     * The out-neighbors of @a u. The range borrows this graph's adjacency vectors and is
+     * invalidated by any mutation of @a u's neighborhood.
+     *
+     * @tparam Weighted select the (node, weight) payload. Requires isWeighted(); an unweighted
+     * graph allocates no weight vector.
+     */
+    template <bool Weighted>
+    auto outNeighbors(node u) const {
+        return neighborsAt<Weighted>(outEdges, outEdgeWeights, u);
+    }
+
+    /// The in-neighbors of @a u. On an undirected graph these are the out-neighbors.
+    template <bool Weighted>
+    auto inNeighbors(node u) const {
+        if (!isDirected()) {
+            return outNeighbors<Weighted>(u);
+        }
+        return neighborsAt<Weighted>(inEdges, inEdgeWeights, u);
+    }
+
+    /// Requires hasEdgeIds(). @tparam Weighted as for outNeighbors().
+    template <bool Weighted>
+    auto outNeighborsIndexed(node u) const {
+        return indexedNeighborsAt<Weighted>(outEdges, outEdgeWeights, outEdgeIds, u);
+    }
+
+    template <bool Weighted>
+    auto inNeighborsIndexed(node u) const {
+        if (!isDirected()) {
+            return outNeighborsIndexed<Weighted>(u);
+        }
+        return indexedNeighborsAt<Weighted>(inEdges, inEdgeWeights, inEdgeIds, u);
+    }
+
+    auto neighborRange(node u) const { return outNeighbors<false>(u); }
+    auto weightNeighborRange(node u) const { return outNeighbors<true>(u); }
+    auto inNeighborRange(node u) const { return inNeighbors<false>(u); }
+    auto weightInNeighborRange(node u) const { return inNeighbors<true>(u); }
+
     /**
      * Create a graph of @a n nodes. The graph has assignable edge weights if @a
      * weighted is set to <code>true</code>. If @a weighted is set to
@@ -70,7 +236,9 @@ public:
      * @param edgesIndexed If set to @c true, the graph will have indexed edges.
      */
     GraphW(count n = 0, bool weighted = false, bool directed = false, bool edgesIndexed = false)
-        : Graph(n, weighted, directed, edgesIndexed), inEdges(directed ? n : 0), outEdges(n),
+        : n(n), m(0), storedNumberOfSelfLoops(0), z(n), t(0), weighted(weighted),
+          directed(directed), omega(0), edgesIndexed(edgesIndexed), deletedID(none),
+          exists(n, true), inEdges(directed ? n : 0), outEdges(n),
           inEdgeWeights(weighted && directed ? n : 0), outEdgeWeights(weighted ? n : 0),
           inEdgeIds(edgesIndexed && directed ? n : 0), outEdgeIds(edgesIndexed ? n : 0) {}
 
@@ -86,26 +254,14 @@ public:
      * Create a graph as copy of @a other.
      * @param other The graph to copy.
      */
-    GraphW(const GraphW &other)
-        : Graph(other, true), inEdges(other.inEdges), outEdges(other.outEdges),
-          inEdgeWeights(other.inEdgeWeights), outEdgeWeights(other.outEdgeWeights),
-          inEdgeIds(other.inEdgeIds), outEdgeIds(other.outEdgeIds) {
-        // GraphW uses vector-based storage, not CSR
-        // Clear any CSR pointers that may have been copied from base class
-        outEdgesCSRIndices.reset();
-        outEdgesCSRIndptr.reset();
-        inEdgesCSRIndices.reset();
-        inEdgesCSRIndptr.reset();
-        outEdgesCSRWeights.reset();
-        inEdgesCSRWeights.reset();
-        usingCSR = false;
-    }
+    GraphW(const GraphW &other) = default;
+    GraphW(GraphW &&other) noexcept = default;
 
     /**
      * Create a graph as copy of @a other.
      * @param other The graph to copy.
      */
-    GraphW(const Graph &other)
+    GraphW(const ReferenceGraph &other)
         : GraphW(other, other.isWeighted(), other.isDirected(), other.hasEdgeIds()) {}
 
     /**
@@ -116,7 +272,7 @@ public:
      * @param edgesIndexed If set to true, the graph will have indexed edges.
      */
     template <class EdgeMerger = std::plus<edgeweight>>
-    GraphW(const Graph &other, bool weighted, bool directed, bool edgesIndexed = false,
+    GraphW(const ReferenceGraph &other, bool weighted, bool directed, bool edgesIndexed = false,
            EdgeMerger edgeMerger = std::plus<edgeweight>())
         : GraphW(other.upperNodeIdBound(), weighted, directed, edgesIndexed) {
 
@@ -168,72 +324,10 @@ public:
         }
     }
 
-    /** move constructor */
-    GraphW(GraphW &&other) noexcept
-        : Graph(std::move(other)), inEdges(std::move(other.inEdges)),
-          outEdges(std::move(other.outEdges)), inEdgeWeights(std::move(other.inEdgeWeights)),
-          outEdgeWeights(std::move(other.outEdgeWeights)), inEdgeIds(std::move(other.inEdgeIds)),
-          outEdgeIds(std::move(other.outEdgeIds)) {}
+    ~GraphW() = default;
 
-    /** move constructor */
-    GraphW(Graph &&other) noexcept : Graph(std::move(other)) { initializeVectorStructures(); }
-
-    /** Default destructor */
-    ~GraphW() override = default;
-
-    /** move assignment operator */
-    GraphW &operator=(GraphW &&other) noexcept {
-        if (this != &other) {
-            Graph::operator=(std::move(other));
-            inEdges = std::move(other.inEdges);
-            outEdges = std::move(other.outEdges);
-            inEdgeWeights = std::move(other.inEdgeWeights);
-            outEdgeWeights = std::move(other.outEdgeWeights);
-            inEdgeIds = std::move(other.inEdgeIds);
-            outEdgeIds = std::move(other.outEdgeIds);
-        }
-        return *this;
-    }
-
-    /** move assignment operator */
-    GraphW &operator=(Graph &&other) noexcept {
-        Graph::operator=(std::move(other));
-        // Clear existing vectors before reinitializing to avoid keeping old edge data
-        inEdges.clear();
-        outEdges.clear();
-        inEdgeWeights.clear();
-        outEdgeWeights.clear();
-        inEdgeIds.clear();
-        outEdgeIds.clear();
-        initializeVectorStructures();
-        return *this;
-    }
-
-    /** copy assignment operator */
-    GraphW &operator=(const GraphW &other) {
-        Graph::operator=(other);
-        inEdges = other.inEdges;
-        outEdges = other.outEdges;
-        inEdgeWeights = other.inEdgeWeights;
-        outEdgeWeights = other.outEdgeWeights;
-        inEdgeIds = other.inEdgeIds;
-        outEdgeIds = other.outEdgeIds;
-        return *this;
-    }
-
-    /** copy assignment operator */
-    GraphW &operator=(const Graph &other) {
-        Graph::operator=(other);
-        // Clear existing vectors before reinitializing to avoid keeping old edge data
-        inEdges.clear();
-        outEdges.clear();
-        inEdgeWeights.clear();
-        outEdgeWeights.clear();
-        inEdgeIds.clear();
-        outEdgeIds.clear();
-        initializeVectorStructures();
-        return *this;
-    }
+    GraphW &operator=(const GraphW &other) = default;
+    GraphW &operator=(GraphW &&other) noexcept = default;
 
     /** EDGE IDS **/
 
@@ -620,7 +714,7 @@ public:
      * @param v Endpoint of edge.
      * @return Edge weight of edge {@a u,@a v} or 0 if edge does not exist.
      */
-    edgeweight weight(node u, node v) const override;
+    edgeweight weight(node u, node v) const;
 
     /**
      * Set edge weight of edge {@a u,@a v}. BEWARE: Running time is \Theta(deg(u))!
@@ -638,7 +732,7 @@ public:
      * @param i Index of the outgoing edge.
      * @param ew New edge weight.
      */
-    void setWeightAtIthNeighbor(Unsafe, node u, index i, edgeweight ew) override;
+    void setWeightAtIthNeighbor(Unsafe, node u, index i, edgeweight ew);
 
     /**
      * Set edge weight of the @a i-th incoming edge of node @a u. BEWARE: Running time is constant.
@@ -647,7 +741,7 @@ public:
      * @param i Index of the incoming edge.
      * @param ew New edge weight.
      */
-    void setWeightAtIthInNeighbor(Unsafe, node u, index i, edgeweight ew) override;
+    void setWeightAtIthInNeighbor(Unsafe, node u, index i, edgeweight ew);
 
     /**
      * Increase edge weight of edge {@a u,@a v} by @a ew. BEWARE: Running time is \Theta(deg(u))!
@@ -711,12 +805,12 @@ public:
      * @param v Node.
      * @return The number of outgoing neighbors.
      */
-    count degree(node v) const override {
+    count degree(node v) const {
         assert(hasNode(v));
         return outEdges[v].size();
     }
 
-    count degreeIn(node v) const override {
+    count degreeIn(node v) const {
         assert(hasNode(v));
         if (directed) {
             return inEdges[v].size();
@@ -724,7 +818,7 @@ public:
         return outEdges[v].size();
     }
 
-    bool isIsolated(node v) const override {
+    bool isIsolated(node v) const {
         if (!hasNode(v))
             throw std::runtime_error("Error, the node does not exist!");
         if (directed) {
@@ -733,11 +827,11 @@ public:
         return outEdges[v].size() == 0;
     }
 
-    edgeid edgeId(node u, node v) const override;
+    edgeid edgeId(node u, node v) const;
 
-    index indexInOutEdgeArray(node u, node v) const override;
+    index indexInOutEdgeArray(node u, node v) const;
 
-    index indexInInEdgeArray(node v, node u) const override;
+    index indexInInEdgeArray(node v, node u) const;
 
     /**
      * Return the i-th (outgoing) neighbor of @a u.
@@ -747,7 +841,7 @@ public:
      * @return @a i-th (outgoing) neighbor of @a u, or @c none if no such
      * neighbor exists.
      */
-    node getIthNeighbor(Unsafe, node u, index i) const override { return outEdges[u][i]; }
+    node getIthNeighbor(Unsafe, node u, index i) const { return outEdges[u][i]; }
 
     /**
      * Return the weight to the i-th (outgoing) neighbor of @a u.
@@ -769,7 +863,7 @@ public:
      * @return @a i-th (outgoing) neighbor of @a u, or @c none if no such
      * neighbor exists.
      */
-    node getIthNeighbor(node u, index i) const override {
+    node getIthNeighbor(node u, index i) const {
         if (!hasNode(u) || i >= outEdges[u].size())
             return none;
         return outEdges[u][i];
@@ -783,7 +877,9 @@ public:
      * @return @a i-th (incoming) neighbor of @a u, or @c none if no such
      * neighbor exists.
      */
-    node getIthInNeighbor(node u, index i) const override {
+    node getIthInNeighbor(node u, index i) const {
+        if (!directed)
+            return getIthNeighbor(u, i);
         if (!hasNode(u) || i >= inEdges[u].size())
             return none;
         return inEdges[u][i];
@@ -797,7 +893,7 @@ public:
      * @return @a edge weight to the i-th (outgoing) neighbor of @a u, or @c +inf if no such
      * neighbor exists.
      */
-    edgeweight getIthNeighborWeight(node u, index i) const override {
+    edgeweight getIthNeighborWeight(node u, index i) const {
         if (!hasNode(u) || i >= outEdges[u].size())
             return nullWeight;
         return isWeighted() ? outEdgeWeights[u][i] : defaultEdgeWeight;
@@ -811,7 +907,7 @@ public:
      * @return pair: i-th (outgoing) neighbor of @a u and the corresponding
      * edge weight, or @c defaultEdgeWeight if unweighted.
      */
-    std::pair<node, edgeweight> getIthNeighborWithWeight(node u, index i) const override {
+    std::pair<node, edgeweight> getIthNeighborWithWeight(node u, index i) const {
         if (!hasNode(u) || i >= outEdges[u].size())
             return {none, none};
         return getIthNeighborWithWeight(unsafe, u, i);
@@ -839,7 +935,7 @@ public:
      * @return pair: i-th (outgoing) neighbor of @a u and the corresponding
      * edge id, or @c none if no such neighbor exists.
      */
-    std::pair<node, edgeid> getIthNeighborWithId(node u, index i) const override {
+    std::pair<node, edgeid> getIthNeighborWithId(node u, index i) const {
         assert(hasEdgeIds());
         if (!hasNode(u) || i >= outEdges[u].size())
             return {none, none};
@@ -915,8 +1011,6 @@ private:
      * @param handle The handle that shall be executed for each edge
      * @return void
      */
-    template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
-    inline void forOutEdgesOfImpl(node u, L handle) const;
 
     /**
      * @brief Implementation of the for loop for incoming edges of u
@@ -928,8 +1022,6 @@ private:
      * @param handle The handle that shall be executed for each edge
      * @return void
      */
-    template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
-    inline void forInEdgesOfImpl(node u, L handle) const;
 
     /**
      * @brief Summation variant of the parallel for loop for all edges, @see
@@ -938,183 +1030,25 @@ private:
      * @param handle The handle that shall be executed for all edges
      * @return void
      */
-    template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
-    inline double parallelSumForEdgesImpl(L handle) const;
 
-    /**
-     * @brief Override for vector-based edge iteration
-     */
-    void
-    forEdgesVirtualImpl(bool directed, bool weighted, bool hasEdgeIds,
-                        std::function<void(node, node, edgeweight, edgeid)> handle) const override;
+public:
+    bool hasEdge(node u, node v) const;
 
-    /**
-     * @brief Override for vector-based forEdgesOf
-     */
-    void forEdgesOfVirtualImpl(
-        node u, bool directed, bool weighted, bool hasEdgeIds,
-        std::function<void(node, node, edgeweight, edgeid)> handle) const override;
-
-    /**
-     * @brief Override for vector-based forInEdgesOf
-     */
-    void forInEdgesVirtualImpl(
-        node u, bool directed, bool weighted, bool hasEdgeIds,
-        std::function<void(node, node, edgeweight, edgeid)> handle) const override;
-
-    /**
-     * @brief Override for vector-based parallelSumForEdges
-     */
-    double parallelSumForEdgesVirtualImpl(
-        bool directed, bool weighted, bool hasEdgeIds,
-        std::function<double(node, node, edgeweight, edgeid)> handle) const override;
-
-    /**
-     * @brief Override for hasEdge - vector-based implementation
-     */
-    bool hasEdgeImpl(node u, node v) const override;
+private:
 
 protected:
     /**
      * Get neighbors as a vector (vector-based implementation)
      */
-    std::vector<node> getNeighborsVector(node u, bool inEdges = false) const override;
+public:
+    std::vector<node> getNeighborsVector(node u, bool inEdges = false) const;
 
     /**
      * Get neighbors with weights as vectors (vector-based implementation)
      */
     std::pair<std::vector<node>, std::vector<edgeweight>>
-    getNeighborsWithWeightsVector(node u, bool inEdges = false) const override;
+    getNeighborsWithWeightsVector(node u, bool inEdges = false) const;
 
-public:
-    /**
-     * Wrapper class to iterate over a range of the neighbors of a node within
-     * a for loop.
-     */
-    template <bool InEdges = false>
-    class NeighborRange {
-        const GraphW *G;
-        node u{none};
-
-    public:
-        NeighborRange(const GraphW &G, node u) : G(&G), u(u) { assert(G.hasNode(u)); };
-
-        NeighborRange() : G(nullptr) {};
-
-        NeighborIterator begin() const {
-            assert(G);
-            return InEdges ? NeighborIterator(G->inEdges[u].begin())
-                           : NeighborIterator(G->outEdges[u].begin());
-        }
-
-        NeighborIterator end() const {
-            assert(G);
-            return InEdges ? NeighborIterator(G->inEdges[u].end())
-                           : NeighborIterator(G->outEdges[u].end());
-        }
-
-        // Conversion operator to Graph::NeighborRange for Cython compatibility
-        operator typename Graph::NeighborRange<InEdges>() const {
-            throw std::runtime_error(
-                "Conversion from GraphW::NeighborRange to Graph::NeighborRange not supported - "
-                "iterator methods not implemented in base Graph class");
-        }
-    };
-
-    using OutNeighborRange = NeighborRange<false>;
-    using InNeighborRange = NeighborRange<true>;
-
-    /**
-     * Wrapper class to iterate over a range of the neighbors of a node
-     * including the edge weights within a for loop.
-     * Values are std::pair<node, edgeweight>.
-     */
-    template <bool InEdges = false>
-    class NeighborWeightRange {
-        const GraphW *G;
-        node u{none};
-
-    public:
-        NeighborWeightRange(const GraphW &G, node u) : G(&G), u(u) { assert(G.hasNode(u)); };
-
-        NeighborWeightRange() : G(nullptr) {};
-
-        NeighborWeightIterator begin() const {
-            assert(G);
-            return InEdges
-                       ? NeighborWeightIterator(G->inEdges[u].begin(), G->inEdgeWeights[u].begin())
-                       : NeighborWeightIterator(G->outEdges[u].begin(),
-                                                G->outEdgeWeights[u].begin());
-        }
-
-        NeighborWeightIterator end() const {
-            assert(G);
-            return InEdges
-                       ? NeighborWeightIterator(G->inEdges[u].end(), G->inEdgeWeights[u].end())
-                       : NeighborWeightIterator(G->outEdges[u].end(), G->outEdgeWeights[u].end());
-        }
-
-        // Conversion operator to Graph::NeighborWeightRange for Cython compatibility
-        operator typename Graph::NeighborWeightRange<InEdges>() const {
-            throw std::runtime_error(
-                "Conversion from GraphW::NeighborWeightRange to Graph::NeighborWeightRange not "
-                "supported - iterator methods not implemented in base Graph class");
-        }
-    };
-
-    using OutNeighborWeightRange = NeighborWeightRange<false>;
-    using InNeighborWeightRange = NeighborWeightRange<true>;
-
-    /**
-     * Get an iterable range over the neighbors of @a.
-     *
-     * @param u Node.
-     * @return Iterator range over the neighbors of @a u.
-     */
-    NeighborRange<false> neighborRange(node u) const {
-        assert(exists[u]);
-        return NeighborRange<false>(*this, u);
-    }
-
-    /**
-     * Get an iterable range over the neighbors of @a u including the edge
-     * weights.
-     *
-     * @param u Node.
-     * @return Iterator range over pairs of neighbors of @a u and corresponding
-     * edge weights.
-     */
-    NeighborWeightRange<false> weightNeighborRange(node u) const {
-        assert(isWeighted());
-        assert(exists[u]);
-        return NeighborWeightRange<false>(*this, u);
-    }
-
-    /**
-     * Get an iterable range over the in-neighbors of @a.
-     *
-     * @param u Node.
-     * @return Iterator range over pairs of in-neighbors of @a u.
-     */
-    NeighborRange<true> inNeighborRange(node u) const {
-        assert(isDirected());
-        assert(exists[u]);
-        return NeighborRange<true>(*this, u);
-    }
-
-    /**
-     * Get an iterable range over the in-neighbors of @a u including the
-     * edge weights.
-     *
-     * @param u Node.
-     * @return Iterator range over pairs of in-neighbors of @a u and corresponding
-     * edge weights.
-     */
-    NeighborWeightRange<true> weightInNeighborRange(node u) const {
-        assert(isDirected() && isWeighted());
-        assert(exists[u]);
-        return NeighborWeightRange<true>(*this, u);
-    }
 };
 
 // Template method implementations for GraphW
@@ -1179,57 +1113,10 @@ inline bool GraphW::useEdgeInIteration<false>(node u, node v) const {
     return u >= v;
 }
 
-template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
-inline void GraphW::forOutEdgesOfImpl(node u, L handle) const {
-    for (index i = 0; i < outEdges[u].size(); ++i) {
-        node v = outEdges[u][i];
-
-        if (useEdgeInIteration<graphIsDirected>(u, v)) {
-            Graph::edgeLambda<L>(handle, u, v, getOutEdgeWeight<hasWeights>(u, i),
-                                 getOutEdgeId<graphHasEdgeIds>(u, i));
-        }
-    }
-}
-
-template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
-inline void GraphW::forInEdgesOfImpl(node u, L handle) const {
-    if (graphIsDirected) {
-        for (index i = 0; i < inEdges[u].size(); i++) {
-            node v = inEdges[u][i];
-
-            Graph::edgeLambda<L>(handle, u, v, getInEdgeWeight<hasWeights>(u, i),
-                                 getInEdgeId<graphHasEdgeIds>(u, i));
-        }
-    } else {
-        for (index i = 0; i < outEdges[u].size(); ++i) {
-            node v = outEdges[u][i];
-
-            Graph::edgeLambda<L>(handle, u, v, getOutEdgeWeight<hasWeights>(u, i),
-                                 getOutEdgeId<graphHasEdgeIds>(u, i));
-        }
-    }
-}
-
-template <bool graphIsDirected, bool hasWeights, bool graphHasEdgeIds, typename L>
-inline double GraphW::parallelSumForEdgesImpl(L handle) const {
-    double sum = 0.0;
-
-#pragma omp parallel for reduction(+ : sum)
-    for (omp_index u = 0; u < static_cast<omp_index>(z); ++u) {
-        for (index i = 0; i < outEdges[u].size(); ++i) {
-            node v = outEdges[u][i];
-
-            // undirected, do not iterate over edges twice
-            // {u, v} instead of (u, v); if v == none, u > v is not fulfilled
-            if (useEdgeInIteration<graphIsDirected>(u, v)) {
-                sum += Graph::edgeLambda<L>(handle, u, v, getOutEdgeWeight<hasWeights>(u, i),
-                                            getOutEdgeId<graphHasEdgeIds>(u, i));
-            }
-        }
-    }
-
-    return sum;
-}
+static_assert(GraphLike<GraphW>);
+static_assert(IndexedGraph<GraphW>);
+static_assert(MutableGraph<GraphW>);
+static_assert(std::derived_from<GraphW, AttributedGraphBase<GraphW>>);
 
 } /* namespace NetworKit */
 
