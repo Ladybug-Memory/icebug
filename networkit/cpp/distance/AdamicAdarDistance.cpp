@@ -12,7 +12,7 @@
 
 namespace NetworKit {
 
-AdamicAdarDistance::AdamicAdarDistance(const GraphW &G) : NodeDistance(G) {}
+AdamicAdarDistance::AdamicAdarDistance(const Graph &G) : NodeDistance(G) {}
 
 void AdamicAdarDistance::preprocess() {
     if (!G->hasEdgeIds()) {
