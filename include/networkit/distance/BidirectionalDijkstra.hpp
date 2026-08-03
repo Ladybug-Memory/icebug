@@ -8,6 +8,7 @@
 #ifndef NETWORKIT_DISTANCE_BIDIRECTIONAL_DIJKSTRA_HPP_
 #define NETWORKIT_DISTANCE_BIDIRECTIONAL_DIJKSTRA_HPP_
 
+#include <deque>
 #include <networkit/auxiliary/VectorComparator.hpp>
 #include <networkit/distance/STSP.hpp>
 
