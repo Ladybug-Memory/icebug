@@ -7,7 +7,10 @@
 #ifndef NETWORKIT_GRAPH_EDGE_ITERATORS_HPP_
 #define NETWORKIT_GRAPH_EDGE_ITERATORS_HPP_
 
+#include <type_traits>
+
 #include <networkit/Globals.hpp>
+#include <networkit/graph/GraphTypes.hpp>
 #include <networkit/graph/NodeIterators.hpp>
 
 namespace NetworKit {
@@ -151,6 +154,13 @@ class EdgeTypeRange {
 public:
     EdgeTypeRange(const GraphType &G) : G(&G) {}
 
+    /*
+     * The range stores a pointer, so a temporary would dangle. This matters because a concrete
+     * graph converts implicitly to the erased handle: EdgeTypeRange<Graph>(someGraphW) would
+     * otherwise silently bind to the conversion temporary.
+     */
+    EdgeTypeRange(GraphType &&) = delete;
+
     EdgeTypeRange() : G(nullptr) {};
 
     ~EdgeTypeRange() = default;
@@ -165,6 +175,23 @@ public:
         return EdgeTypeIterator<GraphType, EdgeType>(G, G->nodeRange().end());
     }
 };
+
+template <typename GraphType>
+bool EdgeIteratorBase<GraphType>::validEdge() const noexcept {
+    return G->isDirected() || (*nodeIter <= G->getIthNeighbor(Unsafe{}, *nodeIter, i));
+}
+
+template <typename GraphType, typename EdgeType>
+EdgeType EdgeTypeIterator<GraphType, EdgeType>::operator*() const noexcept {
+    assert(this->nodeIter != this->G->nodeRange().end());
+    const node u = *this->nodeIter;
+    const node v = this->G->getIthNeighbor(Unsafe{}, u, this->i);
+    if constexpr (std::is_same_v<EdgeType, WeightedEdge>) {
+        return WeightedEdge(u, v, this->G->getIthNeighborWeight(Unsafe{}, u, this->i));
+    } else {
+        return EdgeType(u, v);
+    }
+}
 
 } // namespace NetworKit
 
