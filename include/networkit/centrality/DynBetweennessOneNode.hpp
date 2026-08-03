@@ -37,7 +37,7 @@ public:
      * @param G The graph.
      * @paarm x The node for which we want to compute betweenness.
      */
-    DynBetweennessOneNode(Graph &G, node x);
+    DynBetweennessOneNode(const Graph &G, node x);
 
     /** initialize distances and Pred by repeatedly running the Dijkstra2 algorithm */
     void run() override;
@@ -74,7 +74,7 @@ public:
     edgeweight getbcx();
 
 private:
-    Graph &G;
+    const Graph &G;
     node x;
     // betweenness centrality of node x
     edgeweight bcx = 0;

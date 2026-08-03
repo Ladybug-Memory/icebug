@@ -14,9 +14,9 @@ namespace NetworKit {
  */
 class DotPartitionWriter final {
 public:
-    void write(Graph &graph, Partition &zeta, std::string_view path) const;
+    void write(const Graph &graph, Partition &zeta, std::string_view path) const;
 
-    std::map<index, double> createHueMap(Graph &graph, Partition &zeta) const;
+    std::map<index, double> createHueMap(const Graph &graph, Partition &zeta) const;
 };
 
 } /* namespace NetworKit */
