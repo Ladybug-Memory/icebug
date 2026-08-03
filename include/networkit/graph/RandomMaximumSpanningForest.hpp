@@ -99,7 +99,7 @@ private:
             : attribute(attribute), u(u), v(v), eid(eid), rand(Aux::Random::integer()) {};
     };
 
-    const Graph &G;
+    Graph G;
     std::vector<weightedEdge> weightedEdges;
 
     GraphW msf;
