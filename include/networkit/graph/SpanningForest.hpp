@@ -19,11 +19,11 @@ namespace NetworKit {
  */
 class SpanningForest : public Algorithm {
 protected:
-    const Graph *G;
+    Graph G;
     GraphW forest;
 
 public:
-    SpanningForest(const Graph &G) : G(&G) {}
+    SpanningForest(const Graph &G) : G(G) {}
 
     void run() override;
 

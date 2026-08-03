@@ -58,7 +58,7 @@ public:
 private:
     enum class NodeMark : unsigned char { NONE, TEMP, PERM };
 
-    const Graph &G;
+    Graph G;
 
     std::optional<std::unordered_map<node, node>> computedNodeIdMap;
 
