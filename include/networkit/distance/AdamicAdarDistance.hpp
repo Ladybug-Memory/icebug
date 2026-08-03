@@ -26,7 +26,7 @@ public:
     /**
      * @param G The graph.
      */
-    AdamicAdarDistance(const GraphW &G);
+    AdamicAdarDistance(const Graph &G);
 
     /**
      * Computes the Adamic Adar distances of all connected pairs of nodes.
