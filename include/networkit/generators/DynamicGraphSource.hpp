@@ -21,7 +21,7 @@ class DynamicGraphSource {
 
 protected:
     GraphEventProxy *Gproxy; // receives events produced by the generator and forwards them
-    Graph *G;
+    GraphW *G;
     // true if newGraph has been called and graph and proxy instances are properly set
     bool graphSet;
     // true if initializeGraph has been called and graph has been properly initialized

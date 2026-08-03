@@ -35,17 +35,17 @@ void DynamicGraphSource::generateEdges(count m) {
 
 GraphEventProxy *DynamicGraphSource::newGraph() {
     this->G = new GraphW(0);
-    this->Gproxy = new GraphEventProxy(*static_cast<GraphW *>(this->G));
+    this->Gproxy = new GraphEventProxy(*this->G);
     // not returning proxy because only generator needs write access to graph
     this->graphSet = true;
     return this->Gproxy;
 }
 
 void DynamicGraphSource::generateTimeSteps(count t) {
-    while (static_cast<GraphW *>(G)->time() < t) {
+    while (G->time() < t) {
         this->generate();
     }
-    static_cast<GraphW *>(G)
+    G
         ->shrinkToFit(); // TODO shrinkToFit: is this method supposed to be called often?
 }
 
