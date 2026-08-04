@@ -240,6 +240,22 @@ jobs:
             cxx: g++
             artifact_name: icebug-linux-arm64
             archive: icebug-linux-arm64.tar.gz
+          - os: linux
+            arch: x86_64
+            compiler: llvm-20
+            runner: ubuntu-latest
+            cc: clang-20
+            cxx: clang++-20
+            artifact_name: icebug-linux-x86_64-perf
+            archive: icebug-linux-x86_64-perf.tar.gz
+          - os: linux
+            arch: arm64
+            compiler: llvm-20
+            runner: ubuntu-24.04-arm
+            cc: clang-20
+            cxx: clang++-20
+            artifact_name: icebug-linux-arm64-perf
+            archive: icebug-linux-arm64-perf.tar.gz
           - os: macos
             arch: arm64
             compiler: llvm-20
@@ -264,8 +280,8 @@ jobs:
         with:
           submodules: true
 
-      - name: Install prerequisites (Linux)
-        if: matrix.os == 'linux'
+      - name: Install prerequisites (Linux, manylinux gcc-13)
+        if: matrix.os == 'linux' && matrix.compiler == 'gcc-13'
         run: |
           dnf install -y 'dnf-command(config-manager)'
           dnf config-manager --set-enabled powertools
@@ -276,11 +292,21 @@ jobs:
           dnf install -y cmake git wget unzip gcc-toolset-13
 
       - name: Enable gcc-13 toolset (Linux container)
-        if: matrix.os == 'linux'
+        if: matrix.os == 'linux' && matrix.compiler == 'gcc-13'
         run: |
           source /opt/rh/gcc-toolset-13/enable
           echo "/opt/rh/gcc-toolset-13/root/usr/bin" >> "$GITHUB_PATH"
           echo "LD_LIBRARY_PATH=/opt/rh/gcc-toolset-13/root/usr/lib64:/opt/rh/gcc-toolset-13/root/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+
+      - name: Install prerequisites (Linux, llvm-20 perf)
+        if: matrix.os == 'linux' && matrix.compiler == 'llvm-20'
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm-snapshot.asc
+          echo "deb http://apt.llvm.org/noble llvm-toolchain-noble-20 main" | sudo tee /etc/apt/sources.list.d/llvm20.list
+          wget https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-noble.deb
+          sudo apt-get install -y ./apache-arrow-apt-source-latest-noble.deb
+          sudo apt-get update
+          sudo apt-get install -y clang-20 libomp-20-dev ninja-build libarrow-dev
 
       - name: Install prerequisites (macOS)
         if: matrix.os == 'macos'
