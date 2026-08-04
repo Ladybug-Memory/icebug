@@ -174,22 +174,25 @@ jobs:
           CXX: ${{ matrix.compiler == 'llvm-20' && '/opt/homebrew/opt/llvm@20/bin/clang++' || 'g++-14' }}
 
   linux-build-latest:
-    name: "Linux (gcc-14${{ startsWith(matrix.build-configuration, 'full') && ', CPython 3.13' || '' }}): ${{ matrix.build-configuration }}"
-    runs-on: ubuntu-24.04
+    name: "Linux (gcc-toolset-13${{ startsWith(matrix.build-configuration, 'full') && ', CPython 3.13' || '' }}): ${{ matrix.build-configuration }}"
+    runs-on: ubuntu-latest
+    container: quay.io/pypa/manylinux_2_28_x86_64
     env:
-      CC: gcc-14
-      CXX: g++-14
+      CC: gcc
+      CXX: g++
     strategy:
       matrix:
         build-configuration: ['full', 'full (native)', 'core (non-monolithic)', 'core (C++20)']
     steps:
       - name: Install prerequisites
         run:  |
-          sudo add-apt-repository 'deb http://mirrors.kernel.org/ubuntu noble main universe'
-          wget https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-noble.deb
-          sudo apt-get install -y ./apache-arrow-apt-source-latest-noble.deb
-          sudo apt-get update
-          sudo apt-get install ninja-build libarrow-dev
+          dnf install -y 'dnf-command(config-manager)'
+          dnf config-manager --set-enabled powertools
+          dnf install -y epel-release
+          # Arrow 25.0.0 RPMs have a GPG key mismatch, so we use --nogpgcheck.
+          dnf install -y https://apache.jfrog.io/artifactory/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe)/apache-arrow-release-latest.rpm
+          dnf install -y --nogpgcheck --enablerepo=epel arrow-devel arrow-compute-devel ninja-build ccache
+          dnf install -y cmake git wget unzip gcc-toolset-13
       - name: Setup Python 3.13
         uses: actions/setup-python@v5
         with:
@@ -205,7 +208,9 @@ jobs:
           repository: tlx/tlx
           path: tlx
       - name: Prepare environment and run checks
-        run:  ${{ github.workspace }}/.github/workflows/scripts/$SCRIPT
+        run:  |
+          source /opt/rh/gcc-toolset-13/enable
+          ${{ github.workspace }}/.github/workflows/scripts/$SCRIPT
         shell: bash
         env:
           NATIVE: ${{ matrix.build-configuration == 'full (native)' }}
@@ -214,20 +219,22 @@ jobs:
           CXX_STANDARD: ${{ matrix.build-configuration == 'core (C++20)' && '20' || env.CXX_STANDARD }}
 
   linux-build-misc:
-    name: "Linux (${{ matrix.compiler }}): core"
-    runs-on: ubuntu-24.04
-    strategy:
-      matrix:
-        compiler: ['llvm-19']
+    name: "Linux (gcc-toolset-13): core"
+    runs-on: ubuntu-latest
+    container: quay.io/pypa/manylinux_2_28_x86_64
+    env:
+      CC: gcc
+      CXX: g++
     steps:
       - name: Install prerequisites
         run:  |
-          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm-snapshot.asc
-          echo "deb http://apt.llvm.org/noble llvm-toolchain-noble-19 main" | sudo tee /etc/apt/sources.list.d/llvm19.list
-          wget https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-noble.deb
-          sudo apt-get install -y ./apache-arrow-apt-source-latest-noble.deb
-          sudo apt-get update
-          sudo apt-get install clang-19 libomp-19-dev ninja-build libarrow-dev
+          dnf install -y 'dnf-command(config-manager)'
+          dnf config-manager --set-enabled powertools
+          dnf install -y epel-release
+          # Arrow 25.0.0 RPMs have a GPG key mismatch, so we use --nogpgcheck.
+          dnf install -y https://apache.jfrog.io/artifactory/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe)/apache-arrow-release-latest.rpm
+          dnf install -y --nogpgcheck --enablerepo=epel arrow-devel arrow-compute-devel ninja-build ccache
+          dnf install -y cmake git wget unzip gcc-toolset-13
       - name: Checkout networkit
         uses: actions/checkout@v4
         with:
@@ -238,22 +245,25 @@ jobs:
           repository: tlx/tlx
           path: tlx
       - name: Prepare environment and run checks
-        run:  ${{ github.workspace }}/.github/workflows/scripts/cpp_only.sh
+        run:  |
+          source /opt/rh/gcc-toolset-13/enable
+          ${{ github.workspace }}/.github/workflows/scripts/cpp_only.sh
         shell: bash
-        env:
-          CC: clang-19
-          CXX: clang++-19
 
   linux-pep-518-install:
     name: "Linux: Release build using pyproject.toml"
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
+    container: quay.io/pypa/manylinux_2_28_x86_64
     steps:
       - name: Install prerequisites
         run:  |
-          wget https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-noble.deb
-          sudo apt-get install -y ./apache-arrow-apt-source-latest-noble.deb
-          sudo apt-get update
-          sudo apt-get install libarrow-dev
+          dnf install -y 'dnf-command(config-manager)'
+          dnf config-manager --set-enabled powertools
+          dnf install -y epel-release
+          # Arrow 25.0.0 RPMs have a GPG key mismatch, so we use --nogpgcheck.
+          dnf install -y https://apache.jfrog.io/artifactory/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe)/apache-arrow-release-latest.rpm
+          dnf install -y --nogpgcheck --enablerepo=epel arrow-devel arrow-compute-devel
+          dnf install -y cmake git wget unzip gcc-toolset-13
       - name: Checkout networkit
         uses: actions/checkout@v4
         with:
@@ -261,11 +271,14 @@ jobs:
       - name: Setup Python 3.13
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'  
+          python-version: '3.13'
       - name: Build and install NetworKit using pyproject.toml
-        run:  pip install .
+        run:  |
+          source /opt/rh/gcc-toolset-13/enable
+          pip install .
       - name: Run minimal function test
         run:  |
+          source /opt/rh/gcc-toolset-13/enable
           mkdir ./tmp && cd ./tmp
           python3 -c "import networkit"
 
