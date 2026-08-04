@@ -26,15 +26,19 @@ jobs:
   build:
     name: "${{ matrix.os }} (${{ matrix.compiler }})"
     runs-on: ${{ matrix.runner }}
+    # Only the gcc-13 build runs in the manylinux_2_28 container (glibc 2.28
+    # compatible release binaries); macos/windows/llvm-20 run on their runners.
+    container: ${{ matrix.container }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: linux
-            compiler: gcc-14
+            compiler: gcc-13
             runner: ubuntu-latest
-            cc: gcc-14
-            cxx: g++-14
+            container: quay.io/pypa/manylinux_2_28_x86_64
+            cc: gcc
+            cxx: g++
           - os: linux
             compiler: llvm-20
             runner: ubuntu-latest
@@ -91,12 +95,15 @@ jobs:
           sudo apt-get install -y clang-20 libomp-20-dev ninja-build libarrow-dev=25.0.0-1
 
       - name: Install prerequisites (Linux)
-        if: matrix.os == 'linux' && matrix.compiler == 'gcc-14'
+        if: matrix.os == 'linux' && matrix.compiler == 'gcc-13'
         run: |
-          wget https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-noble.deb
-          sudo apt-get install -y ./apache-arrow-apt-source-latest-noble.deb
-          sudo apt-get update
-          sudo apt-get install -y g++-14 ninja-build libarrow-dev=25.0.0-1
+          dnf install -y 'dnf-command(config-manager)'
+          dnf config-manager --set-enabled powertools
+          dnf install -y epel-release
+          # Arrow RPMs have a GPG key mismatch, so we use --nogpgcheck.
+          dnf install -y https://apache.jfrog.io/artifactory/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe)/apache-arrow-release-latest.rpm
+          dnf install -y --nogpgcheck --enablerepo=epel arrow-devel arrow-compute-devel ninja-build ccache
+          dnf install -y cmake git wget unzip gcc-toolset-13
 
       - name: Install prerequisites (macOS)
         if: matrix.os == 'macos'
@@ -149,7 +156,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Run clang-format check (Linux)
-        if: matrix.os == 'linux'
+        if: matrix.os == 'linux' && matrix.compiler != 'gcc-13'
         run: |
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm-snapshot.asc
           echo "deb http://apt.llvm.org/noble llvm-toolchain-noble-18 main" | sudo tee /etc/apt/sources.list.d/llvm18.list
@@ -170,15 +177,17 @@ jobs:
 
       - name: Prepare environment and run checks (Linux/macOS)
         if: matrix.os != 'windows'
-        run: ${{ github.workspace }}/.github/workflows/scripts/cpp_only.sh
+        run: |
+          if [ "${{ matrix.compiler }}" = "gcc-13" ]; then source /opt/rh/gcc-toolset-13/enable; fi
+          ${{ github.workspace }}/.github/workflows/scripts/cpp_only.sh
         shell: bash
 
       - name: Setup uv (Linux)
-        if: matrix.os == 'linux'
+        if: matrix.os == 'linux' && matrix.compiler != 'gcc-13'
         uses: astral-sh/setup-uv@v5
 
       - name: Run pytest (Linux)
-        if: matrix.os == 'linux'
+        if: matrix.os == 'linux' && matrix.compiler != 'gcc-13'
         run: |
           uv sync --extra pytest
           uv pip install -e ".[test]"
