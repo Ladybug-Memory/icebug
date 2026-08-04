@@ -24,9 +24,9 @@ env:
 
 jobs:
   build:
-    name: "${{ matrix.os }} (${{ matrix.compiler }})"
+    name: "${{ matrix.os }} (${{ matrix.arch }}, ${{ matrix.compiler }})"
     runs-on: ${{ matrix.runner }}
-    # Only the gcc-13 build runs in the manylinux_2_28 container (glibc 2.28
+    # The gcc-13 builds run in manylinux_2_28 containers (glibc 2.28
     # compatible release binaries); macos/windows/llvm-20 run on their runners.
     container: ${{ matrix.container }}
     strategy:
@@ -34,22 +34,33 @@ jobs:
       matrix:
         include:
           - os: linux
+            arch: x86_64
             compiler: gcc-13
             runner: ubuntu-latest
             container: quay.io/pypa/manylinux_2_28_x86_64
             cc: gcc
             cxx: g++
           - os: linux
+            arch: arm64
+            compiler: gcc-13
+            runner: ubuntu-24.04-arm
+            container: quay.io/pypa/manylinux_2_28_aarch64
+            cc: gcc
+            cxx: g++
+          - os: linux
+            arch: x86_64
             compiler: llvm-20
             runner: ubuntu-latest
             cc: clang-20
             cxx: clang++-20
           - os: macos
+            arch: arm64
             compiler: llvm-20
             runner: macos-15
             cc: /opt/homebrew/opt/llvm@20/bin/clang
             cxx: /opt/homebrew/opt/llvm@20/bin/clang++
           - os: windows
+            arch: amd64
             compiler: msvc
             runner: windows-2022
             cc: cl
@@ -204,24 +215,29 @@ jobs:
     # Skip on PRs — release artifacts are only needed on main and manual runs.
     if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.runner }}
+    # Linux release binaries are built in manylinux_2_28 containers so they are
+    # usable on glibc >= 2.28; macOS/Windows build on their own runners.
+    container: ${{ matrix.container }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: linux
             arch: x86_64
-            compiler: llvm-20
+            compiler: gcc-13
             runner: ubuntu-latest
-            cc: clang-20
-            cxx: clang++-20
+            container: quay.io/pypa/manylinux_2_28_x86_64
+            cc: gcc
+            cxx: g++
             artifact_name: icebug-linux-x86_64
             archive: icebug-linux-x86_64.tar.gz
           - os: linux
             arch: arm64
-            compiler: llvm-20
+            compiler: gcc-13
             runner: ubuntu-24.04-arm
-            cc: clang-20
-            cxx: clang++-20
+            container: quay.io/pypa/manylinux_2_28_aarch64
+            cc: gcc
+            cxx: g++
             artifact_name: icebug-linux-arm64
             archive: icebug-linux-arm64.tar.gz
           - os: macos
@@ -251,12 +267,20 @@ jobs:
       - name: Install prerequisites (Linux)
         if: matrix.os == 'linux'
         run: |
-          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm-snapshot.asc
-          echo "deb http://apt.llvm.org/noble llvm-toolchain-noble-20 main" | sudo tee /etc/apt/sources.list.d/llvm20.list
-          wget https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-noble.deb
-          sudo apt-get install -y ./apache-arrow-apt-source-latest-noble.deb
-          sudo apt-get update
-          sudo apt-get install -y clang-20 libomp-20-dev ninja-build libarrow-dev
+          dnf install -y 'dnf-command(config-manager)'
+          dnf config-manager --set-enabled powertools
+          dnf install -y epel-release
+          # Arrow RPMs have a GPG key mismatch, so we use --nogpgcheck.
+          dnf install -y https://apache.jfrog.io/artifactory/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe)/apache-arrow-release-latest.rpm
+          dnf install -y --nogpgcheck --enablerepo=epel arrow-devel arrow-compute-devel ninja-build ccache
+          dnf install -y cmake git wget unzip gcc-toolset-13
+
+      - name: Enable gcc-13 toolset (Linux container)
+        if: matrix.os == 'linux'
+        run: |
+          source /opt/rh/gcc-toolset-13/enable
+          echo "/opt/rh/gcc-toolset-13/root/usr/bin" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=/opt/rh/gcc-toolset-13/root/usr/lib64:/opt/rh/gcc-toolset-13/root/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
 
       - name: Install prerequisites (macOS)
         if: matrix.os == 'macos'
@@ -318,7 +342,7 @@ jobs:
         run: |
           cmake -GNinja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/dist \
+            -DCMAKE_INSTALL_PREFIX=$PWD/dist \
             -DNETWORKIT_MONOLITH=ON \
             -DNETWORKIT_CXX_STANDARD=${{ env.CXX_STANDARD }} \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
