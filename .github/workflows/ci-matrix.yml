@@ -179,7 +179,7 @@ jobs:
         if: matrix.os != 'windows'
         run: |
           if [ "${{ matrix.compiler }}" = "gcc-13" ]; then source /opt/rh/gcc-toolset-13/enable; fi
-          ${{ github.workspace }}/.github/workflows/scripts/cpp_only.sh
+          .github/workflows/scripts/cpp_only.sh
         shell: bash
 
       - name: Setup uv (Linux)
