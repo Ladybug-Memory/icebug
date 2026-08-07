@@ -5,6 +5,7 @@
  *      Author: cls
  */
 
+#include <vector>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <networkit/auxiliary/Log.hpp>
@@ -331,7 +332,13 @@ TEST_F(CommunityGTest, testDeletedNodesPLM) {
     Modularity modularity;
     GraphW G = reader.read("input/PGPgiantcompo.graph");
 
-    G.forNeighborsOf(10, [&](node v) { G.removeEdge(10, v); });
+    // Snapshot neighbours before removing: mutating the graph (removeEdge) while range-iterating
+    // the same node's adjacency invalidates the iterator (UB), which MSVC's debug STL asserts on.
+    std::vector<node> neighborsOf10;
+    G.forNeighborsOf(10, [&](node v) { neighborsOf10.push_back(v); });
+    for (node v : neighborsOf10) {
+        G.removeEdge(10, v);
+    }
 
     G.removeNode(10);
 
