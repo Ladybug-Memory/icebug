@@ -80,12 +80,8 @@ public:
         return edgeAttributes().template get<std::string>(name);
     }
 
-    void detachNodeAttribute(const std::string &name) {
-        nodeAttributes().detach(name);
-    }
-    void detachEdgeAttribute(const std::string &name) {
-        edgeAttributes().detach(name);
-    }
+    void detachNodeAttribute(const std::string &name) { nodeAttributes().detach(name); }
+    void detachEdgeAttribute(const std::string &name) { edgeAttributes().detach(name); }
 
     /// Edge attributes are only copied when @a other has edge ids to key them by.
     template <typename Other>
@@ -120,12 +116,10 @@ protected:
     }
 
     AttributedGraphBase &operator=(AttributedGraphBase &&other) noexcept {
-        nodeAttributeMap =
-            AttributeMap<PerNode, ReferenceGraph>(std::move(other.nodeAttributeMap),
-                                                  this->asGraph());
-        edgeAttributeMap =
-            AttributeMap<PerEdge, ReferenceGraph>(std::move(other.edgeAttributeMap),
-                                                  this->asGraph());
+        nodeAttributeMap = AttributeMap<PerNode, ReferenceGraph>(std::move(other.nodeAttributeMap),
+                                                                 this->asGraph());
+        edgeAttributeMap = AttributeMap<PerEdge, ReferenceGraph>(std::move(other.edgeAttributeMap),
+                                                                 this->asGraph());
         return *this;
     }
 };

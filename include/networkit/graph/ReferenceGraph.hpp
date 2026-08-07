@@ -101,11 +101,11 @@ public:
     using NeighborIterator =
         ErasedNeighborIterator<node, NeighborIteratorBase<std::vector<node>::const_iterator>,
                                NeighborIteratorBase<const node *>>;
-    using NeighborWeightIterator = ErasedNeighborIterator<
-        std::pair<node, edgeweight>,
-        NeighborWeightIteratorBase<std::vector<node>::const_iterator,
-                                   std::vector<edgeweight>::const_iterator>,
-        NeighborWeightIteratorBase<const node *, const edgeweight *>>;
+    using NeighborWeightIterator =
+        ErasedNeighborIterator<std::pair<node, edgeweight>,
+                               NeighborWeightIteratorBase<std::vector<node>::const_iterator,
+                                                          std::vector<edgeweight>::const_iterator>,
+                               NeighborWeightIteratorBase<const node *, const edgeweight *>>;
 
     /// The neighbors of a node, borrowed from the arm's own storage; nothing is copied.
     template <bool InEdges = false>
