@@ -14,7 +14,7 @@
 #include <networkit/graph/AttributedGraphBase.hpp>
 #include <networkit/graph/EdgeIterators.hpp>
 #include <networkit/graph/GraphConcepts.hpp>
-#include <networkit/graph/GraphIterationMixin.hpp>
+#include <networkit/graph/GraphIterationOps.hpp>
 #include <networkit/graph/GraphTypes.hpp>
 #include <networkit/graph/NeighborIterators.hpp>
 #include <networkit/graph/NodeIterators.hpp>
@@ -30,7 +30,7 @@ namespace NetworKit {
  * GraphW stores adjacency as vectors of vectors, which is what makes mutation cheap. Use GraphR
  * for read-only analysis of large graphs, where CSR is far more compact.
  */
-class GraphW final : public GraphIterationMixin<GraphW>, public AttributedGraphBase<GraphW> {
+class GraphW final : public AttributedGraphBase<GraphW> {
     count n, m, storedNumberOfSelfLoops;
     node z;
     count t;
@@ -122,6 +122,115 @@ public:
     using EdgeWeightIterator = EdgeTypeIterator<GraphW, WeightedEdge>;
     using EdgeRange = EdgeTypeRange<GraphW, Edge>;
     using EdgeWeightRange = EdgeTypeRange<GraphW, WeightedEdge>;
+
+    /* ITERATION, LOOKUPS, AND WEIGHT AGGREGATES (free operations) */
+
+    /*
+     * Thin forwarders to the free operations in GraphIterationOps, which are implemented once in
+     * terms of the GraphLike primitives. A call goes straight to the compile-time-selected body,
+     * so there is no runtime dispatch and no base class to inherit.
+     */
+
+    /// True when node ids are dense, so iteration may skip the hasNode() check.
+    /*
+     * The defaulted template parameter defers this body to use-time: a plain member would be
+     * instantiated while GraphW is still incomplete, before outNeighbors's deduced return type
+     * exists, which fails the GraphLike constraint the operation is checked against.
+     */
+    template <typename = void>
+    bool hasContiguousNodeIds() const {
+        return NetworKit::hasContiguousNodeIds(*this);
+    }
+
+    template <typename L>
+    void forNodes(L handle) const {
+        GraphIterationOps::forNodes(*this, handle);
+    }
+
+    template <typename L>
+    void parallelForNodes(L handle) const {
+        GraphIterationOps::parallelForNodes(*this, handle);
+    }
+
+    template <typename C, typename L>
+    void forNodesWhile(C condition, L handle) const {
+        GraphIterationOps::forNodesWhile(*this, condition, handle);
+    }
+
+    template <typename L>
+    void forNodesInRandomOrder(L handle) const {
+        GraphIterationOps::forNodesInRandomOrder(*this, handle);
+    }
+
+    template <typename L>
+    void balancedParallelForNodes(L handle) const {
+        GraphIterationOps::balancedParallelForNodes(*this, handle);
+    }
+
+    template <typename L>
+    void forNodePairs(L handle) const {
+        GraphIterationOps::forNodePairs(*this, handle);
+    }
+
+    template <typename L>
+    void parallelForNodePairs(L handle) const {
+        GraphIterationOps::parallelForNodePairs(*this, handle);
+    }
+
+    template <typename L>
+    void forEdges(L handle) const {
+        GraphIterationOps::forEdges(*this, handle);
+    }
+
+    template <typename L>
+    void parallelForEdges(L handle) const {
+        GraphIterationOps::parallelForEdges(*this, handle);
+    }
+
+    template <typename L>
+    void forNeighborsOf(node u, L handle) const {
+        GraphIterationOps::forNeighborsOf(*this, u, handle);
+    }
+
+    template <typename L>
+    void forEdgesOf(node u, L handle) const {
+        GraphIterationOps::forEdgesOf(*this, u, handle);
+    }
+
+    template <typename L>
+    void forInNeighborsOf(node u, L handle) const {
+        GraphIterationOps::forInNeighborsOf(*this, u, handle);
+    }
+
+    template <typename L>
+    void forInEdgesOf(node u, L handle) const {
+        GraphIterationOps::forInEdgesOf(*this, u, handle);
+    }
+
+    template <typename L>
+    double parallelSumForNodes(L handle) const {
+        return GraphIterationOps::parallelSumForNodes(*this, handle);
+    }
+
+    template <typename L>
+    double parallelSumForEdges(L handle) const {
+        return GraphIterationOps::parallelSumForEdges(*this, handle);
+    }
+
+    template <typename = void>
+    edgeweight weightedDegree(node u, bool countSelfLoopsTwice = false) const {
+        return GraphIterationOps::weightedDegree(*this, u, countSelfLoopsTwice);
+    }
+
+    template <typename = void>
+    edgeweight weightedDegreeIn(node u, bool countSelfLoopsTwice = false) const {
+        return GraphIterationOps::weightedDegreeIn(*this, u, countSelfLoopsTwice);
+    }
+
+    template <typename = void>
+    edgeweight totalEdgeWeight() const {
+        return GraphIterationOps::totalEdgeWeight(*this);
+    }
 
     /* GLOBAL PROPERTIES */
 
