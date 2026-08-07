@@ -148,12 +148,11 @@ inline edgeweight ReferenceGraph::getIthNeighborWeight(node u, index i) const {
 inline edgeweight ReferenceGraph::getIthNeighborWeight(Unsafe, node u, index i) const {
     return visit([u, i](const auto &g) { return g.getIthNeighborWeight(Unsafe{}, u, i); });
 }
-inline std::pair<node, edgeweight> ReferenceGraph::getIthNeighborWithWeight(node u,
-                                                                           index i) const {
+inline std::pair<node, edgeweight> ReferenceGraph::getIthNeighborWithWeight(node u, index i) const {
     return visit([u, i](const auto &g) { return g.getIthNeighborWithWeight(u, i); });
 }
 inline std::pair<node, edgeweight> ReferenceGraph::getIthNeighborWithWeight(Unsafe, node u,
-                                                                           index i) const {
+                                                                            index i) const {
     return visit([u, i](const auto &g) { return g.getIthNeighborWithWeight(Unsafe{}, u, i); });
 }
 inline std::pair<node, edgeid> ReferenceGraph::getIthNeighborWithId(node u, index i) const {
