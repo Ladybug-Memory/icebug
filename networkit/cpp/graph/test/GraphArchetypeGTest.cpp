@@ -12,12 +12,12 @@
 
 #include <networkit/Globals.hpp>
 #include <networkit/graph/GraphConcepts.hpp>
-#include <networkit/graph/GraphIterationMixin.hpp>
+#include <networkit/graph/GraphIterationOps.hpp>
 
 /*
- * Deliberately not namespace NetworKit. A mixin member that reaches a helper only through
- * argument-dependent lookup compiles for GraphW and GraphR -- which are NetworKit types, so ADL
- * finds NetworKit -- and fails here. That asymmetry is the point of the foreign namespace.
+ * Deliberately not namespace NetworKit. The free operations are found by qualified
+ * call (GraphIterationOps::forNodes(...)) rather than argument-dependent lookup, so a foreign
+ * namespace cannot hide an unintended ADL dependence.
  */
 namespace ArchetypeTest {
 
@@ -25,10 +25,11 @@ using NetworKit::count;
 using NetworKit::edgeweight;
 using NetworKit::index;
 using NetworKit::node;
+namespace Ops = NetworKit::GraphIterationOps;
 
 /**
  * The four neighbor ranges and the storage behind them, shared by the archetype and by the
- * negative controls so that they differ only in the property under test.
+ * negated controls so that they differ only in the property under test.
  */
 class Neighborhoods {
 public:
@@ -55,8 +56,8 @@ protected:
     std::vector<std::vector<std::pair<node, edgeweight>>> outWeighted_;
 };
 
-/// Implements every GraphLike primitive and inherits the rest.
-class MinimalGraph : public Neighborhoods, public NetworKit::GraphIterationMixin<MinimalGraph> {
+/// Implements every GraphLike primitive and nothing else; structurally satisfies GraphLike.
+class MinimalGraph : public Neighborhoods {
 public:
     count numberOfNodes() const { return 4; }
     count numberOfEdges() const { return 3; }
@@ -68,21 +69,8 @@ public:
     count numberOfSelfLoops() const { return 0; }
 };
 
-/// Structurally a graph, but does not derive from the mixin.
-class WithoutMixin : public Neighborhoods {
-public:
-    count numberOfNodes() const { return 4; }
-    count numberOfEdges() const { return 3; }
-    index upperNodeIdBound() const { return 4; }
-    bool hasNode(node u) const { return u < 4; }
-    count degree(node u) const { return out_[u].size(); }
-    bool isDirected() const { return false; }
-    bool isWeighted() const { return false; }
-    count numberOfSelfLoops() const { return 0; }
-};
-
-/// Derives from the mixin, but omits degree().
-class WithoutDegree : public Neighborhoods, public NetworKit::GraphIterationMixin<WithoutDegree> {
+/// Omits degree(); structurally a graph apart from the missing primitive.
+class WithoutDegree : public Neighborhoods {
 public:
     count numberOfNodes() const { return 4; }
     count numberOfEdges() const { return 3; }
@@ -94,51 +82,49 @@ public:
 };
 
 static_assert(NetworKit::GraphLike<MinimalGraph>,
-              "the primitive list and the mixin base are together sufficient");
-static_assert(!NetworKit::GraphLike<WithoutMixin>,
-              "structural matching alone must not satisfy the concept");
+              "the primitive list alone must be sufficient: membership is structural");
 static_assert(!NetworKit::GraphLike<WithoutDegree>, "a missing primitive must be rejected");
 
 /*
  * Satisfying the concept only proves the primitives are callable. C++20 never checks a constrained
- * template's body against its own constraints, so each derived member is additionally instantiated
+ * template's body against its own constraints, so each free operation is additionally instantiated
  * below -- that, not the static_asserts, is what catches a body reaching past the primitive list.
  */
-TEST(GraphArchetypeGTest, testEveryDerivedMemberInstantiates) {
+TEST(GraphArchetypeGTest, testEveryDerivedOperationInstantiates) {
     const MinimalGraph G;
     count nodes = 0, edges = 0;
 
-    G.forNodes([&](node) { ++nodes; });
-    G.parallelForNodes([&](node) {});
-    G.forNodesWhile([] { return true; }, [](node) {});
-    G.forNodesInRandomOrder([](node) {});
-    G.balancedParallelForNodes([](node) {});
-    G.forNodePairs([](node, node) {});
-    G.parallelForNodePairs([](node, node) {});
+    Ops::forNodes(G, [&](node) { ++nodes; });
+    Ops::parallelForNodes(G, [](node) {});
+    Ops::forNodesWhile(G, [] { return true; }, [](node) {});
+    Ops::forNodesInRandomOrder(G, [](node) {});
+    Ops::balancedParallelForNodes(G, [](node) {});
+    Ops::forNodePairs(G, [](node, node) {});
+    Ops::parallelForNodePairs(G, [](node, node) {});
 
-    G.forEdges([&](node, node) { ++edges; });
-    G.forEdges([](node, node, edgeweight) {});
-    G.parallelForEdges([](node, node) {});
+    Ops::forEdges(G, [&](node, node) { ++edges; });
+    Ops::forEdges(G, [](node, node, edgeweight) {});
+    Ops::parallelForEdges(G, [](node, node) {});
 
-    G.forNeighborsOf(1, [](node) {});
-    G.forEdgesOf(1, [](node, node) {});
-    G.forEdgesOf(1, [](node, node, edgeweight) {});
-    G.forInNeighborsOf(1, [](node) {});
-    G.forInEdgesOf(1, [](node, node) {});
+    Ops::forNeighborsOf(G, 1, [](node) {});
+    Ops::forEdgesOf(G, 1, [](node, node) {});
+    Ops::forEdgesOf(G, 1, [](node, node, edgeweight) {});
+    Ops::forInNeighborsOf(G, 1, [](node) {});
+    Ops::forInEdgesOf(G, 1, [](node, node) {});
 
     EXPECT_EQ(4u, nodes);
     EXPECT_EQ(3u, edges);
-    EXPECT_DOUBLE_EQ(4.0, G.parallelSumForNodes([](node) { return 1.0; }));
-    EXPECT_DOUBLE_EQ(3.0, G.parallelSumForEdges([](node, node, edgeweight) { return 1.0; }));
+    EXPECT_DOUBLE_EQ(4.0, Ops::parallelSumForNodes(G, [](node) { return 1.0; }));
+    EXPECT_DOUBLE_EQ(3.0, Ops::parallelSumForEdges(G, [](node, node, edgeweight) { return 1.0; }));
 
-    EXPECT_EQ(3u, G.degreeOut(1));
-    EXPECT_EQ(3u, G.degreeIn(1));
-    EXPECT_TRUE(G.hasEdge(1, 3));
-    EXPECT_FALSE(G.hasEdge(0, 2));
-    EXPECT_DOUBLE_EQ(NetworKit::defaultEdgeWeight, G.weight(1, 3));
-    EXPECT_DOUBLE_EQ(1.0, G.weightedDegree(0));
-    EXPECT_DOUBLE_EQ(1.0, G.weightedDegreeIn(0));
-    EXPECT_DOUBLE_EQ(3.0, G.totalEdgeWeight());
+    EXPECT_EQ(3u, Ops::degreeOut(G, 1));
+    EXPECT_EQ(3u, Ops::degreeIn(G, 1));
+    EXPECT_TRUE(Ops::hasEdge(G, 1, 3));
+    EXPECT_FALSE(Ops::hasEdge(G, 0, 2));
+    EXPECT_DOUBLE_EQ(NetworKit::defaultEdgeWeight, Ops::weight(G, 1, 3));
+    EXPECT_DOUBLE_EQ(1.0, Ops::weightedDegree(G, 0));
+    EXPECT_DOUBLE_EQ(1.0, Ops::weightedDegreeIn(G, 0));
+    EXPECT_DOUBLE_EQ(3.0, Ops::totalEdgeWeight(G));
 }
 
 } // namespace ArchetypeTest

@@ -66,19 +66,17 @@ concept NeighborLike = requires(const N nb) {
     { neighborWeight(nb) } -> std::convertible_to<edgeweight>;
 };
 
-template <typename Derived>
-class GraphIterationMixin;
-
 /**
  * The base capability: a node universe, out-neighbor iteration, and the two axes.
  *
- * Membership is by construction, not by tag: a class satisfies this only by deriving from
- * GraphIterationMixin<itself>, which is also what supplies the whole @c for* family. Structural
- * matching alone is not enough, and there is nothing to remember to declare.
+ * Membership is purely structural: a class satisfies this by declaring the primitives below and
+ * nothing else. There is no base class to derive from and nothing to remember to declare -- the
+ * derived operations (the whole @c for* family, lookups, weight aggregates) live as free functions
+ * in <networkit/graph/GraphIterationOps.hpp>, selected by this concept.
  *
  * Everything listed here is a *primitive* -- it cannot be computed from the others without
- * changing an algorithm's complexity. Anything derivable lives in the mixin instead, so a new
- * graph type implements this list and gets the rest. @c numberOfSelfLoops is the documented
+ * changing an algorithm's complexity. Anything derivable lives in the free operation layer, so a
+ * new graph type implements this list and gets the rest. @c numberOfSelfLoops is the documented
  * exception: derivable in principle, but call sites use it as an entry predicate where an
  * O(n * lookup) default would be wrong.
  *
@@ -93,7 +91,7 @@ class GraphIterationMixin;
  * family never see this; implementers of a graph class do.
  */
 template <typename G>
-concept GraphLike = std::derived_from<G, GraphIterationMixin<G>> && requires(const G g, node u) {
+concept GraphLike = requires(const G g, node u) {
     { g.numberOfNodes() } -> std::convertible_to<count>;
     { g.numberOfEdges() } -> std::convertible_to<count>;
     { g.upperNodeIdBound() } -> std::convertible_to<index>;
@@ -140,6 +138,33 @@ concept MutableGraph = GraphLike<G> && requires(G g, node u, node v, edgeweight 
     g.removeNode(u);
     g.setWeight(u, v, ew);
 };
+
+/*
+ * Structural queries used by the free iteration operations. Each answers at runtime what a class
+ * may instead pin for all its instances by declaring the matching static constexpr member. A
+ * class declares only what holds for every instance, so a tag cannot lie, and where one is present
+ * the query folds to a constant.
+ */
+
+/// True when node ids are dense, so iteration may skip the hasNode() check.
+template <typename G>
+inline bool hasContiguousNodeIds(const G &g) {
+    if constexpr (requires { G::alwaysContiguousNodeIds; })
+        return G::alwaysContiguousNodeIds;
+    else
+        return g.numberOfNodes() == g.upperNodeIdBound();
+}
+
+/// True when neighborhoods are in ascending id order, so lookups may bisect.
+template <typename G>
+inline bool hasSortedNeighborhoods(const G &g) {
+    if constexpr (requires { G::alwaysSortedNeighborhoods; })
+        return G::alwaysSortedNeighborhoods;
+    else if constexpr (requires { g.hasSortedNeighborhoods(); })
+        return g.hasSortedNeighborhoods();
+    else
+        return false;
+}
 
 } // namespace NetworKit
 

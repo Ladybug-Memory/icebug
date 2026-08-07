@@ -159,7 +159,7 @@ inline void forInEdgesOfNode(const G &g, node u, L &handle) {
 template <bool Weighted, bool Indexed, bool Directed, GraphLike G, typename L>
 inline double sumForEdgesImpl(const G &g, L &handle) {
     double sum = 0.0;
-    const bool dense = g.hasContiguousNodeIds();
+    const bool dense = hasContiguousNodeIds(g);
     const auto z = static_cast<omp_index>(g.upperNodeIdBound());
 #pragma omp parallel for reduction(+ : sum) schedule(guided)
     for (omp_index i = 0; i < z; ++i) {
