@@ -11,13 +11,14 @@
 #include <ranges>
 #include <sstream>
 #include <unordered_set>
+#include <networkit/auxiliary/ArrayTools.hpp>
 #include <networkit/auxiliary/Log.hpp>
 #include <networkit/graph/GraphTools.hpp>
 #include <networkit/graph/GraphW.hpp>
 
 namespace NetworKit {
 
-GraphW::GraphW(std::initializer_list<WeightedEdge> edges) : Graph(0, true) {
+GraphW::GraphW(std::initializer_list<WeightedEdge> edges) : GraphW(0, true) {
     using namespace std;
 
     /* Number of nodes = highest node index + 1 */
@@ -850,93 +851,7 @@ void GraphW::setWeightAtIthInNeighbor(Unsafe, node u, index i, edgeweight ew) {
     inEdgeWeights[u][i] = ew;
 }
 
-void GraphW::forEdgesVirtualImpl(bool directed, bool weighted, bool hasEdgeIds,
-                                 std::function<void(node, node, edgeweight, edgeid)> handle) const {
-    // Vector-based implementation using GraphW's outEdges
-    for (node u = 0; u < outEdges.size(); ++u) {
-        if (directed) {
-            for (index i = 0; i < outEdges[u].size(); ++i) {
-                node v = outEdges[u][i];
-                edgeweight w = weighted ? outEdgeWeights[u][i] : defaultEdgeWeight;
-                edgeid eid = hasEdgeIds ? outEdgeIds[u][i] : none;
-                handle(u, v, w, eid);
-            }
-        } else {
-            for (index i = 0; i < outEdges[u].size(); ++i) {
-                node v = outEdges[u][i];
-                // For undirected graphs, only process edge if u <= v to avoid duplicates
-                if (static_cast<node>(v) < u)
-                    continue;
-                edgeweight w = weighted ? outEdgeWeights[u][i] : defaultEdgeWeight;
-                edgeid eid = hasEdgeIds ? outEdgeIds[u][i] : none;
-                handle(u, v, w, eid);
-            }
-        }
-    }
-}
-
-void GraphW::forEdgesOfVirtualImpl(
-    node u, [[maybe_unused]] bool directed, [[maybe_unused]] bool weighted,
-    [[maybe_unused]] bool hasEdgeIds,
-    std::function<void(node, node, edgeweight, edgeid)> handle) const {
-    // Vector-based implementation for a single node
-    for (index i = 0; i < outEdges[u].size(); ++i) {
-        node v = outEdges[u][i];
-        edgeweight w = weighted ? outEdgeWeights[u][i] : defaultEdgeWeight;
-        edgeid eid = hasEdgeIds ? outEdgeIds[u][i] : none;
-        handle(u, v, w, eid);
-    }
-}
-
-void GraphW::forInEdgesVirtualImpl(
-    node u, [[maybe_unused]] bool directed, [[maybe_unused]] bool weighted,
-    [[maybe_unused]] bool hasEdgeIds,
-    std::function<void(node, node, edgeweight, edgeid)> handle) const {
-    // Vector-based implementation for in-edges
-    if (directed) {
-        for (index i = 0; i < inEdges[u].size(); ++i) {
-            node v = inEdges[u][i];
-            edgeweight w = weighted ? inEdgeWeights[u][i] : defaultEdgeWeight;
-            edgeid eid = hasEdgeIds ? inEdgeIds[u][i] : none;
-            // For in-edges, call with (neighbor, thisNode) which is (v, u)
-            handle(v, u, w, eid);
-        }
-    } else {
-        // For undirected graphs, incoming edges are the same as outgoing edges
-        for (index i = 0; i < outEdges[u].size(); ++i) {
-            node v = outEdges[u][i];
-            edgeweight w = weighted ? outEdgeWeights[u][i] : defaultEdgeWeight;
-            edgeid eid = hasEdgeIds ? outEdgeIds[u][i] : none;
-            handle(v, u, w, eid);
-        }
-    }
-}
-
-double GraphW::parallelSumForEdgesVirtualImpl(
-    bool directed, bool weighted, bool hasEdgeIds,
-    std::function<double(node, node, edgeweight, edgeid)> handle) const {
-    double sum = 0.0;
-
-#pragma omp parallel for reduction(+ : sum)
-    for (omp_index u = 0; u < static_cast<omp_index>(outEdges.size()); ++u) {
-        for (index i = 0; i < outEdges[u].size(); ++i) {
-            node v = outEdges[u][i];
-
-            // For undirected graphs, only process edge if u <= v to avoid duplicates
-            if (!directed && static_cast<node>(v) < u)
-                continue;
-
-            edgeweight w = weighted ? outEdgeWeights[u][i] : defaultEdgeWeight;
-            edgeid eid = hasEdgeIds ? outEdgeIds[u][i] : none;
-
-            sum += handle(u, v, w, eid);
-        }
-    }
-
-    return sum;
-}
-
-bool GraphW::hasEdgeImpl(node u, node v) const {
+bool GraphW::hasEdge(node u, node v) const {
     // Vector-based implementation
     if (u >= outEdges.size() || v >= outEdges.size()) {
         return false;
