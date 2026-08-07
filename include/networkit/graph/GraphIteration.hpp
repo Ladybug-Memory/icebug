@@ -34,12 +34,13 @@ typename Aux::FunctionTraits<F>::result_type edgeLambda(F &, ...) {
     return std::declval<typename Aux::FunctionTraits<F>::result_type>();
 }
 
-template <class F, typename std::enable_if<
-                       (Aux::FunctionTraits<F>::arity >= 3)
-                       && std::is_same<edgeweight, typename Aux::FunctionTraits<F>::template arg<
-                                                       2>::type>::value
-                       && std::is_same<edgeid, typename Aux::FunctionTraits<F>::template arg<
-                                                   3>::type>::value>::type * = (void *)0>
+template <
+    class F,
+    typename std::enable_if<
+        (Aux::FunctionTraits<F>::arity >= 3)
+        && std::is_same<edgeweight, typename Aux::FunctionTraits<F>::template arg<2>::type>::value
+        && std::is_same<edgeid, typename Aux::FunctionTraits<F>::template arg<3>::type>::value>::
+        type * = (void *)0>
 auto edgeLambda(F &f, node u, node v, edgeweight ew, edgeid id) -> decltype(f(u, v, ew, id)) {
     return f(u, v, ew, id);
 }
@@ -47,8 +48,7 @@ auto edgeLambda(F &f, node u, node v, edgeweight ew, edgeid id) -> decltype(f(u,
 template <class F,
           typename std::enable_if<
               (Aux::FunctionTraits<F>::arity >= 2)
-              && std::is_same<edgeid,
-                              typename Aux::FunctionTraits<F>::template arg<2>::type>::value
+              && std::is_same<edgeid, typename Aux::FunctionTraits<F>::template arg<2>::type>::value
               && std::is_same<node, typename Aux::FunctionTraits<F>::template arg<1>::type>::value
               /* prevent f(v, weight, eid) */
               >::type * = (void *)0>
