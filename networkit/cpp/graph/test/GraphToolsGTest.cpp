@@ -5,9 +5,9 @@
  *      Author: Maximilian Vogel
  */
 
+#include <array>
 #include <unordered_map>
 #include <unordered_set>
-#include <array>
 
 #include <gtest/gtest.h>
 

@@ -82,8 +82,7 @@ public:
 };
 
 /// Derives from the mixin, but omits degree().
-class WithoutDegree : public Neighborhoods,
-                      public NetworKit::GraphIterationMixin<WithoutDegree> {
+class WithoutDegree : public Neighborhoods, public NetworKit::GraphIterationMixin<WithoutDegree> {
 public:
     count numberOfNodes() const { return 4; }
     count numberOfEdges() const { return 3; }
