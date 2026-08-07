@@ -60,7 +60,7 @@ class GraphR final : public GraphIterationMixin<GraphR>, public AttributedGraphB
             assert(weights != nullptr);
             const edgeweight *firstWeight = weights->raw_values() + start;
             return std::ranges::subrange(NeighborWeightIter(first, firstWeight),
-                                        NeighborWeightIter(first + deg, firstWeight + deg));
+                                         NeighborWeightIter(first + deg, firstWeight + deg));
         } else {
             return std::ranges::subrange(NeighborIter(first), NeighborIter(first + deg));
         }
@@ -211,12 +211,10 @@ public:
 private:
     /// The slot of edge (@a u, @a v) in @a indices, or none. Bisects; adjacency is sorted.
     index findInAdjacency(const std::shared_ptr<arrow::UInt64Array> &indptr,
-                          const std::shared_ptr<arrow::UInt64Array> &indices, node u,
-                          node v) const;
+                          const std::shared_ptr<arrow::UInt64Array> &indices, node u, node v) const;
     count degreeCSR(node u, bool incoming = false) const;
     std::pair<const node *, count> getCSROutNeighbors(node u) const;
     std::pair<const node *, count> getCSRInNeighbors(node u) const;
-
 };
 
 static_assert(GraphLike<GraphR>);

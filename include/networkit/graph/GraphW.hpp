@@ -77,12 +77,11 @@ private:
                             const std::vector<std::vector<edgeweight>> &weights, node u) {
         if constexpr (Weighted) {
             assert(u < weights.size());
-            return std::ranges::subrange(
-                NeighborWeightIter(edges[u].begin(), weights[u].begin()),
-                NeighborWeightIter(edges[u].end(), weights[u].end()));
+            return std::ranges::subrange(NeighborWeightIter(edges[u].begin(), weights[u].begin()),
+                                         NeighborWeightIter(edges[u].end(), weights[u].end()));
         } else {
             return std::ranges::subrange(NeighborIter(edges[u].begin()),
-                                        NeighborIter(edges[u].end()));
+                                         NeighborIter(edges[u].end()));
         }
     }
 
@@ -98,7 +97,7 @@ private:
                 NeighborWeightIdIter(edges[u].end(), weights[u].end(), ids[u].end()));
         } else {
             return std::ranges::subrange(NeighborIdIter(edges[u].begin(), ids[u].begin()),
-                                        NeighborIdIter(edges[u].end(), ids[u].end()));
+                                         NeighborIdIter(edges[u].end(), ids[u].end()));
         }
     }
 
@@ -172,9 +171,8 @@ public:
     EdgeWeightRange edgeWeightRange() const noexcept { return EdgeWeightRange(*this); }
 
     using NeighborIter = NeighborIteratorBase<std::vector<node>::const_iterator>;
-    using NeighborWeightIter =
-        NeighborWeightIteratorBase<std::vector<node>::const_iterator,
-                                   std::vector<edgeweight>::const_iterator>;
+    using NeighborWeightIter = NeighborWeightIteratorBase<std::vector<node>::const_iterator,
+                                                          std::vector<edgeweight>::const_iterator>;
     using NeighborWeightIdIter =
         NeighborWeightIdIteratorBase<std::vector<node>::const_iterator,
                                      std::vector<edgeweight>::const_iterator,
@@ -1035,7 +1033,6 @@ public:
     bool hasEdge(node u, node v) const;
 
 private:
-
 protected:
     /**
      * Get neighbors as a vector (vector-based implementation)
@@ -1048,7 +1045,6 @@ public:
      */
     std::pair<std::vector<node>, std::vector<edgeweight>>
     getNeighborsWithWeightsVector(node u, bool inEdges = false) const;
-
 };
 
 // Template method implementations for GraphW

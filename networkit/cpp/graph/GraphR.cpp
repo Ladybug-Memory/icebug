@@ -279,9 +279,8 @@ std::pair<node, edgeweight> GraphR::getIthNeighborWithWeight(node u, index i) co
     }
     const auto start_idx = outEdgesCSRIndptr->Value(u);
     const node v = outEdgesCSRIndices->Value(start_idx + i);
-    const edgeweight w = (weighted && outEdgesCSRWeights)
-                             ? outEdgesCSRWeights->Value(start_idx + i)
-                             : defaultEdgeWeight;
+    const edgeweight w = (weighted && outEdgesCSRWeights) ? outEdgesCSRWeights->Value(start_idx + i)
+                                                          : defaultEdgeWeight;
     return {v, w};
 }
 
