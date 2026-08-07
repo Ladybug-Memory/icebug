@@ -45,8 +45,7 @@ void DynamicGraphSource::generateTimeSteps(count t) {
     while (G->time() < t) {
         this->generate();
     }
-    G
-        ->shrinkToFit(); // TODO shrinkToFit: is this method supposed to be called often?
+    G->shrinkToFit(); // TODO shrinkToFit: is this method supposed to be called often?
 }
 
 } /* namespace NetworKit */
