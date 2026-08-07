@@ -1,8 +1,8 @@
 
+#include <algorithm>
 #include <queue>
 #include <unordered_map>
 #include <unordered_set>
-#include <algorithm>
 
 #include <networkit/auxiliary/Log.hpp>
 #include <networkit/auxiliary/Random.hpp>

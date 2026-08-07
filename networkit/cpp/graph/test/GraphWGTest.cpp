@@ -6,11 +6,11 @@
  * (marvin.ritter@gmail.com)
  */
 
-#include <unordered_map>
-#include <unordered_set>
 #include <algorithm>
 #include <atomic>
 #include <tuple>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include <gtest/gtest.h>
