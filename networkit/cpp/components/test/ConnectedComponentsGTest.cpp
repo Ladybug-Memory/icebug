@@ -4,6 +4,7 @@
  *  Created on: Sep 16, 2013
  *      Author: Maximilian Vogel
  */
+#include <vector>
 #include <gtest/gtest.h>
 
 #include <networkit/components/ConnectedComponents.hpp>
@@ -116,7 +117,14 @@ TEST_F(ConnectedComponentsGTest, testParallelConnectedComponentsWithDeletedNodes
     }
 
     for (node u = 0; u < 10; ++u) {
-        G.forNeighborsOf(u, [&](node v) { G.removeEdge(u, v); });
+        // Snapshot neighbours before removing: mutating the graph (removeEdge) while
+        // range-iterating the same node's adjacency invalidates the iterator (UB), which MSVC's
+        // debug STL asserts on.
+        std::vector<node> neighborsOfU;
+        G.forNeighborsOf(u, [&](node v) { neighborsOfU.push_back(v); });
+        for (node v : neighborsOfU) {
+            G.removeEdge(u, v);
+        }
         G.removeNode(u);
     }
 
