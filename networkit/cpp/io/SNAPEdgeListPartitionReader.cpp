@@ -20,7 +20,8 @@
 namespace NetworKit {
 
 Cover SNAPEdgeListPartitionReader::read(std::string_view path,
-                                        std::unordered_map<node, node> &mapNodeIds, const Graph &G) {
+                                        std::unordered_map<node, node> &mapNodeIds,
+                                        const Graph &G) {
     std::ifstream file;
     std::string line; // the current line
 
