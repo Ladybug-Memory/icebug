@@ -334,4 +334,10 @@ static_assert(GraphR::alwaysContiguousNodeIds);
 
 } // namespace NetworKit
 
+// ReferenceGraph's member templates (for* family etc.) are defined in ReferenceGraphImpl.hpp, which
+// additionally requires GraphW and GraphR to be complete. Include it here so any TU that uses a
+// concrete graph class -- without necessarily pulling in the umbrella Graph.hpp (e.g. test files
+// including only GraphR.hpp) -- still gets those template definitions.
+#include <networkit/graph/ReferenceGraphImpl.hpp>
+
 #endif // NETWORKIT_GRAPH_GRAPH_R_HPP_

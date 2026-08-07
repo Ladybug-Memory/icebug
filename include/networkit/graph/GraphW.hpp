@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <memory>
+#include <numeric>
 #include <ranges>
 #include <set>
 #include <stdexcept>
@@ -1224,5 +1225,11 @@ static_assert(MutableGraph<GraphW>);
 static_assert(std::derived_from<GraphW, AttributedGraphBase<GraphW>>);
 
 } /* namespace NetworKit */
+
+// ReferenceGraph's member templates (for* family etc.) are defined in ReferenceGraphImpl.hpp, which
+// additionally requires GraphW and GraphR to be complete. Include it here so any TU that uses a
+// concrete graph class -- without necessarily pulling in the umbrella Graph.hpp (e.g. test files
+// including only GraphW.hpp) -- still gets those template definitions.
+#include <networkit/graph/ReferenceGraphImpl.hpp>
 
 #endif // NETWORKIT_GRAPH_GRAPH_W_HPP_
