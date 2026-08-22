@@ -7,21 +7,39 @@
 #ifndef NETWORKIT_COARSENING_COARSENED_GRAPH_VIEW_HPP_
 #define NETWORKIT_COARSENING_COARSENED_GRAPH_VIEW_HPP_
 
+#include <utility>
 #include <vector>
+
 #include <networkit/Globals.hpp>
 #include <networkit/graph/Graph.hpp>
+#include <networkit/graph/GraphConcepts.hpp>
+#include <networkit/graph/GraphIterationOps.hpp>
 #include <networkit/structures/Partition.hpp>
 
 namespace NetworKit {
 
 /**
  * @ingroup coarsening
- * Memory-efficient view of a coarsened graph that avoids creating new graph structures.
- * This class provides a graph-like interface over the original CSR graph by maintaining
- * only the node mapping information, computing edges on-demand.
+ * Memory-efficient zero-copy view of a coarsened graph that avoids creating new graph structures.
+ * This class provides a GraphLike interface over the original CSR graph by maintaining only the
+ * node mapping information, computing edges on-demand.
+ *
+ * The view implements the GraphLike concept: it declares the primitives from
+ * <networkit/graph/GraphConcepts.hpp> and inherits the whole @c for* family, lookups and weight
+ * aggregates as free operations, re-exposed as members. Supernode ids are dense in @c [0,
+ * numberOfNodes()), so iteration never consults hasNode().
+ *
+ * Neighborhoods are aggregated on demand: every call to outNeighbors() walks the adjacency of the
+ * member nodes and merges weights into one entry per adjacent supernode. The returned range is an
+ * owning vector rather than a borrowed view -- there is no stored coarsened adjacency to point at.
+ * Entries with non-positive aggregated weight are dropped.
  */
 class CoarsenedGraphView {
 public:
+    /// Node ids are dense: the constructor compacts the partition, so every id in
+    /// [0, numberOfNodes()) exists.
+    static constexpr bool alwaysContiguousNodeIds = true;
+
     /**
      * Construct a coarsened graph view from the original graph and partition.
      * @param originalGraph The original CSR graph
@@ -38,6 +56,8 @@ public:
      */
     CoarsenedGraphView(const CoarsenedGraphView &baseView, const Partition &partition);
 
+    /* GRAPHLIKE PRIMITIVES */
+
     /**
      * Get the number of nodes (supernodes) in the coarsened view
      */
@@ -45,76 +65,188 @@ public:
 
     /**
      * Get the number of edges in the coarsened view
+     *
+     * Aggregates every supernode neighborhood once; O(sum of the members' degrees).
      */
     count numberOfEdges() const;
 
-    /**
-     * Check if a supernode exists
-     */
+    /// Node ids are dense, so the upper node id bound is the supernode count.
+    index upperNodeIdBound() const { return numSupernodes; }
+
+    /// True when @a supernode is in [0, numberOfNodes()).
     bool hasNode(node supernode) const { return supernode < numSupernodes; }
+
+    bool isEmpty() const { return numSupernodes == 0; }
 
     /**
      * Get the degree of a supernode (number of adjacent supernodes)
      */
     count degree(node supernode) const;
 
+    /// The view is undirected regardless of the original graph.
+    bool isDirected() const { return false; }
+
+    /// The view is always weighted: aggregated edge weights are carried on the neighborhoods.
+    bool isWeighted() const { return true; }
+
+    /**
+     * The number of supernodes carrying a positive-weight self-loop in this view.
+     */
+    count numberOfSelfLoops() const;
+
+    /**
+     * The aggregated out-neighbors of @a supernode: one entry per adjacent supernode, carrying the
+     * summed edge weight. The range is an owning vector recomputed on each call; entries with
+     * non-positive aggregated weight are dropped.
+     */
+    template <bool Weighted>
+    std::vector<std::pair<node, edgeweight>> outNeighbors(node supernode) const {
+        if (!hasNode(supernode))
+            return {};
+        return computeNeighbors(supernode);
+    }
+
+    /// The view is undirected: the in-neighbors are the out-neighbors.
+    template <bool Weighted>
+    std::vector<std::pair<node, edgeweight>> inNeighbors(node supernode) const {
+        return outNeighbors<Weighted>(supernode);
+    }
+
+    auto neighborRange(node u) const { return outNeighbors<false>(u); }
+    auto weightNeighborRange(node u) const { return outNeighbors<true>(u); }
+    auto inNeighborRange(node u) const { return inNeighbors<false>(u); }
+    auto weightInNeighborRange(node u) const { return inNeighbors<true>(u); }
+
+    /* ITERATION, LOOKUPS, AND WEIGHT AGGREGATES (free operations) */
+
+    /*
+     * Thin forwarders to the free operations in GraphIterationOps, which are implemented once in
+     * terms of the GraphLike primitives. A call goes straight to the compile-time-selected body,
+     * so there is no runtime dispatch and no base class to inherit.
+     */
+
+    template <typename = void>
+    bool hasContiguousNodeIds() const {
+        return NetworKit::hasContiguousNodeIds(*this);
+    }
+
+    template <typename L>
+    void forNodes(L handle) const {
+        GraphIterationOps::forNodes(*this, handle);
+    }
+
+    template <typename L>
+    void parallelForNodes(L handle) const {
+        GraphIterationOps::parallelForNodes(*this, handle);
+    }
+
+    template <typename C, typename L>
+    void forNodesWhile(C condition, L handle) const {
+        GraphIterationOps::forNodesWhile(*this, condition, handle);
+    }
+
+    template <typename L>
+    void forNodesInRandomOrder(L handle) const {
+        GraphIterationOps::forNodesInRandomOrder(*this, handle);
+    }
+
+    template <typename L>
+    void balancedParallelForNodes(L handle) const {
+        GraphIterationOps::balancedParallelForNodes(*this, handle);
+    }
+
+    template <typename L>
+    void forNodePairs(L handle) const {
+        GraphIterationOps::forNodePairs(*this, handle);
+    }
+
+    template <typename L>
+    void parallelForNodePairs(L handle) const {
+        GraphIterationOps::parallelForNodePairs(*this, handle);
+    }
+
+    template <typename L>
+    void forEdges(L handle) const {
+        GraphIterationOps::forEdges(*this, handle);
+    }
+
+    template <typename L>
+    void parallelForEdges(L handle) const {
+        GraphIterationOps::parallelForEdges(*this, handle);
+    }
+
+    template <typename L>
+    void forNeighborsOf(node u, L handle) const {
+        GraphIterationOps::forNeighborsOf(*this, u, handle);
+    }
+
+    template <typename L>
+    void forEdgesOf(node u, L handle) const {
+        GraphIterationOps::forEdgesOf(*this, u, handle);
+    }
+
+    template <typename L>
+    void forInNeighborsOf(node u, L handle) const {
+        GraphIterationOps::forInNeighborsOf(*this, u, handle);
+    }
+
+    template <typename L>
+    void forInEdgesOf(node u, L handle) const {
+        GraphIterationOps::forInEdgesOf(*this, u, handle);
+    }
+
+    template <typename L>
+    double parallelSumForNodes(L handle) const {
+        return GraphIterationOps::parallelSumForNodes(*this, handle);
+    }
+
+    template <typename L>
+    double parallelSumForEdges(L handle) const {
+        return GraphIterationOps::parallelSumForEdges(*this, handle);
+    }
+
     /**
      * Get the weighted degree of a supernode
      * @param countSelfLoopsTwice If true, count self-loops twice (for undirected graphs)
      */
-    edgeweight weightedDegree(node supernode, bool countSelfLoopsTwice = false) const;
-
-    /**
-     * Check if there's an edge between two supernodes
-     */
-    bool hasEdge(node u, node v) const;
-
-    /**
-     * Get the weight of an edge between two supernodes
-     */
-    edgeweight weight(node u, node v) const;
-
-    /**
-     * Iterate over neighbors of a supernode
-     * @param supernode The supernode to iterate neighbors for
-     * @param handle Function to call for each neighbor: void(node neighbor, edgeweight weight)
-     */
-    template <typename Lambda>
-    void forNeighborsOf(node supernode, Lambda handle) const {
-        if (!hasNode(supernode))
-            return;
-
-        auto neighbors = getNeighbors(supernode);
-        for (const auto &entry : neighbors) {
-            handle(entry.first, entry.second);
-        }
+    template <typename = void>
+    edgeweight weightedDegree(node u, bool countSelfLoopsTwice = false) const {
+        return GraphIterationOps::weightedDegree(*this, u, countSelfLoopsTwice);
     }
 
-    /**
-     * Iterate over all edges in the coarsened view
-     * @param handle Function to call for each edge: void(node u, node v, edgeweight weight)
-     */
-    template <typename Lambda>
-    void forEdges(Lambda handle) const {
-        for (node u = 0; u < numberOfNodes(); ++u) {
-            forNeighborsOf(u, [&](node v, edgeweight w) {
-                if (u <= v) { // Only report each edge once for undirected graphs
-                    handle(u, v, w);
-                }
-            });
-        }
+    template <typename = void>
+    edgeweight weightedDegreeIn(node u, bool countSelfLoopsTwice = false) const {
+        return GraphIterationOps::weightedDegreeIn(*this, u, countSelfLoopsTwice);
     }
 
-    /**
-     * Parallel iteration over nodes
-     */
-    template <typename Lambda>
-    void parallelForNodes(Lambda handle) const {
-#pragma omp parallel for
-        for (omp_index u = 0; u < static_cast<omp_index>(numberOfNodes()); ++u) {
-            handle(static_cast<node>(u));
-        }
+    template <typename = void>
+    edgeweight totalEdgeWeight() const {
+        return GraphIterationOps::totalEdgeWeight(*this);
     }
+
+    /// O(1): the undirected degree.
+    count degreeOut(node u) const { return degree(u); }
+
+    /// O(1): the undirected degree.
+    count degreeIn(node u) const { return degree(u); }
+
+    /// O(deg(u)): linear scan over the aggregated neighborhood.
+    template <typename = void>
+    bool hasEdge(node u, node v) const {
+        if (!hasNode(u) || !hasNode(v))
+            return false;
+        return GraphIterationOps::hasEdge(*this, u, v);
+    }
+
+    /// O(deg(u)); nullWeight when the edge is absent.
+    template <typename = void>
+    edgeweight weight(node u, node v) const {
+        if (!hasNode(u) || !hasNode(v))
+            return nullWeight;
+        return GraphIterationOps::weight(*this, u, v);
+    }
+
+    /* VIEW-SPECIFIC ACCESSORS */
 
     /**
      * Get the mapping from original nodes to supernodes
@@ -126,21 +258,6 @@ public:
      */
     const std::vector<node> &getOriginalNodes(node supernode) const;
 
-    /**
-     * Check if the graph is weighted (always true for coarsened views)
-     */
-    bool isWeighted() const { return true; }
-
-    /**
-     * Check if the graph is directed (always false for current implementation)
-     */
-    bool isDirected() const { return false; }
-
-    /**
-     * Get upper bound for node IDs
-     */
-    node upperNodeIdBound() const { return numSupernodes; }
-
 private:
     const Graph &originalGraph;
     std::vector<node> nodeMapping;                      // original_node -> supernode
@@ -148,17 +265,16 @@ private:
     count numSupernodes;
 
     /**
-     * Get neighbors of a supernode (compute on demand, no caching)
-     */
-    std::vector<std::pair<node, edgeweight>> getNeighbors(node supernode) const {
-        return computeNeighbors(supernode);
-    }
-
-    /**
-     * Compute neighbors of a supernode
+     * Compute the aggregated neighbors of a supernode (on demand, no caching)
      */
     std::vector<std::pair<node, edgeweight>> computeNeighbors(node supernode) const;
 };
+
+static_assert(GraphLike<CoarsenedGraphView>,
+              "the coarsened view must be usable wherever a graph type is");
+static_assert(!IndexedGraph<CoarsenedGraphView>, "aggregated edges carry no edge ids");
+static_assert(!MutableGraph<CoarsenedGraphView>, "a view cannot be mutated");
+static_assert(CoarsenedGraphView::alwaysContiguousNodeIds);
 
 } /* namespace NetworKit */
 
