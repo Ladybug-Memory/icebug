@@ -103,7 +103,16 @@ jobs:
           wget https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-noble.deb
           sudo apt-get install -y ./apache-arrow-apt-source-latest-noble.deb
           sudo apt-get update
-          sudo apt-get install -y clang-20 libomp-20-dev ninja-build libarrow-dev=25.0.0-1
+          # Arrow's apt repo drops old minors as soon as a new one ships, so an exact pin
+          # (libarrow-dev=25.0.0-1) breaks on every upstream release. Pin the whole 25
+          # series instead: >= 25.0.0, < 26. The pytest step keys on the SONAME
+          # libarrow.so.2500, which is stable across the 25.x series.
+          sudo tee /etc/apt/preferences.d/apache-arrow > /dev/null <<'EOF'
+          Package: libarrow* apache-arrow*
+          Pin: version 25.*
+          Pin-Priority: 1001
+          EOF
+          sudo apt-get install -y clang-20 libomp-20-dev ninja-build libarrow-dev
 
       - name: Install prerequisites (Linux)
         if: matrix.os == 'linux' && matrix.compiler == 'gcc-13'
@@ -143,7 +152,7 @@ jobs:
         if: matrix.os == 'windows'
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: 'b322364f06308bdd24823f9d8f03fe0cc86fd46f'
+          vcpkgGitCommitId: '9e593bb18ea69cc5095e012465dcd675a822ed0d'
 
       - name: Authenticate vcpkg NuGet (Windows)
         if: matrix.os == 'windows'
@@ -306,6 +315,12 @@ jobs:
           wget https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-noble.deb
           sudo apt-get install -y ./apache-arrow-apt-source-latest-noble.deb
           sudo apt-get update
+          # Same 25-series pin as the PR build: >= 25.0.0, < 26.
+          sudo tee /etc/apt/preferences.d/apache-arrow > /dev/null <<'EOF'
+          Package: libarrow* apache-arrow*
+          Pin: version 25.*
+          Pin-Priority: 1001
+          EOF
           sudo apt-get install -y clang-20 libomp-20-dev ninja-build libarrow-dev
 
       - name: Install prerequisites (macOS)
@@ -332,7 +347,7 @@ jobs:
         if: matrix.os == 'windows'
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: 'b322364f06308bdd24823f9d8f03fe0cc86fd46f'
+          vcpkgGitCommitId: '9e593bb18ea69cc5095e012465dcd675a822ed0d'
 
       - name: Authenticate vcpkg NuGet (Windows)
         if: matrix.os == 'windows'
