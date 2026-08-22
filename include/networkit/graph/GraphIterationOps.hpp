@@ -252,17 +252,34 @@ inline count degreeIn(const G &g, node u) {
 /// O(log d) on sorted neighborhoods, O(d) otherwise.
 template <typename G>
 inline bool hasEdge(const G &g, node u, node v) {
-    if (hasSortedNeighborhoods(g))
-        return std::ranges::binary_search(g.template outNeighbors<false>(u), v);
+    /*
+     * Bisection needs the unweighted payload to order against a bare node. A neighborhood may
+     * instead carry (node, weight) pairs -- e.g. a view that aggregates weights on the fly --
+     * which sorts by target just fine but does not compare with v, so it falls back to the scan.
+     */
+    constexpr bool bisectable = requires(const G &gg, node uu, node vv) {
+        std::ranges::binary_search(gg.template outNeighbors<false>(uu), vv);
+    };
+    if constexpr (bisectable) {
+        if (hasSortedNeighborhoods(g))
+            return std::ranges::binary_search(g.template outNeighbors<false>(u), v);
+    }
     for (auto nb : g.template outNeighbors<false>(u))
         if (neighborTarget(nb) == v)
             return true;
     return false;
 }
 
-/// O(d); nullWeight when the edge is absent.
+/// O(d); nullWeight when the edge is absent. On an unweighted graph an existing edge weighs
+/// defaultEdgeWeight, mirroring the concrete graphs' own weight().
 template <typename G>
 inline edgeweight weight(const G &g, node u, node v) {
+    if (!g.isWeighted()) {
+        for (auto nb : g.template outNeighbors<false>(u))
+            if (neighborTarget(nb) == v)
+                return defaultEdgeWeight;
+        return nullWeight;
+    }
     for (auto nb : g.template outNeighbors<true>(u))
         if (neighborTarget(nb) == v)
             return neighborWeight(nb);
