@@ -216,12 +216,12 @@ private:
                 return copy;
             }
 
-            friend bool operator==(const iterator &a, const iterator &b) noexcept {
-                if (a.atEnd_ || b.atEnd_)
-                    return a.atEnd_ && b.atEnd_;
-                if (a.range_ != b.range_)
+            bool operator==(const iterator &other) const noexcept {
+                if (atEnd_ || other.atEnd_)
+                    return atEnd_ && other.atEnd_;
+                if (range_ != other.range_)
                     return false;
-                return a.range_->scanSubset_ ? a.pos_ == b.pos_ : a.baseIt_ == b.baseIt_;
+                return range_->scanSubset_ ? pos_ == other.pos_ : baseIt_ == other.baseIt_;
             }
 
         private:
