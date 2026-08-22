@@ -8,6 +8,7 @@
 #define NETWORKIT_GRAPH_INDUCED_SUBGRAPH_VIEW_HPP_
 
 #include <algorithm>
+#include <bit>
 #include <cassert>
 #include <initializer_list>
 #include <ranges>
@@ -33,9 +34,11 @@ namespace NetworKit {
  *
  * Membership is edited in batches (@c addNodes / @c removeNodes). The induced degrees, the edge
  * count and the self-loop count are maintained incrementally while the batch is applied, which
- * keeps every GraphLike primitive O(1). Neighborhoods are never materialized: each range filters
- * the base adjacency on the fly, so the view's memory footprint is one presence flag and one or
- * two degree counters per base node.
+ * keeps every GraphLike primitive O(1). Neighborhoods are never materialized: each range either
+ * filters the base adjacency on the fly or, when the base degree dwarfs the view, walks the view's
+ * members and probes the base for adjacency instead (see NeighborRange), so the view's memory
+ * footprint is one presence flag, one or two degree counters per base node, plus a member index
+ * that is rebuilt lazily after edits.
  *
  * The base graph must outlive the view and must not be modified while the view exists; ranges
  * borrowed from the view are additionally invalidated by any addNodes()/removeNodes() call, just
@@ -135,25 +138,193 @@ public:
     /// The induced self-loop count; maintained incrementally, O(1).
     count numberOfSelfLoops() const noexcept { return selfLoops_; }
 
+private:
     /**
-     * The out-neighbors of @a u inside the view: the base neighborhood filtered by membership.
-     * The range borrows the base graph's storage and this view's flags, and is invalidated by any
-     * membership edit. @tparam Weighted selects the (node, weight) payload; an unweighted base
-     * has no weight array, so only request it when isWeighted() holds.
+     * The neighborhood of @a u restricted to the view, as a forward range. Elements are bare
+     * nodes when @a Weighted is false and (node, weight) pairs otherwise, regardless of how the
+     * base graph represents its neighborhoods.
+     *
+     * Two evaluation strategies produce the same members; the range picks one at construction:
+     *
+     * - scanning @a u's base neighborhood and keeping the subset members (order: base adjacency
+     *   order), or
+     * - walking the subset members ascending and probing the base graph for adjacency (order:
+     *   ascending ids).
+     *
+     * The second strategy engages only while the base neighborhoods stay sorted, so both orders
+     * agree whenever it can run at all. It exists for small views over graphs with skewed
+     * degrees: scanning a hub's whole adjacency costs O(deg(u)) no matter how few induced
+     * neighbors turn up, while the probe-per-member walk costs one binary search each and wins
+     * once deg(u) overshoots n * bit_width(deg(u)) by 4x.
+     */
+    template <bool Weighted, bool Incoming>
+    class NeighborRange {
+        template <bool W>
+        using BaseOutRange = decltype(std::views::all(
+            std::declval<const BaseGraph &>().template outNeighbors<W>(0)));
+        template <bool W>
+        using BaseInRange =
+            decltype(std::views::all(std::declval<const BaseGraph &>().template inNeighbors<W>(0)));
+        using BaseRange =
+            std::conditional_t<Incoming, BaseInRange<Weighted>, BaseOutRange<Weighted>>;
+        // The range travels as const everywhere, so iterators must be taken off the const view.
+        using BaseIt = std::ranges::iterator_t<const BaseRange>;
+        using BaseSent = std::ranges::sentinel_t<const BaseRange>;
+
+    public:
+        using Payload = std::conditional_t<Weighted, std::pair<node, edgeweight>, node>;
+
+        NeighborRange(const InducedSubgraphView &view, node u)
+            : view_(&view), u_(u), scanSubset_(chooseScan()), baseRange_(makeBaseRange()),
+              members_(&view.sortedMembers()) {}
+
+        class iterator {
+        public:
+            using value_type = Payload;
+            using reference = Payload;
+            using difference_type = std::ptrdiff_t;
+            using iterator_concept = std::forward_iterator_tag;
+
+            iterator() noexcept = default;
+
+            iterator(const NeighborRange &range, bool atEnd) : range_(&range), atEnd_(atEnd) {
+                if (atEnd_)
+                    return;
+                if (range_->scanSubset_) {
+                    pos_ = 0;
+                    nextSubset();
+                } else {
+                    baseIt_ = range_->baseRange_.begin();
+                    baseEnd_ = range_->baseRange_.end();
+                    nextBase();
+                }
+            }
+
+            const Payload &operator*() const noexcept { return current_; }
+
+            iterator &operator++() {
+                if (range_->scanSubset_)
+                    nextSubset();
+                else
+                    nextBase();
+                return *this;
+            }
+
+            iterator operator++(int) {
+                iterator copy(*this);
+                ++(*this);
+                return copy;
+            }
+
+            friend bool operator==(const iterator &a, const iterator &b) noexcept {
+                if (a.atEnd_ || b.atEnd_)
+                    return a.atEnd_ && b.atEnd_;
+                if (a.range_ != b.range_)
+                    return false;
+                return a.range_->scanSubset_ ? a.pos_ == b.pos_ : a.baseIt_ == b.baseIt_;
+            }
+
+        private:
+            void nextBase() {
+                while (baseIt_ != baseEnd_) {
+                    const auto nb = *baseIt_;
+                    const node v = neighborTarget(nb);
+                    ++baseIt_;
+                    if (!range_->view_->exists_[v])
+                        continue;
+                    if constexpr (Weighted)
+                        current_ = {v, neighborWeight(nb)};
+                    else
+                        current_ = v;
+                    return;
+                }
+                atEnd_ = true;
+            }
+
+            void nextSubset() {
+                const auto &members = *range_->members_;
+                while (pos_ < members.size()) {
+                    const node v = members[pos_++];
+                    const node from = Incoming ? v : range_->u_;
+                    const node to = Incoming ? range_->u_ : v;
+                    if (!GraphIterationOps::hasEdge(*range_->view_->base_, from, to))
+                        continue;
+                    if constexpr (Weighted)
+                        current_ = {v, GraphIterationOps::weight(*range_->view_->base_, from, to)};
+                    else
+                        current_ = v;
+                    return;
+                }
+                atEnd_ = true;
+            }
+
+            const NeighborRange *range_ = nullptr;
+            bool atEnd_ = false;
+            std::size_t pos_ = 0;
+            BaseIt baseIt_{};
+            BaseSent baseEnd_{};
+            Payload current_{};
+        };
+
+        iterator begin() const { return iterator(*this, false); }
+        iterator end() const { return iterator(*this, true); }
+
+    private:
+        BaseRange makeBaseRange() const {
+            if constexpr (Incoming)
+                return BaseRange(std::views::all(view_->base_->template inNeighbors<Weighted>(u_)));
+            else
+                return BaseRange(
+                    std::views::all(view_->base_->template outNeighbors<Weighted>(u_)));
+        }
+
+        count baseDegree() const {
+            if constexpr (Incoming && requires { view_->base_->degreeIn(u_); })
+                return view_->base_->degreeIn(u_);
+            else if constexpr (!Incoming && requires { view_->base_->degree(u_); })
+                return view_->base_->degree(u_);
+            else if constexpr (Incoming)
+                return GraphIterationOps::degreeIn(*view_->base_, u_);
+            else
+                return GraphIterationOps::degreeOut(*view_->base_, u_);
+        }
+
+        bool chooseScan() const {
+            constexpr bool sortable = requires(const BaseGraph &g) { g.hasSortedNeighborhoods(); };
+            if constexpr (!sortable)
+                return false;
+            else {
+                const count deg = baseDegree();
+                return deg > 0 && view_->hasSortedNeighborhoods()
+                       && deg > view_->n_ * std::bit_width(deg) * 4;
+            }
+        }
+
+        const InducedSubgraphView *view_;
+        node u_;
+        bool scanSubset_;
+        BaseRange baseRange_;
+        const std::vector<node> *members_;
+    };
+
+public:
+    /**
+     * The out-neighbors of @a u inside the view. The range borrows the base graph's storage and
+     * this view's flags, and is invalidated by any membership edit. @tparam Weighted selects the
+     * (node, weight) payload; an unweighted base has no weight array, so only request it when
+     * isWeighted() holds.
      */
     template <bool Weighted>
-    auto outNeighbors(node u) const {
+    NeighborRange<Weighted, false> outNeighbors(node u) const {
         assert(hasNode(u));
-        return std::ranges::owning_view(base_->template outNeighbors<Weighted>(u))
-               | std::views::filter([this](const auto &nb) { return hasNode(neighborTarget(nb)); });
+        return NeighborRange<Weighted, false>(*this, u);
     }
 
     /// The in-neighbors of @a u inside the view. On an undirected base these are the out-neighbors.
     template <bool Weighted>
-    auto inNeighbors(node u) const {
+    NeighborRange<Weighted, true> inNeighbors(node u) const {
         assert(hasNode(u));
-        return std::ranges::owning_view(base_->template inNeighbors<Weighted>(u))
-               | std::views::filter([this](const auto &nb) { return hasNode(neighborTarget(nb)); });
+        return NeighborRange<Weighted, true>(*this, u);
     }
 
     auto neighborRange(node u) const { return outNeighbors<false>(u); }
@@ -308,15 +479,10 @@ public:
     /// The graph the view spans.
     const BaseGraph &getBaseGraph() const noexcept { return *base_; }
 
-    /// The members of the subgraph, in ascending id order. O(z).
-    std::vector<node> getNodeSubset() const {
-        std::vector<node> result;
-        result.reserve(n_);
-        for (node u = 0; u < exists_.size(); ++u)
-            if (exists_[u])
-                result.push_back(u);
-        return result;
-    }
+    /// The members of the subgraph, in ascending id order. Ascending is what the adaptive
+    /// neighbor ranges rely on; the index is rebuilt lazily after membership edits. O(z) once per
+    /// edit batch, O(1) otherwise.
+    const std::vector<node> &getNodeSubset() const { return sortedMembers(); }
 
     /**
      * Nodes outside the view that are out-neighbors of a node inside it. Ascending and unique.
@@ -369,6 +535,22 @@ private:
     count n_ = 0, m_ = 0, selfLoops_ = 0;
     bool directed_;
 
+    /// Ascending member ids, derived from exists_ on demand; see NeighborRange and
+    /// getNodeSubset(). Mutable because a const range must be able to rebuild it.
+    mutable std::vector<node> sortedMembers_;
+    mutable bool membersDirty_ = true;
+
+    const std::vector<node> &sortedMembers() const {
+        if (membersDirty_) {
+            sortedMembers_.clear();
+            for (node v = 0; v < exists_.size(); ++v)
+                if (exists_[v])
+                    sortedMembers_.push_back(v);
+            membersDirty_ = false;
+        }
+        return sortedMembers_;
+    }
+
     template <typename NodeRange>
     void addNodesImpl(const NodeRange &nodes) {
         for (const node v : nodes) {
@@ -391,6 +573,7 @@ private:
             return;
         exists_[v] = 1;
         ++n_;
+        membersDirty_ = true;
 
         count outDeg = 0;
         for (const auto nb : base_->template outNeighbors<false>(v)) {
@@ -471,6 +654,7 @@ private:
         outDegree_[v] = 0;
         exists_[v] = 0;
         --n_;
+        membersDirty_ = true;
     }
 };
 
