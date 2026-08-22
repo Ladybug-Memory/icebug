@@ -2,6 +2,7 @@ networkit_add_test(graph GraphArchetypeGTest)
 networkit_add_test(graph GraphBuilderAutoCompleteGTest auxiliary)
 networkit_add_test(graph GraphGTest
     auxiliary dyn_distance io generators)
+networkit_add_test(graph InducedSubgraphViewGTest)
 networkit_add_test(graph GraphWGTest
     auxiliary dyn_distance io generators)
 networkit_add_test(graph GraphToolsGTest generators io)
