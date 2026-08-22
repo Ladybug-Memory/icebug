@@ -321,7 +321,7 @@ jobs:
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: 'b322364f06308bdd24823f9d8f03fe0cc86fd46f'
+          vcpkgGitCommitId: '9e593bb18ea69cc5095e012465dcd675a822ed0d'
           runVcpkgInstall: true
         env:
           VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
@@ -371,7 +371,7 @@ jobs:
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: 'b322364f06308bdd24823f9d8f03fe0cc86fd46f'
+          vcpkgGitCommitId: '9e593bb18ea69cc5095e012465dcd675a822ed0d'
           runVcpkgInstall: true
         env:
           VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
