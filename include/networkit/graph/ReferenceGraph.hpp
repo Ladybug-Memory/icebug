@@ -141,6 +141,28 @@ public:
     /// References a shared empty read-only graph. Required so Cython can materialize temporaries.
     ReferenceGraph() noexcept;
 
+    /**
+     * The out-neighbors of @a u, as an erased range over the referenced graph's own storage.
+     * These two templates are what makes a ReferenceGraph itself satisfy GraphLike, so views and
+     * algorithms generic over the concept accept a type-erased handle directly.
+     */
+    template <bool Weighted>
+    auto outNeighbors(node u) const {
+        if constexpr (Weighted)
+            return weightNeighborRange(u);
+        else
+            return neighborRange(u);
+    }
+
+    /// The in-neighbors of @a u. On an undirected graph these are the out-neighbors.
+    template <bool Weighted>
+    auto inNeighbors(node u) const {
+        if constexpr (Weighted)
+            return weightInNeighborRange(u);
+        else
+            return inNeighborRange(u);
+    }
+
     /*
      * Explicit so that converting a concrete graph by value goes through SelfHandled's
      * conversion operator. With both routes available g++ silently materializes a temporary

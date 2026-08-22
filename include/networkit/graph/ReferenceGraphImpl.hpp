@@ -282,6 +282,12 @@ double ReferenceGraph::parallelSumForEdges(L handle) const {
     return visit([&](const auto &g) { return g.parallelSumForEdges(handle); });
 }
 
+static_assert(GraphLike<ReferenceGraph>,
+              "the type-erased handle must be usable wherever a graph type is");
+static_assert(!IndexedGraph<ReferenceGraph>,
+              "edge ids are only carried by graphs that index their edges");
+static_assert(!MutableGraph<ReferenceGraph>, "a handle cannot mutate the referenced graph");
+
 } // namespace NetworKit
 
 #endif // NETWORKIT_GRAPH_REFERENCE_GRAPH_IMPL_HPP_
