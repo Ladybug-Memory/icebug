@@ -193,8 +193,13 @@ TEST_F(InducedSubgraphViewGTest, testUnknownNodeThrows) {
     InducedSubgraphView<GraphW> view(base);
     EXPECT_THROW(view.addNode(base.upperNodeIdBound()), std::runtime_error);
     EXPECT_THROW(view.addNodes({0, 99}), std::runtime_error);
-    // removal of unknown ids is a no-op, not an error
+    // removal of unknown ids is a no-op, not an error -- including ids beyond the base's id
+    // space, which must not touch the presence/degree storage (regression: OOB write)
     EXPECT_NO_THROW(view.removeNode(99));
+    EXPECT_NO_THROW(view.removeNodes({99, base.upperNodeIdBound() + 100}));
+    // the failed batch left node 0 inserted; removal of unknown ids changed nothing else
+    EXPECT_EQ(1u, view.numberOfNodes());
+    EXPECT_TRUE(view.hasNode(0));
 }
 
 TEST_F(InducedSubgraphViewGTest, testInNeighborsOnUndirectedBase) {
