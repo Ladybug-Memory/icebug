@@ -59,7 +59,7 @@ CoarsenedGraphView::CoarsenedGraphView(const CoarsenedGraphView &baseView,
 count CoarsenedGraphView::numberOfEdges() const {
     count edges = 0;
     for (node u = 0; u < numberOfNodes(); ++u) {
-        const auto &neighbors = getNeighbors(u);
+        const auto neighbors = computeNeighbors(u);
         for (const auto &entry : neighbors) {
             if (u <= entry.first) { // Count each edge only once
                 edges++;
@@ -72,52 +72,20 @@ count CoarsenedGraphView::numberOfEdges() const {
 count CoarsenedGraphView::degree(node supernode) const {
     if (!hasNode(supernode))
         return 0;
-    return getNeighbors(supernode).size();
+    return computeNeighbors(supernode).size();
 }
 
-edgeweight CoarsenedGraphView::weightedDegree(node supernode, bool countSelfLoopsTwice) const {
-    if (!hasNode(supernode))
-        return 0.0;
-
-    const auto &neighbors = getNeighbors(supernode);
-
-    edgeweight totalWeight = 0.0;
-    for (const auto &entry : neighbors) {
-        if (entry.first == supernode) {
-            if (countSelfLoopsTwice) {
-                totalWeight += 2 * entry.second;
+count CoarsenedGraphView::numberOfSelfLoops() const {
+    count selfLoops = 0;
+    for (node u = 0; u < numSupernodes; ++u) {
+        for (const auto &entry : computeNeighbors(u)) {
+            if (entry.first == u) { // aggregated entries carry positive weight only
+                ++selfLoops;
+                break;
             }
-        } else {
-            totalWeight += entry.second;
         }
     }
-    return totalWeight;
-}
-
-bool CoarsenedGraphView::hasEdge(node u, node v) const {
-    if (!hasNode(u) || !hasNode(v))
-        return false;
-
-    const auto &neighbors = getNeighbors(u);
-    for (const auto &entry : neighbors) {
-        if (entry.first == v) {
-            return true;
-        }
-    }
-    return false;
-}
-
-edgeweight CoarsenedGraphView::weight(node u, node v) const {
-    if (!hasNode(u) || !hasNode(v))
-        return 0.0;
-
-    const auto &neighbors = getNeighbors(u);
-    for (const auto &entry : neighbors) {
-        if (entry.first == v) {
-            return entry.second;
-        }
-    }
-    return 0.0;
+    return selfLoops;
 }
 
 const std::vector<node> &CoarsenedGraphView::getOriginalNodes(node supernode) const {
@@ -138,6 +106,13 @@ CoarsenedGraphView::computeNeighbors(node supernode) const {
         // Iterate through neighbors of each original node
         originalGraph.forNeighborsOf(originalNode, [&](node originalNeighbor, edgeweight weight) {
             node neighborSupernode = nodeMapping[originalNeighbor];
+            /*
+             * An undirected edge sits in the adjacency of both endpoints, so an edge inside this
+             * supernode would be aggregated twice. Count it once, from the higher endpoint,
+             * mirroring ParallelPartitionCoarsening's aggregation.
+             */
+            if (neighborSupernode == supernode && originalNode < originalNeighbor)
+                return;
             // Aggregate weights to the same supernode
             aggregatedWeights[neighborSupernode] += weight;
         });
