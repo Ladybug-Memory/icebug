@@ -413,4 +413,46 @@ TEST_F(InducedSubgraphViewGTest, testRandomizedAgainstGroundTruth) {
     }
 }
 
+TEST_F(InducedSubgraphViewGTest, testAdaptiveHubNeighborhoods) {
+    // A star: node 0 with 200 leaves. The view keeps the hub and three of its leaves, so
+    // deg_base(0) = 200 overshoots n_view * bit_width(200) * 4 = 4 * 8 * 4 = 128: both the
+    // out- and the in-neighborhood ranges must take the subset-scanning strategy, which walks
+    // members ascending rather than scanning all 200 base neighbors.
+    GraphW star(201, true, false);
+    for (node leaf = 1; leaf <= 200; ++leaf)
+        star.addEdge(0, leaf, static_cast<edgeweight>(leaf));
+
+    const std::set<node> subset{0, 5, 100, 200};
+    InducedSubgraphView<GraphW> view(star, subset);
+    ASSERT_EQ(3u, view.numberOfEdges());
+
+    std::vector<node> plain;
+    for (const auto v : view.outNeighbors<false>(0))
+        plain.push_back(v);
+    EXPECT_EQ((std::vector<node>{5, 100, 200}), plain); // ascending: subset-scan order
+
+    std::vector<std::pair<node, edgeweight>> weighted;
+    for (const auto &nb : view.outNeighbors<true>(0))
+        weighted.push_back(nb);
+    EXPECT_EQ(3u, weighted.size());
+    for (const auto &[v, w] : weighted) {
+        EXPECT_EQ(w, static_cast<edgeweight>(v)); // weights carried through either strategy
+    }
+
+    // undirected base: in-neighbors agree with out-neighbors
+    std::vector<node> incoming;
+    view.forInNeighborsOf(0, [&](node v) { incoming.push_back(v); });
+    EXPECT_EQ((std::vector<node>{5, 100, 200}), incoming);
+
+    // a big view over the same hub stays on the base scan and must produce identical members
+    std::set<node> wide{0};
+    for (node leaf = 1; leaf <= 150; ++leaf)
+        wide.insert(leaf);
+    InducedSubgraphView<GraphW> wideView(star, wide);
+    std::vector<node> fromWide;
+    wideView.forNeighborsOf(0, [&](node v) { fromWide.push_back(v); });
+    ASSERT_EQ(150u, fromWide.size()); // every kept leaf
+    EXPECT_TRUE(std::is_sorted(fromWide.begin(), fromWide.end()));
+}
+
 } // namespace NetworKit
