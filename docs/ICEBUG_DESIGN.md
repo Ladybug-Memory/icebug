@@ -181,7 +181,8 @@ include/networkit/graph/
 ├── GraphR.hpp         # CSR-based immutable implementation
 ├── GraphR.cpp         # CSR implementation
 ├── GraphW.hpp         # Mutable graph with vector storage
-└── GraphW.cpp         # Vector-based implementation
+├── GraphW.cpp         # Vector-based implementation
+└── InducedSubgraphView.hpp  # Zero-copy induced subgraph over any GraphLike base
 ```
 
 ### Coarsening Infrastructure
