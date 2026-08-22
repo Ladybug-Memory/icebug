@@ -431,7 +431,9 @@ private:
     /// The inverse of insertNode(). @a v stays marked present until its own adjacency has been
     /// scanned, so a self-loop is seen exactly once.
     void eraseNode(node v) {
-        if (!exists_[v])
+        // ids outside the base's id space were never inserted; indexing exists_ with them
+        // would read past its storage
+        if (v >= exists_.size() || !exists_[v])
             return;
 
         count removedOut = 0;
