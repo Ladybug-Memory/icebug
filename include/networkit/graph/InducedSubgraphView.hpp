@@ -138,7 +138,6 @@ public:
     /// The induced self-loop count; maintained incrementally, O(1).
     count numberOfSelfLoops() const noexcept { return selfLoops_; }
 
-private:
     /**
      * The neighborhood of @a u restricted to the view, as a forward range. Elements are bare
      * nodes when @a Weighted is false and (node, weight) pairs otherwise, regardless of how the
@@ -167,17 +166,54 @@ private:
             decltype(std::views::all(std::declval<const BaseGraph &>().template inNeighbors<W>(0)));
         using BaseRange =
             std::conditional_t<Incoming, BaseInRange<Weighted>, BaseOutRange<Weighted>>;
-        // The range travels as const everywhere, so iterators must be taken off the const view.
+        // The shared handle below hands out a const range, so iterators come off the const view.
         using BaseIt = std::ranges::iterator_t<const BaseRange>;
         using BaseSent = std::ranges::sentinel_t<const BaseRange>;
+
+        static std::shared_ptr<const BaseRange> makeBaseRange(const InducedSubgraphView &view,
+                                                              node u) {
+            if constexpr (Incoming)
+                return std::make_shared<BaseRange>(
+                    std::views::all(view.base_->template inNeighbors<Weighted>(u)));
+            else
+                return std::make_shared<BaseRange>(
+                    std::views::all(view.base_->template outNeighbors<Weighted>(u)));
+        }
+
+        static count baseDegree(const InducedSubgraphView &view, node u) {
+            if constexpr (Incoming && requires { view.base_->degreeIn(u); })
+                return view.base_->degreeIn(u);
+            else if constexpr (!Incoming && requires { view.base_->degree(u); })
+                return view.base_->degree(u);
+            else if constexpr (Incoming)
+                return GraphIterationOps::degreeIn(*view.base_, u);
+            else
+                return GraphIterationOps::degreeOut(*view.base_, u);
+        }
+
+        static bool chooseScan(const InducedSubgraphView &view, node u) {
+            constexpr bool sortable = requires(const BaseGraph &g) { g.hasSortedNeighborhoods(); };
+            if constexpr (!sortable)
+                return false;
+            else {
+                const count deg = baseDegree(view, u);
+                return deg > 0 && view.hasSortedNeighborhoods()
+                       && deg > view.n_ * std::bit_width(deg) * 4;
+            }
+        }
 
     public:
         using Payload = std::conditional_t<Weighted, std::pair<node, edgeweight>, node>;
 
         NeighborRange(const InducedSubgraphView &view, node u)
-            : view_(&view), u_(u), scanSubset_(chooseScan()), baseRange_(makeBaseRange()),
+            : view_(&view), u_(u), scanSubset_(chooseScan(view, u)), base_(makeBaseRange(view, u)),
               members_(&view.sortedMembers()) {}
 
+        /**
+         * A self-contained cursor: it carries its own copy of the borrowed base range (kept
+         * alive through the shared handle), so iterators survive the temporary range object they
+         * were created from -- which the type-erased handles rely on.
+         */
         class iterator {
         public:
             using value_type = Payload;
@@ -187,15 +223,17 @@ private:
 
             iterator() noexcept = default;
 
-            iterator(const NeighborRange &range, bool atEnd) : range_(&range), atEnd_(atEnd) {
+            iterator(const NeighborRange &range, bool atEnd)
+                : view_(range.view_), u_(range.u_), scanSubset_(range.scanSubset_),
+                  base_(range.base_), members_(range.members_), atEnd_(atEnd) {
                 if (atEnd_)
                     return;
-                if (range_->scanSubset_) {
+                if (scanSubset_) {
                     pos_ = 0;
                     nextSubset();
                 } else {
-                    baseIt_ = range_->baseRange_.begin();
-                    baseEnd_ = range_->baseRange_.end();
+                    baseIt_ = base_->begin();
+                    baseEnd_ = base_->end();
                     nextBase();
                 }
             }
@@ -203,7 +241,7 @@ private:
             const Payload &operator*() const noexcept { return current_; }
 
             iterator &operator++() {
-                if (range_->scanSubset_)
+                if (scanSubset_)
                     nextSubset();
                 else
                     nextBase();
@@ -219,9 +257,7 @@ private:
             bool operator==(const iterator &other) const noexcept {
                 if (atEnd_ || other.atEnd_)
                     return atEnd_ && other.atEnd_;
-                if (range_ != other.range_)
-                    return false;
-                return range_->scanSubset_ ? pos_ == other.pos_ : baseIt_ == other.baseIt_;
+                return scanSubset_ ? pos_ == other.pos_ : baseIt_ == other.baseIt_;
             }
 
         private:
@@ -230,7 +266,7 @@ private:
                     const auto nb = *baseIt_;
                     const node v = neighborTarget(nb);
                     ++baseIt_;
-                    if (!range_->view_->exists_[v])
+                    if (!view_->exists_[v])
                         continue;
                     if constexpr (Weighted)
                         current_ = {v, neighborWeight(nb)};
@@ -242,15 +278,15 @@ private:
             }
 
             void nextSubset() {
-                const auto &members = *range_->members_;
+                const auto &members = *members_;
                 while (pos_ < members.size()) {
                     const node v = members[pos_++];
-                    const node from = Incoming ? v : range_->u_;
-                    const node to = Incoming ? range_->u_ : v;
-                    if (!GraphIterationOps::hasEdge(*range_->view_->base_, from, to))
+                    const node from = Incoming ? v : u_;
+                    const node to = Incoming ? u_ : v;
+                    if (!GraphIterationOps::hasEdge(*view_->base_, from, to))
                         continue;
                     if constexpr (Weighted)
-                        current_ = {v, GraphIterationOps::weight(*range_->view_->base_, from, to)};
+                        current_ = {v, GraphIterationOps::weight(*view_->base_, from, to)};
                     else
                         current_ = v;
                     return;
@@ -258,7 +294,11 @@ private:
                 atEnd_ = true;
             }
 
-            const NeighborRange *range_ = nullptr;
+            const InducedSubgraphView *view_ = nullptr;
+            node u_ = none;
+            bool scanSubset_ = false;
+            std::shared_ptr<const BaseRange> base_{};
+            const std::vector<node> *members_ = nullptr;
             bool atEnd_ = false;
             std::size_t pos_ = 0;
             BaseIt baseIt_{};
@@ -270,40 +310,10 @@ private:
         iterator end() const { return iterator(*this, true); }
 
     private:
-        BaseRange makeBaseRange() const {
-            if constexpr (Incoming)
-                return BaseRange(std::views::all(view_->base_->template inNeighbors<Weighted>(u_)));
-            else
-                return BaseRange(
-                    std::views::all(view_->base_->template outNeighbors<Weighted>(u_)));
-        }
-
-        count baseDegree() const {
-            if constexpr (Incoming && requires { view_->base_->degreeIn(u_); })
-                return view_->base_->degreeIn(u_);
-            else if constexpr (!Incoming && requires { view_->base_->degree(u_); })
-                return view_->base_->degree(u_);
-            else if constexpr (Incoming)
-                return GraphIterationOps::degreeIn(*view_->base_, u_);
-            else
-                return GraphIterationOps::degreeOut(*view_->base_, u_);
-        }
-
-        bool chooseScan() const {
-            constexpr bool sortable = requires(const BaseGraph &g) { g.hasSortedNeighborhoods(); };
-            if constexpr (!sortable)
-                return false;
-            else {
-                const count deg = baseDegree();
-                return deg > 0 && view_->hasSortedNeighborhoods()
-                       && deg > view_->n_ * std::bit_width(deg) * 4;
-            }
-        }
-
         const InducedSubgraphView *view_;
         node u_;
         bool scanSubset_;
-        BaseRange baseRange_;
+        std::shared_ptr<const BaseRange> base_;
         const std::vector<node> *members_;
     };
 
@@ -339,6 +349,12 @@ public:
         else
             return false;
     }
+
+    /// Whether lookups may bisect: exactly when the borrowed neighborhoods are sorted.
+    bool getKeepEdgesSorted() const { return hasSortedNeighborhoods(); }
+
+    /// Tag for the type-erased handle: this arm's ranges travel through AnyNeighborCursor.
+    constexpr bool isInducedSubgraph() const noexcept { return true; }
 
     /* ITERATION, LOOKUPS, AND WEIGHT AGGREGATES (free operations) */
 
@@ -472,6 +488,112 @@ public:
         if (!hasNode(u) || !hasNode(v))
             return nullWeight;
         return GraphIterationOps::weight(*this, u, v);
+    }
+
+    /* EDGE IDS AND INDEXED NEIGHBOR ACCESS */
+
+    /// A view stores no edges of its own, so it assigns no edge ids.
+    bool hasEdgeIds() const noexcept { return false; }
+
+    index upperEdgeIdBound() const noexcept { return none; }
+
+    /// Nothing to maintain without edge ids; mirrors the concrete graphs' knob.
+    bool getMaintainCompactEdges() const noexcept { return true; }
+
+    /**
+     * Recomputes the node, edge, and self-loop counts straight from the base graph and reports
+     * whether they agree with the incrementally maintained ones. O(z + m).
+     */
+    bool checkConsistency() const {
+        count n = 0;
+        count ordered = 0; // sightings of an induced edge from one of its endpoints
+        count loops = 0;
+        for (const node u : sortedMembers()) {
+            ++n;
+            for (const auto nb : base_->template outNeighbors<false>(u)) {
+                const node v = neighborTarget(nb);
+                if (!exists_[v])
+                    continue;
+                ++ordered;
+                if (u == v)
+                    ++loops;
+            }
+        }
+        const count m = directed_ ? ordered : (ordered + loops) / 2;
+        return n == n_ && m == m_ && loops == selfLoops_;
+    }
+
+    /**
+     * The @a i-th member of @a u's induced neighborhood, or @c none when @a i is out of range.
+     * Members appear in the adaptive range's order -- base adjacency order, which is ascending on
+     * sorted bases. O(deg(u)).
+     */
+    node getIthNeighbor(node u, index i) const {
+        if (!hasNode(u) || i >= degree(u))
+            return none;
+        return getIthNeighbor(Unsafe{}, u, i);
+    }
+
+    node getIthNeighbor(Unsafe, node u, index i) const {
+        count j = 0;
+        for (const auto nb : outNeighbors<false>(u))
+            if (j++ == i)
+                return neighborTarget(nb);
+        return none;
+    }
+
+    /// As getIthNeighbor, over the induced in-neighborhood.
+    node getIthInNeighbor(node u, index i) const {
+        if (!hasNode(u) || i >= degreeIn(u))
+            return none;
+        count j = 0;
+        for (const auto nb : inNeighbors<false>(u))
+            if (j++ == i)
+                return neighborTarget(nb);
+        return none;
+    }
+
+    /// The weight of the @a i-th induced neighbor of @a u, or @c none when @a i is out of range.
+    edgeweight getIthNeighborWeight(node u, index i) const {
+        if (!hasNode(u) || i >= degree(u))
+            return nullWeight;
+        return getIthNeighborWeight(Unsafe{}, u, i);
+    }
+
+    edgeweight getIthNeighborWeight(Unsafe, node u, index i) const {
+        count j = 0;
+        for (const auto nb : outNeighbors<true>(u))
+            if (j++ == i)
+                return neighborWeight(nb);
+        return nullWeight;
+    }
+
+    /// The @a i-th induced neighbor of @a u with its weight, or (@c none, @c nullWeight).
+    std::pair<node, edgeweight> getIthNeighborWithWeight(node u, index i) const {
+        if (!hasNode(u) || i >= degree(u))
+            return {none, nullWeight};
+        return getIthNeighborWithWeight(Unsafe{}, u, i);
+    }
+
+    std::pair<node, edgeweight> getIthNeighborWithWeight(Unsafe, node u, index i) const {
+        count j = 0;
+        for (const auto nb : outNeighbors<true>(u))
+            if (j++ == i)
+                return {neighborTarget(nb), neighborWeight(nb)};
+        return {none, nullWeight};
+    }
+
+    /// The position of @a v in @a u's induced neighborhood, or @c none when absent. O(deg(u)).
+    index indexOfNeighbor(node u, node v) const {
+        if (!hasNode(u) || !hasNode(v))
+            return none;
+        index i = 0;
+        for (const auto nb : outNeighbors<false>(u)) {
+            if (neighborTarget(nb) == v)
+                return i;
+            ++i;
+        }
+        return none;
     }
 
     /* VIEW-SPECIFIC OPERATIONS */
