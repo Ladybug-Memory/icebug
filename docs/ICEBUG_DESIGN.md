@@ -217,9 +217,11 @@ networkit/
 
 `ReferenceGraph` is the `Graph` name algorithms see: a non-owning variant handle over the two
 concrete graphs plus the two view instantiations (`InducedSubgraphView<GraphW>` and
-`InducedSubgraphView<GraphR>`). Binding a view is implicit — `CoreDecomposition(view)` compiles
-unchanged — while binding a concrete graph stays explicit so no temporary can be materialized by
-accident.
+`InducedSubgraphView<GraphR>`). Every arm derives `SelfHandled`, so conversion yields the handle
+embedded inside the graph object itself — one address per object, stable across statements, which
+is what makes "construct an algorithm, then run it" sound. `CoreDecomposition(view)` therefore
+compiles unchanged *and* binds to storage the view owns; the direct converting constructors are
+`explicit` on all four arms so no route can silently materialize a temporary.
 
 Two consequences worth remembering when touching either side:
 

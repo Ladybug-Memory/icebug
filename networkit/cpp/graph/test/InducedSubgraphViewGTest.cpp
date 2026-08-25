@@ -475,6 +475,33 @@ TEST_F(InducedSubgraphViewGTest, testHandleRunsExistingAlgorithms) {
         EXPECT_EQ(referenceKcore.score(u), kcore.score(u)) << "node " << u;
 }
 
+/*
+ * The conversion hands out the handle embedded inside the view: one address per view, stable
+ * across statements -- which is what makes "construct an algorithm, then run it" sound rather
+ * than merely lucky -- and re-seated when the view is copied, so a copy never aliases the
+ * original's handle.
+ */
+TEST_F(InducedSubgraphViewGTest, testHandleIsEmbeddedAndIdentityBound) {
+    const std::set<node> subset{1, 2, 3, 4};
+    InducedSubgraphView<GraphW> view(base, subset);
+
+    const ReferenceGraph &borrowed = view;
+    EXPECT_EQ(&borrowed, &view.asGraph());
+
+    GraphW reference = GraphTools::subgraphFromNodes(base, subset.begin(), subset.end(), false);
+    CoreDecomposition expected(reference);
+    expected.run();
+    CoreDecomposition kcore(borrowed); // stored across statements by the algorithm class
+    kcore.run();
+    for (const node u : subset)
+        EXPECT_EQ(expected.score(u), kcore.score(u)) << "node " << u;
+
+    InducedSubgraphView<GraphW> copy = view;
+    const ReferenceGraph &copiedHandle = copy;
+    EXPECT_NE(&copiedHandle, &borrowed); // identity-bound: the copy carries its own handle
+    EXPECT_EQ(borrowed.numberOfEdges(), copiedHandle.numberOfEdges());
+}
+
 TEST_F(InducedSubgraphViewGTest, testHandleSurfaceOverViewArms) {
     const std::set<node> subset{1, 2, 3, 4};
     InducedSubgraphView<GraphW> wView(base, subset);

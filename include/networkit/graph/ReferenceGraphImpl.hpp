@@ -43,12 +43,6 @@ inline ReferenceGraph refGraphW(const GraphW &g) {
 inline ReferenceGraph refGraphR(const GraphR &g) {
     return ReferenceGraph(g);
 }
-inline ReferenceGraph refGraphVW(const InducedSubgraphView<GraphW> &g) {
-    return ReferenceGraph(g);
-}
-inline ReferenceGraph refGraphVR(const InducedSubgraphView<GraphR> &g) {
-    return ReferenceGraph(g);
-}
 
 /* GLOBAL PROPERTIES */
 
