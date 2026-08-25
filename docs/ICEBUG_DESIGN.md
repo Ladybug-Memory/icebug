@@ -205,12 +205,31 @@ include/networkit/community/
 ```
 networkit/
 ├── graph.pxd          # Cython declarations
-├── graph.pyx          # Python bindings for Graph/GraphW
+├── graph.pyx          # Python bindings for Graph/GraphW/InducedSubgraphView
 ├── community.pyx      # ParallelLeidenView bindings
 └── test/
     ├── test_parallel_leiden.py     # Leiden tests
-    └── test_arrow_pagerank.py      # Arrow integration tests
+    ├── test_arrow_pagerank.py      # Arrow integration tests
+    └── test_induced_subgraph_view.py  # InducedSubgraphView bindings
 ```
+
+### Views and the Type-Erased Handle
+
+`ReferenceGraph` is the `Graph` name algorithms see: a non-owning variant handle over the two
+concrete graphs plus the two view instantiations (`InducedSubgraphView<GraphW>` and
+`InducedSubgraphView<GraphR>`). Binding a view is implicit — `CoreDecomposition(view)` compiles
+unchanged — while binding a concrete graph stays explicit so no temporary can be materialized by
+accident.
+
+Two consequences worth remembering when touching either side:
+
+- The view's neighbor iterators are self-contained (they own their borrowed base range through a
+  shared handle), because the erased ranges copy cursors out of temporaries. The view arms travel
+  through `AnyNeighborCursor`, a small virtual cursor, since the handle header cannot name the
+  view's iterator types without a cycle.
+- The views carry no edge ids and no attribute maps; the corresponding handle calls throw rather
+	than silently degrade. Python mirrors this: attribute attachment on a view-backed graph raises,
+	and mutation goes through `_mutable()`, which rejects view seats.
 
 ## Python API
 

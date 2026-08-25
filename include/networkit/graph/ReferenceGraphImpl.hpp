@@ -9,12 +9,14 @@
 #define NETWORKIT_GRAPH_REFERENCE_GRAPH_IMPL_HPP_
 
 #include <ranges>
+#include <stdexcept>
 #include <utility>
 #include <variant>
 
 #include <networkit/graph/GraphIteration.hpp>
 #include <networkit/graph/GraphR.hpp>
 #include <networkit/graph/GraphW.hpp>
+#include <networkit/graph/InducedSubgraphView.hpp>
 #include <networkit/graph/ReferenceGraph.hpp>
 
 namespace NetworKit {
@@ -39,6 +41,12 @@ inline ReferenceGraph refGraphW(const GraphW &g) {
     return ReferenceGraph(g);
 }
 inline ReferenceGraph refGraphR(const GraphR &g) {
+    return ReferenceGraph(g);
+}
+inline ReferenceGraph refGraphVW(const InducedSubgraphView<GraphW> &g) {
+    return ReferenceGraph(g);
+}
+inline ReferenceGraph refGraphVR(const InducedSubgraphView<GraphR> &g) {
     return ReferenceGraph(g);
 }
 
@@ -83,13 +91,21 @@ inline edgeweight ReferenceGraph::totalEdgeWeight() const noexcept {
 inline bool ReferenceGraph::checkConsistency() const {
     return visit([](const auto &g) { return g.checkConsistency(); });
 }
-inline const AttributeMap<PerNode, ReferenceGraph> &
-ReferenceGraph::nodeAttributes() const noexcept {
-    return visit([](const auto &g) -> decltype(auto) { return g.nodeAttributes(); });
+inline const AttributeMap<PerNode, ReferenceGraph> &ReferenceGraph::nodeAttributes() const {
+    return visit([&](const auto &g) -> const AttributeMap<PerNode, ReferenceGraph> & {
+        if constexpr (requires { g.nodeAttributes(); })
+            return g.nodeAttributes();
+        else
+            throw std::runtime_error("attributes are not supported on this graph");
+    });
 }
-inline const AttributeMap<PerEdge, ReferenceGraph> &
-ReferenceGraph::edgeAttributes() const noexcept {
-    return visit([](const auto &g) -> decltype(auto) { return g.edgeAttributes(); });
+inline const AttributeMap<PerEdge, ReferenceGraph> &ReferenceGraph::edgeAttributes() const {
+    return visit([&](const auto &g) -> const AttributeMap<PerEdge, ReferenceGraph> & {
+        if constexpr (requires { g.edgeAttributes(); })
+            return g.edgeAttributes();
+        else
+            throw std::runtime_error("attributes are not supported on this graph");
+    });
 }
 
 /* NODE AND EDGE PROPERTIES */
@@ -122,10 +138,20 @@ inline edgeweight ReferenceGraph::weight(node u, node v) const {
     return visit([u, v](const auto &g) { return g.weight(u, v); });
 }
 inline edgeid ReferenceGraph::edgeId(node u, node v) const {
-    return visit([u, v](const auto &g) { return g.edgeId(u, v); });
+    return visit([&](const auto &g) -> edgeid {
+        if constexpr (requires { g.edgeId(u, v); })
+            return g.edgeId(u, v);
+        else
+            throw std::runtime_error("this graph does not maintain edge ids");
+    });
 }
 inline std::pair<node, node> ReferenceGraph::edgeById(index id) const {
-    return visit([id](const auto &g) { return g.edgeById(id); });
+    return visit([&](const auto &g) -> std::pair<node, node> {
+        if constexpr (requires { g.edgeById(id); })
+            return g.edgeById(id);
+        else
+            throw std::runtime_error("this graph does not maintain edge ids");
+    });
 }
 
 /* INDEXED NEIGHBOR ACCESS */
@@ -156,7 +182,12 @@ inline std::pair<node, edgeweight> ReferenceGraph::getIthNeighborWithWeight(Unsa
     return visit([u, i](const auto &g) { return g.getIthNeighborWithWeight(Unsafe{}, u, i); });
 }
 inline std::pair<node, edgeid> ReferenceGraph::getIthNeighborWithId(node u, index i) const {
-    return visit([u, i](const auto &g) { return g.getIthNeighborWithId(u, i); });
+    return visit([&](const auto &g) -> std::pair<node, edgeid> {
+        if constexpr (requires { g.getIthNeighborWithId(u, i); })
+            return g.getIthNeighborWithId(u, i);
+        else
+            throw std::runtime_error("this graph does not maintain edge ids");
+    });
 }
 /* RANGES */
 
@@ -187,20 +218,40 @@ auto neighborsOf(const G &g, node u) {
 template <bool InEdges>
 ReferenceGraph::NeighborRange<InEdges>::NeighborRange(const ReferenceGraph &G, node u) {
     G.visit([&](const auto &g) {
-        auto r = ReferenceGraphDetail::neighborsOf<InEdges, false>(g, u);
-        using Cur = NeighborCursor<std::ranges::iterator_t<decltype(r)>>;
-        first = NeighborIterator(Cur{r.begin(), r.end()});
-        last = NeighborIterator(Cur{r.end(), r.end()});
+        if constexpr (requires { g.isInducedSubgraph(); }) {
+            // The view's iterators cannot be named here; erase them behind a cursor that owns
+            // the materialized base range.
+            auto r = ReferenceGraphDetail::neighborsOf<InEdges, false>(g, u);
+            using Rng = std::decay_t<decltype(r)>;
+            auto owned = std::make_shared<const Rng>(std::move(r));
+            first = NeighborIterator(AnyNeighborCursor<node>::over(owned, false));
+            last = NeighborIterator(AnyNeighborCursor<node>::over(std::move(owned), true));
+        } else {
+            auto r = ReferenceGraphDetail::neighborsOf<InEdges, false>(g, u);
+            using Cur = NeighborCursor<std::ranges::iterator_t<decltype(r)>>;
+            first = NeighborIterator(Cur{r.begin(), r.end()});
+            last = NeighborIterator(Cur{r.end(), r.end()});
+        }
     });
 }
 
 template <bool InEdges>
 ReferenceGraph::NeighborWeightRange<InEdges>::NeighborWeightRange(const ReferenceGraph &G, node u) {
     G.visit([&](const auto &g) {
-        auto r = ReferenceGraphDetail::neighborsOf<InEdges, true>(g, u);
-        using Cur = NeighborCursor<std::ranges::iterator_t<decltype(r)>>;
-        first = NeighborWeightIterator(Cur{r.begin(), r.end()});
-        last = NeighborWeightIterator(Cur{r.end(), r.end()});
+        if constexpr (requires { g.isInducedSubgraph(); }) {
+            auto r = ReferenceGraphDetail::neighborsOf<InEdges, true>(g, u);
+            using Rng = std::decay_t<decltype(r)>;
+            auto owned = std::make_shared<const Rng>(std::move(r));
+            first = NeighborWeightIterator(
+                AnyNeighborCursor<std::pair<node, edgeweight>>::over(owned, false));
+            last = NeighborWeightIterator(
+                AnyNeighborCursor<std::pair<node, edgeweight>>::over(std::move(owned), true));
+        } else {
+            auto r = ReferenceGraphDetail::neighborsOf<InEdges, true>(g, u);
+            using Cur = NeighborCursor<std::ranges::iterator_t<decltype(r)>>;
+            first = NeighborWeightIterator(Cur{r.begin(), r.end()});
+            last = NeighborWeightIterator(Cur{r.end(), r.end()});
+        }
     });
 }
 

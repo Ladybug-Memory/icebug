@@ -14,6 +14,7 @@
 
 #include <networkit/auxiliary/Random.hpp>
 #include <networkit/auxiliary/Vector2Arrow.hpp>
+#include <networkit/centrality/CoreDecomposition.hpp>
 #include <networkit/generators/ErdosRenyiGenerator.hpp>
 #include <networkit/graph/Graph.hpp>
 #include <networkit/graph/GraphIterationOps.hpp>
@@ -453,6 +454,81 @@ TEST_F(InducedSubgraphViewGTest, testAdaptiveHubNeighborhoods) {
     wideView.forNeighborsOf(0, [&](node v) { fromWide.push_back(v); });
     ASSERT_EQ(150u, fromWide.size()); // every kept leaf
     EXPECT_TRUE(std::is_sorted(fromWide.begin(), fromWide.end()));
+}
+
+/*
+ * The type-erased handle accepts the two view instantiations as arms, so an unmodified algorithm
+ * -- here CoreDecomposition, the case Ian asked to compile unchanged -- consumes a view directly.
+ */
+TEST_F(InducedSubgraphViewGTest, testHandleRunsExistingAlgorithms) {
+    const std::set<node> subset{1, 2, 3, 4};
+    InducedSubgraphView<GraphW> view(base, subset);
+    GraphW reference = GraphTools::subgraphFromNodes(base, subset.begin(), subset.end(), false);
+
+    // Implicit handle conversion at the call site; no copy of the view, no wrapper type.
+    CoreDecomposition kcore(view);
+    kcore.run();
+    CoreDecomposition referenceKcore(reference);
+    referenceKcore.run();
+
+    for (const node u : subset)
+        EXPECT_EQ(referenceKcore.score(u), kcore.score(u)) << "node " << u;
+}
+
+TEST_F(InducedSubgraphViewGTest, testHandleSurfaceOverViewArms) {
+    const std::set<node> subset{1, 2, 3, 4};
+    InducedSubgraphView<GraphW> wView(base, subset);
+    const ReferenceGraph &h = wView; // implicit, same conversion the algorithms take
+
+    EXPECT_EQ(4u, h.numberOfNodes());
+    EXPECT_EQ(6u, h.numberOfEdges()); // every base edge with both endpoints kept
+    EXPECT_EQ(0u, h.numberOfSelfLoops());
+    EXPECT_EQ(5u, h.upperNodeIdBound());
+    EXPECT_FALSE(h.hasNode(0));
+    EXPECT_TRUE(h.hasEdge(1, 2));
+    EXPECT_FALSE(h.hasEdge(0, 1));
+    EXPECT_EQ(3u, h.degree(1));
+    EXPECT_TRUE(h.isWeighted());
+    EXPECT_FALSE(h.hasEdgeIds());
+    EXPECT_TRUE(h.checkConsistency());
+    EXPECT_DOUBLE_EQ(1.0 + 4.0 + 5.0 + 6.0 + 7.0 + 8.0, h.totalEdgeWeight());
+
+    // indexed access follows the base adjacency order of each row, filtered to the members
+    EXPECT_EQ(3u, h.getIthNeighbor(1, 0));
+    EXPECT_EQ(none, h.getIthNeighbor(1, 3));
+    EXPECT_DOUBLE_EQ(4.0, h.getIthNeighborWeight(1, 1));
+    EXPECT_EQ(0u, h.indexOfNeighbor(2, 1));
+
+    // erased neighbor ranges agree with the view's own
+    count seen = 0;
+    h.forNeighborsOf(4, [&](node v) {
+        EXPECT_TRUE(wView.hasNode(v));
+        ++seen;
+    });
+    EXPECT_EQ(3u, seen);
+
+    count edgeCount = 0;
+    edgeweight weightSum = 0.0;
+    h.forEdges([&](node, node, edgeweight w) {
+        ++edgeCount;
+        weightSum += w;
+    });
+    EXPECT_EQ(6u, edgeCount);
+    EXPECT_DOUBLE_EQ(h.totalEdgeWeight(), weightSum);
+
+    // capabilities the views deliberately do not carry
+    EXPECT_THROW(h.edgeId(1, 2), std::runtime_error);
+    EXPECT_THROW((void)h.nodeAttributes(), std::runtime_error);
+
+    // the same surface over a CSR base
+    const GraphR R = houseCSR();
+    InducedSubgraphView<GraphR> rView(R, {2});
+    const ReferenceGraph &rh = rView;
+    EXPECT_EQ(1u, rh.numberOfNodes());
+    EXPECT_EQ(0u, rh.numberOfEdges());
+    EXPECT_EQ(0u, rh.degree(2));
+    EXPECT_TRUE(rh.checkConsistency());
+    EXPECT_THROW(rh.edgeById(0), std::runtime_error);
 }
 
 } // namespace NetworKit

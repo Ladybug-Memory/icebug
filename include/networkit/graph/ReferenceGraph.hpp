@@ -26,6 +26,15 @@ class GraphR;
 class GraphW;
 
 /**
+ * The two instantiations the handle knows. The view is deliberately absent from every other
+ * position: its bases are concrete graphs only, which is what bounds template instantiation when
+ * a handle member (say, outNeighbors) reaches into a view arm and the view reaches back into its
+ * base.
+ */
+template <typename BaseGraph>
+class InducedSubgraphView;
+
+/**
  * A handle to some concrete graph, resolved statically rather than through a vtable.
  *
  * Non-owning: the referenced graph must outlive the handle. Copying copies a pointer, never a
@@ -33,7 +42,9 @@ class GraphW;
  * the concrete type.
  */
 class ReferenceGraph {
-    std::variant<const GraphW *, const GraphR *> arm_;
+    std::variant<const GraphW *, const GraphR *, const InducedSubgraphView<GraphW> *,
+                 const InducedSubgraphView<GraphR> *>
+        arm_;
 
 public:
     using NodeIterator = NodeIteratorBase<ReferenceGraph>;
@@ -60,9 +71,87 @@ public:
         bool operator==(const NeighborCursor &) const = default;
     };
 
-    template <typename Payload, typename... ArmIters>
+    /**
+     * A cursor over an arm range whose iterator type cannot be named where the handle is
+     * declared -- today, the induced-subgraph-view arms. The Impl header binds the concrete
+     * iterators; every step pays one virtual call, which is noise next to the filtering and
+     * probing those ranges already do per element.
+     */
+    template <typename Payload>
+    class AnyNeighborCursor {
+        struct Concept {
+            virtual ~Concept() = default;
+            virtual std::unique_ptr<Concept> clone() const = 0;
+            virtual bool done() const = 0;
+            virtual Payload get() const = 0;
+            virtual void next() = 0;
+            virtual bool equals(const Concept &other) const = 0;
+        };
+
+        template <typename Range>
+        struct Model final : Concept {
+            using It = std::ranges::iterator_t<const Range>;
+
+            std::shared_ptr<const Range> range;
+            It cur{};
+            bool atEnd = false;
+
+            Model(std::shared_ptr<const Range> r, bool end)
+                : range(std::move(r)), cur(range->begin()), atEnd(end) {}
+
+            std::unique_ptr<Concept> clone() const override {
+                return std::make_unique<Model>(*this);
+            }
+            bool done() const override { return atEnd || cur == range->end(); }
+            Payload get() const override { return static_cast<Payload>(*cur); }
+            void next() override {
+                assert(!done());
+                ++cur;
+            }
+            bool equals(const Concept &other) const override {
+                const auto *o = dynamic_cast<const Model *>(&other);
+                if (o == nullptr || o->range != range)
+                    return false;
+                const bool mine = done(), theirs = o->done();
+                return mine != theirs ? false : (mine ? true : cur == o->cur);
+            }
+        };
+
+        std::unique_ptr<Concept> model_;
+
+        explicit AnyNeighborCursor(std::unique_ptr<Concept> m) : model_(std::move(m)) {}
+
+    public:
+        AnyNeighborCursor() = default;
+        AnyNeighborCursor(const AnyNeighborCursor &other)
+            : model_(other.model_ ? other.model_->clone() : nullptr) {}
+        AnyNeighborCursor &operator=(const AnyNeighborCursor &other) {
+            if (this != &other)
+                model_ = other.model_ ? other.model_->clone() : nullptr;
+            return *this;
+        }
+        AnyNeighborCursor(AnyNeighborCursor &&) noexcept = default;
+        AnyNeighborCursor &operator=(AnyNeighborCursor &&) noexcept = default;
+
+        bool done() const { return !model_ || model_->done(); }
+        Payload get() const { return model_->get(); }
+        void next() { model_->next(); }
+        bool operator==(const AnyNeighborCursor &other) const {
+            if (!model_ || !other.model_)
+                return model_.get() == other.model_.get();
+            return model_->equals(*other.model_);
+        }
+
+        /// Takes ownership of a materialized arm range; @a end selects the end cursor.
+        template <typename Range>
+        static AnyNeighborCursor over(std::shared_ptr<const Range> range, bool end) {
+            return AnyNeighborCursor(std::make_unique<Model<Range>>(std::move(range), end));
+        }
+    };
+
+    template <typename Payload, typename... Cursors>
     class ErasedNeighborIterator {
-        std::variant<NeighborCursor<ArmIters>...> cursor_;
+        std::variant<Cursors...> cursor_;
 
     public:
         using value_type = Payload;
@@ -91,21 +180,22 @@ public:
             return std::visit(
                 [&o](const auto &a) {
                     const auto *b = std::get_if<std::decay_t<decltype(a)>>(&o.cursor_);
-                    return b != nullptr && a.cur == b->cur;
+                    return b != nullptr && a == *b;
                 },
                 cursor_);
         }
         bool operator!=(const ErasedNeighborIterator &o) const { return !(*this == o); }
     };
 
-    using NeighborIterator =
-        ErasedNeighborIterator<node, NeighborIteratorBase<std::vector<node>::const_iterator>,
-                               NeighborIteratorBase<const node *>>;
-    using NeighborWeightIterator =
-        ErasedNeighborIterator<std::pair<node, edgeweight>,
-                               NeighborWeightIteratorBase<std::vector<node>::const_iterator,
-                                                          std::vector<edgeweight>::const_iterator>,
-                               NeighborWeightIteratorBase<const node *, const edgeweight *>>;
+    using NeighborIterator = ErasedNeighborIterator<
+        node, NeighborCursor<NeighborIteratorBase<std::vector<node>::const_iterator>>,
+        NeighborCursor<NeighborIteratorBase<const node *>>, AnyNeighborCursor<node>>;
+    using NeighborWeightIterator = ErasedNeighborIterator<
+        std::pair<node, edgeweight>,
+        NeighborCursor<NeighborWeightIteratorBase<std::vector<node>::const_iterator,
+                                                  std::vector<edgeweight>::const_iterator>>,
+        NeighborCursor<NeighborWeightIteratorBase<const node *, const edgeweight *>>,
+        AnyNeighborCursor<std::pair<node, edgeweight>>>;
 
     /// The neighbors of a node, borrowed from the arm's own storage; nothing is copied.
     template <bool InEdges = false>
@@ -171,6 +261,14 @@ public:
     explicit ReferenceGraph(const GraphW &g) noexcept : arm_(&g) {}
     explicit ReferenceGraph(const GraphR &g) noexcept : arm_(&g) {}
 
+    /**
+     * Implicit on purpose, unlike the concrete-graph conversions above: those guard against
+     * SelfHandled's by-value conversion operator materializing a temporary, while a view is only
+     * ever bound by address -- and "Algorithm(view)" is exactly the ergonomics views exist for.
+     */
+    ReferenceGraph(const InducedSubgraphView<GraphW> &g) noexcept : arm_(&g) {}
+    ReferenceGraph(const InducedSubgraphView<GraphR> &g) noexcept : arm_(&g) {}
+
     /// Calls @a f with a reference to the concrete graph, instantiating it once per arm.
     template <typename Fn>
     decltype(auto) visit(Fn &&f) const;
@@ -195,8 +293,9 @@ public:
     edgeweight totalEdgeWeight() const noexcept;
     bool checkConsistency() const;
 
-    const AttributeMap<PerNode, ReferenceGraph> &nodeAttributes() const noexcept;
-    const AttributeMap<PerEdge, ReferenceGraph> &edgeAttributes() const noexcept;
+    /// Throws when the arm carries no attributes (the views do not).
+    const AttributeMap<PerNode, ReferenceGraph> &nodeAttributes() const;
+    const AttributeMap<PerEdge, ReferenceGraph> &edgeAttributes() const;
 
     /* NODE AND EDGE PROPERTIES */
 

@@ -194,6 +194,44 @@ cdef extern from "<networkit/graph/GraphR.hpp>":
 		_NodeAttrMap& nodeAttributes() noexcept
 		_EdgeAttrMap& edgeAttributes() noexcept
 
+# The two instantiations the type-erased handle knows: views over the writable graph and over
+# the read-only CSR graph. Membership edits are allowed over either base.
+cdef extern from "<networkit/graph/InducedSubgraphView.hpp>":
+	cdef cppclass _InducedSubgraphViewW "NetworKit::InducedSubgraphView<NetworKit::GraphW>":
+		_InducedSubgraphViewW(const _GraphW& base) except +
+		count numberOfNodes() except +
+		count numberOfEdges() except +
+		count numberOfSelfLoops() except +
+		index upperNodeIdBound() except +
+		bool_t isDirected() except +
+		bool_t isWeighted() except +
+		bool_t hasNode(node u) except +
+		count degree(node u) except +
+		void addNodes(vector[node] nodes) except +
+		void removeNodes(vector[node] nodes) except +
+		vector[node] getNodeSubset() except +
+		_GraphW realize(bool_t compact) except +
+
+	cdef cppclass _InducedSubgraphViewR "NetworKit::InducedSubgraphView<NetworKit::GraphR>":
+		_InducedSubgraphViewR(const _GraphR& base) except +
+		count numberOfNodes() except +
+		count numberOfEdges() except +
+		count numberOfSelfLoops() except +
+		index upperNodeIdBound() except +
+		bool_t isDirected() except +
+		bool_t isWeighted() except +
+		bool_t hasNode(node u) except +
+		count degree(node u) except +
+		void addNodes(vector[node] nodes) except +
+		void removeNodes(vector[node] nodes) except +
+		vector[node] getNodeSubset() except +
+		_GraphW realize(bool_t compact) except +
+
+cdef extern from "<networkit/graph/ReferenceGraphImpl.hpp>" namespace "NetworKit":
+	# Cython cannot spell the implicit view-to-handle conversions; these give it one.
+	_Graph refGraphVW(const _InducedSubgraphViewW& g) except +
+	_Graph refGraphVR(const _InducedSubgraphViewR& g) except +
+
 cdef extern from "<networkit/graph/Graph.hpp>" namespace "NetworKit":
 	# Parameterized on the handle rather than on the concrete graph, so every arm's attribute
 	# maps have this one type. Reaching an attribute therefore never depends on which arm is
@@ -412,9 +450,12 @@ cdef class Graph:
 	cdef _NodeAttrMap *_nodeAttrs
 	cdef _EdgeAttrMap *_edgeAttrs
 	cdef _GraphW *_w  # non-NULL exactly when this graph can be written
+	cdef _GraphR *_r  # non-NULL exactly when this graph is CSR-backed
+	cdef object _base  # the viewed graph, exactly when this graph is a subgraph view
 	cdef dict _arrow_arrays
 	cdef _seatW(self, shared_ptr[_GraphW] g)
 	cdef _seatR(self, shared_ptr[_GraphR] g)
+	cdef _seatV(self, shared_ptr[_InducedSubgraphViewW] wv, shared_ptr[_InducedSubgraphViewR] rv, object base)
 	cdef const _Graph* _view(self) noexcept nogil
 	cdef _GraphW* _mutable(self) except NULL
 	cdef setThis(self, const _Graph& other)

@@ -2,6 +2,7 @@
 
 from cython.operator import dereference, preincrement
 from libcpp.algorithm cimport swap
+from libcpp.vector cimport vector
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -63,6 +64,8 @@ cdef class Graph:
 	# must go through one, or the cached pointers below describe a graph that is no longer held.
 	cdef _seatW(self, shared_ptr[_GraphW] g):
 		self._w = g.get()
+		self._r = NULL
+		self._base = None
 		self._handle = dereference(self._w).asGraph()
 		self._nodeAttrs = &dereference(self._w).nodeAttributes()
 		self._edgeAttrs = &dereference(self._w).edgeAttributes()
@@ -71,10 +74,30 @@ cdef class Graph:
 
 	cdef _seatR(self, shared_ptr[_GraphR] g):
 		self._w = NULL
+		self._r = g.get()
+		self._base = None
 		self._handle = dereference(g).asGraph()
 		self._nodeAttrs = &dereference(g).nodeAttributes()
 		self._edgeAttrs = &dereference(g).edgeAttributes()
 		self._owner = nk_erase[_GraphR](g)
+		return self
+
+	cdef _seatV(self, shared_ptr[_InducedSubgraphViewW] wv, shared_ptr[_InducedSubgraphViewR] rv,
+			object base):
+		self._w = NULL
+		self._r = NULL
+		# The view holds a bare pointer into base, so base has to outlive this seat; keeping the
+		# Python object alive keeps the C++ graph alive with it.
+		self._base = base
+		if wv:
+			self._handle = refGraphVW(dereference(wv))
+			self._owner = nk_erase[_InducedSubgraphViewW](wv)
+		else:
+			self._handle = refGraphVR(dereference(rv))
+			self._owner = nk_erase[_InducedSubgraphViewR](rv)
+		# Views carry no attribute maps of their own.
+		self._nodeAttrs = NULL
+		self._edgeAttrs = NULL
 		return self
 
 	cdef const _Graph* _view(self) noexcept nogil:
@@ -1030,6 +1053,9 @@ cdef class Graph:
 		if not isinstance(name, str):
 			raise Exception("Attribute name has to be a string")
 
+		if self._nodeAttrs is NULL:
+			raise RuntimeError("this graph does not carry attributes; attach them to the base graph")
+
 		if ofType == int:
 			return NodeAttribute(NodeIntAttribute().setThis(dereference(self._nodeAttrs).attachInt(stdstring(name))), int)
 		elif ofType == float:
@@ -1066,6 +1092,9 @@ cdef class Graph:
 		if not isinstance(name, str):
 			raise Exception("Attribute name has to be a string")
 
+		if self._nodeAttrs is NULL:
+			raise RuntimeError("this graph does not carry attributes; attach them to the base graph")
+
 		if ofType == int:
 			return NodeAttribute(NodeIntAttribute().setThis(dereference(self._nodeAttrs).getInt(stdstring(name))), int)
 		elif ofType == float:
@@ -1090,6 +1119,8 @@ cdef class Graph:
 		"""
 		if not isinstance(name, str):
 			raise Exception("Attribute name has to be a string")
+		if self._nodeAttrs is NULL:
+			raise RuntimeError("this graph does not carry attributes; attach them to the base graph")
 		dereference(self._nodeAttrs).detach(stdstring(name))
 
 	def attachEdgeAttribute(self, name, ofType):
@@ -1131,6 +1162,9 @@ cdef class Graph:
 		if not isinstance(name, str):
 			raise Exception("Attribute name has to be a string")
 
+		if self._edgeAttrs is NULL:
+			raise RuntimeError("this graph does not carry attributes; attach them to the base graph")
+
 		if ofType == int:
 			return EdgeAttribute(EdgeIntAttribute().setThis(dereference(self._edgeAttrs).attachInt(stdstring(name))), int)
 		elif ofType == float:
@@ -1168,6 +1202,9 @@ cdef class Graph:
 		if not isinstance(name, str):
 			raise Exception("Attribute name has to be a string")
 
+		if self._edgeAttrs is NULL:
+			raise RuntimeError("this graph does not carry attributes; attach them to the base graph")
+
 		if ofType == int:
 			return EdgeAttribute(EdgeIntAttribute().setThis(dereference(self._edgeAttrs).getInt(stdstring(name))), int)
 		elif ofType == float:
@@ -1192,6 +1229,8 @@ cdef class Graph:
 		"""
 		if not isinstance(name, str):
 			raise Exception("Attribute name has to be a string")
+		if self._edgeAttrs is NULL:
+			raise RuntimeError("this graph does not carry attributes; attach them to the base graph")
 		dereference(self._edgeAttrs).detach(stdstring(name))
 
 	# Mutable operations (require underlying _GraphW)
@@ -1504,6 +1543,205 @@ cdef class Graph:
 		"""
 		dereference(self._mutable()).setWeight(u, v, w)
 		return self
+
+cdef class InducedSubgraphView:
+
+	"""
+	InducedSubgraphView(base)
+	InducedSubgraphView(base, nodes)
+
+	The subgraph of `base` induced by a set of nodes, without materializing it.
+
+	Nodes are added and removed in batches; the edges are those of `base` with both endpoints in
+	the subset, recomputed on each traversal rather than stored. Only the operations that a
+	:class:`Graph` cannot express live here -- every read goes through :meth:`asGraph`.
+
+	Non-owning: `base` is kept alive by this object and by any graph handed out by
+	:meth:`asGraph`, but the view never copies it. Node ids are `base`'s.
+
+	Parameters
+	----------
+	base : networkit.Graph
+		The graph to view. May not itself be a view.
+	nodes : iterable of int, optional
+		Initial subset, given as base-graph ids. Ids absent from the base graph raise.
+	"""
+
+	cdef shared_ptr[_InducedSubgraphViewW] _wv  # set exactly when the base is writable
+	cdef shared_ptr[_InducedSubgraphViewR] _rv  # set exactly when the base is CSR-backed
+	cdef object _base
+
+	def __cinit__(self, Graph base not None, nodes=None):
+		cdef vector[node] cnodes
+		# The only place that branches on which concrete graph a Graph holds: the view's
+		# constructors take a concrete graph, so that a view of a view cannot be built.
+		if base._w is not NULL:
+			self._wv = make_shared[_InducedSubgraphViewW](dereference(base._w))
+		elif base._r is not NULL:
+			self._rv = make_shared[_InducedSubgraphViewR](dereference(base._r))
+		else:
+			raise TypeError("cannot induce a view on a view")
+		if nodes is not None:
+			cnodes = list(nodes)
+			self._addNodes(cnodes)
+		self._base = base
+
+	def __repr__(self):
+		if self._wv:
+			return "networkit.InducedSubgraphView(n={0}, m={1})".format(
+				dereference(self._wv).numberOfNodes(), dereference(self._wv).numberOfEdges())
+		return "networkit.InducedSubgraphView(n={0}, m={1})".format(
+			dereference(self._rv).numberOfNodes(), dereference(self._rv).numberOfEdges())
+
+	@property
+	def base(self):
+		"""
+		The graph being viewed.
+		"""
+		return self._base
+
+	def numberOfNodes(self):
+		if self._wv:
+			return dereference(self._wv).numberOfNodes()
+		return dereference(self._rv).numberOfNodes()
+
+	def numberOfEdges(self):
+		if self._wv:
+			return dereference(self._wv).numberOfEdges()
+		return dereference(self._rv).numberOfEdges()
+
+	def hasNode(self, node u):
+		"""
+		hasNode(u)
+
+		Returns whether `u`, given as a base-graph id, is in the subset.
+		"""
+		if self._wv:
+			return dereference(self._wv).hasNode(u)
+		return dereference(self._rv).hasNode(u)
+
+	def degree(self, node u):
+		"""
+		degree(u)
+
+		The number of the induced neighbors of `u`.
+		"""
+		if self._wv:
+			return dereference(self._wv).degree(u)
+		return dereference(self._rv).degree(u)
+
+	cdef _addNodes(self, vector[node] cnodes):
+		if self._wv:
+			dereference(self._wv).addNodes(cnodes)
+		else:
+			dereference(self._rv).addNodes(cnodes)
+
+	def addNode(self, node u):
+		"""
+		addNode(u)
+
+		Add one node, given as a base-graph id, to the subset.
+
+		Parameters
+		----------
+		u : int
+			A node of the base graph. Raises if absent from the base graph; ignored if already
+			present.
+		"""
+		cdef vector[node] cnodes
+		cnodes.push_back(u)
+		self._addNodes(cnodes)
+		return self
+
+	def addNodes(self, nodes):
+		"""
+		addNodes(nodes)
+
+		Add nodes, given as base-graph ids, to the subset.
+
+		Parameters
+		----------
+		nodes : iterable of int
+			Nodes of the base graph. Raises if any id is absent from the base graph; already
+			present ids are ignored.
+		"""
+		cdef vector[node] cnodes = list(nodes)
+		self._addNodes(cnodes)
+		return self
+
+	def removeNode(self, node u):
+		"""
+		removeNode(u)
+
+		Remove one node, given as a base-graph id, from the subset. Ignored if not present.
+		"""
+		self.removeNodes([u])
+		return self
+
+	def removeNodes(self, nodes):
+		"""
+		removeNodes(nodes)
+
+		Remove nodes, given as base-graph ids, from the subset. Absent ids are ignored.
+		"""
+		cdef vector[node] cnodes = list(nodes)
+		if self._wv:
+			dereference(self._wv).removeNodes(cnodes)
+		else:
+			dereference(self._rv).removeNodes(cnodes)
+		return self
+
+	def getNodeSubset(self):
+		"""
+		getNodeSubset()
+
+		Returns
+		-------
+		list(int)
+			The subset, always as base-graph ids, in ascending order.
+		"""
+		if self._wv:
+			return dereference(self._wv).getNodeSubset()
+		return dereference(self._rv).getNodeSubset()
+
+	def asGraph(self):
+		"""
+		asGraph()
+
+		Returns
+		-------
+		networkit.Graph
+			A read-only graph reading through this view. Reflects later changes to the subset;
+			attempting to modify it raises RuntimeError.
+
+		Notes
+		-----
+		:meth:`Graph.iterEdges` and :meth:`Graph.iterEdgesWeights` work but are slow: they step
+		each neighborhood by index, which recomputes the induced neighborhood per step. Iterate
+		nodes and their neighbors, or use :meth:`realize`, when iterating every edge matters.
+		"""
+		cdef Graph G = Graph.__new__(Graph)
+		return G._seatV(self._wv, self._rv, self._base)
+
+	def realize(self, bool_t compact=False):
+		"""
+		realize(compact=False)
+
+		Materialize an equivalent graph, copying the induced edges out of the base graph.
+
+		Parameters
+		----------
+		compact : bool, optional
+			Whether the result has ids 0..n-1 rather than the base ids. Default: False
+
+		Returns
+		-------
+		networkit.Graph
+			A writable graph holding its own copy of the induced edges.
+		"""
+		if self._wv:
+			return Graph().setThisFromGraphW(dereference(self._wv).realize(compact))
+		return Graph().setThisFromGraphW(dereference(self._rv).realize(compact))
 
 cdef class GraphW:
 	"""
