@@ -254,20 +254,19 @@ public:
     }
 
     /*
-     * Explicit so that converting a concrete graph by value goes through SelfHandled's
-     * conversion operator. With both routes available g++ silently materializes a temporary
-     * while clang++ rejects the call as ambiguous.
+     * Explicit so that converting a graph goes through that graph's SelfHandled conversion
+     * operator, which yields the handle embedded inside it. With both routes available g++
+     * silently materializes a temporary while clang++ rejects the call as ambiguous -- and a
+     * temporary would dangle the moment an algorithm stored the reference it was given.
+     *
+     * The views take the same route: only the two arm instantiations derive SelfHandled (a view
+     * of a view has no handle to embed), and their operator keeps "Algorithm(view)" implicit
+     * while binding to the embedded, identity-bound handle.
      */
     explicit ReferenceGraph(const GraphW &g) noexcept : arm_(&g) {}
     explicit ReferenceGraph(const GraphR &g) noexcept : arm_(&g) {}
-
-    /**
-     * Implicit on purpose, unlike the concrete-graph conversions above: those guard against
-     * SelfHandled's by-value conversion operator materializing a temporary, while a view is only
-     * ever bound by address -- and "Algorithm(view)" is exactly the ergonomics views exist for.
-     */
-    ReferenceGraph(const InducedSubgraphView<GraphW> &g) noexcept : arm_(&g) {}
-    ReferenceGraph(const InducedSubgraphView<GraphR> &g) noexcept : arm_(&g) {}
+    explicit ReferenceGraph(const InducedSubgraphView<GraphW> &g) noexcept : arm_(&g) {}
+    explicit ReferenceGraph(const InducedSubgraphView<GraphR> &g) noexcept : arm_(&g) {}
 
     /// Calls @a f with a reference to the concrete graph, instantiating it once per arm.
     template <typename Fn>

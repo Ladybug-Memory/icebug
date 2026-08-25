@@ -13,6 +13,7 @@
 #include <initializer_list>
 #include <ranges>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -20,8 +21,18 @@
 #include <networkit/graph/GraphConcepts.hpp>
 #include <networkit/graph/GraphIterationOps.hpp>
 #include <networkit/graph/GraphW.hpp>
+#include <networkit/graph/ReferenceGraph.hpp>
 
 namespace NetworKit {
+
+namespace InducedSubgraphViewDetail {
+/**
+ * Stand-in base for bases that are not handle arms (a view of a view, say): there is no embedded
+ * handle to carry, so the base contributes nothing. Keeping it empty is what lets the real base,
+ * SelfHandled, stay true to its documented requirement that Derived be a variant alternative.
+ */
+struct NoEmbeddedHandle {};
+} // namespace InducedSubgraphViewDetail
 
 /**
  * @ingroup graph
@@ -45,7 +56,10 @@ namespace NetworKit {
  * like ranges borrowed from a GraphW are invalidated by mutation.
  */
 template <typename BaseGraph>
-class InducedSubgraphView {
+class InducedSubgraphView : public std::conditional_t<std::is_same_v<BaseGraph, GraphW>
+                                                          || std::is_same_v<BaseGraph, GraphR>,
+                                                      SelfHandled<InducedSubgraphView<BaseGraph>>,
+                                                      InducedSubgraphViewDetail::NoEmbeddedHandle> {
     static_assert(GraphLike<BaseGraph>, "the base graph of an induced view must be GraphLike");
 
 public:

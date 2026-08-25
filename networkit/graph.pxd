@@ -199,6 +199,7 @@ cdef extern from "<networkit/graph/GraphR.hpp>":
 cdef extern from "<networkit/graph/InducedSubgraphView.hpp>":
 	cdef cppclass _InducedSubgraphViewW "NetworKit::InducedSubgraphView<NetworKit::GraphW>":
 		_InducedSubgraphViewW(const _GraphW& base) except +
+		const _Graph& asGraph() noexcept
 		count numberOfNodes() except +
 		count numberOfEdges() except +
 		count numberOfSelfLoops() except +
@@ -214,6 +215,7 @@ cdef extern from "<networkit/graph/InducedSubgraphView.hpp>":
 
 	cdef cppclass _InducedSubgraphViewR "NetworKit::InducedSubgraphView<NetworKit::GraphR>":
 		_InducedSubgraphViewR(const _GraphR& base) except +
+		const _Graph& asGraph() noexcept
 		count numberOfNodes() except +
 		count numberOfEdges() except +
 		count numberOfSelfLoops() except +
@@ -226,11 +228,6 @@ cdef extern from "<networkit/graph/InducedSubgraphView.hpp>":
 		void removeNodes(vector[node] nodes) except +
 		vector[node] getNodeSubset() except +
 		_GraphW realize(bool_t compact) except +
-
-cdef extern from "<networkit/graph/ReferenceGraphImpl.hpp>" namespace "NetworKit":
-	# Cython cannot spell the implicit view-to-handle conversions; these give it one.
-	_Graph refGraphVW(const _InducedSubgraphViewW& g) except +
-	_Graph refGraphVR(const _InducedSubgraphViewR& g) except +
 
 cdef extern from "<networkit/graph/Graph.hpp>" namespace "NetworKit":
 	# Parameterized on the handle rather than on the concrete graph, so every arm's attribute

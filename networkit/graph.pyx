@@ -90,10 +90,12 @@ cdef class Graph:
 		# Python object alive keeps the C++ graph alive with it.
 		self._base = base
 		if wv:
-			self._handle = refGraphVW(dereference(wv))
+			# The view carries its own embedded handle, so this binds to storage the view owns
+			# rather than to a temporary.
+			self._handle = dereference(wv).asGraph()
 			self._owner = nk_erase[_InducedSubgraphViewW](wv)
 		else:
-			self._handle = refGraphVR(dereference(rv))
+			self._handle = dereference(rv).asGraph()
 			self._owner = nk_erase[_InducedSubgraphViewR](rv)
 		# Views carry no attribute maps of their own.
 		self._nodeAttrs = NULL
