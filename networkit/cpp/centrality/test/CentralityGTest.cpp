@@ -46,6 +46,7 @@
 #include <networkit/centrality/LocalPartitionCoverage.hpp>
 #include <networkit/centrality/LocalSquareClusteringCoefficient.hpp>
 #include <networkit/centrality/PageRank.hpp>
+#include <networkit/centrality/ParallelCoreDecomposition.hpp>
 #include <networkit/centrality/PermanenceCentrality.hpp>
 #include <networkit/centrality/Sfigality.hpp>
 #include <networkit/centrality/SpanningEdgeCentrality.hpp>
@@ -1521,6 +1522,44 @@ TEST_F(CentralityGTest, testCoreDecomposition) {
     H.addEdge(0, 1);
     H.addEdge(1, 1);
     EXPECT_ANY_THROW(CoreDecomposition CoreDec(H));
+}
+
+TEST_F(CentralityGTest, testParallelCoreDecompositionMatchesSequentialOracle) {
+    Aux::Random::setSeed(42, false);
+    GraphW G = ErdosRenyiGenerator(1000, 0.02, false).generate();
+
+    CoreDecomposition reference(G, false, true);
+    reference.run();
+
+    ParallelCoreDecomposition parallel(G);
+    parallel.run();
+
+    EXPECT_EQ(reference.scores(), parallel.scores());
+    EXPECT_EQ(reference.maxCoreNumber(), parallel.maxCoreNumber());
+    EXPECT_EQ(0u, parallel.numberOfRestarts());
+}
+
+TEST_F(CentralityGTest, testParallelCoreDecompositionHierarchicalBuckets) {
+    GraphW G = ErdosRenyiGenerator(520, 1.0, false).generate();
+    ParallelCoreDecomposition parallel(G);
+    parallel.run();
+
+    EXPECT_EQ(519u, parallel.maxCoreNumber());
+    G.forNodes([&](node u) { EXPECT_EQ(519, parallel.score(u)); });
+}
+
+TEST_F(CentralityGTest, testParallelCoreDecompositionSampling) {
+    GraphW G(25001);
+    for (node leaf = 1; leaf < G.numberOfNodes(); ++leaf) {
+        G.addEdge(0, leaf);
+    }
+
+    ParallelCoreDecomposition parallel(G);
+    parallel.run();
+
+    EXPECT_EQ(1u, parallel.maxCoreNumber());
+    G.forNodes([&](node u) { EXPECT_EQ(1, parallel.score(u)); });
+    EXPECT_EQ(0u, parallel.numberOfRestarts());
 }
 
 TEST_F(CentralityGTest, benchCoreDecompositionLocal) {
