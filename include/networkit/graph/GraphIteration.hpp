@@ -117,13 +117,13 @@ inline void applyEdge(L &handle, node u, const N &nb) {
 template <bool Weighted, bool Indexed, bool Directed, bool Dedup, GraphLike G, typename L>
 inline void forOutEdgesOf(const G &g, node u, L &handle) {
     if constexpr (Indexed && IndexedGraph<G>) {
-        for (const auto nb : g.template outNeighborsIndexed<Weighted>(u)) {
+        for (const auto &nb : g.template outNeighborsIndexed<Weighted>(u)) {
             if (Dedup && !useEdge<Directed>(u, neighborTarget(nb)))
                 continue;
             applyEdge<true>(handle, u, nb);
         }
     } else {
-        for (const auto nb : g.template outNeighbors<Weighted>(u)) {
+        for (const auto &nb : g.template outNeighbors<Weighted>(u)) {
             if (Dedup && !useEdge<Directed>(u, neighborTarget(nb)))
                 continue;
             applyEdge<false>(handle, u, nb);
@@ -141,10 +141,10 @@ inline void forOutEdgesOf(const G &g, node u, L &handle) {
 template <bool Weighted, bool Indexed, GraphLike G, typename L>
 inline void forInEdgesOfNode(const G &g, node u, L &handle) {
     if constexpr (Indexed && IndexedGraph<G>) {
-        for (const auto nb : g.template inNeighborsIndexed<Weighted>(u))
+        for (const auto &nb : g.template inNeighborsIndexed<Weighted>(u))
             applyEdge<true>(handle, u, nb);
     } else {
-        for (const auto nb : g.template inNeighbors<Weighted>(u))
+        for (const auto &nb : g.template inNeighbors<Weighted>(u))
             applyEdge<false>(handle, u, nb);
     }
 }
