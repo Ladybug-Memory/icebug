@@ -137,7 +137,7 @@ TEST_F(InducedSubgraphViewGTest, testNeighborhoodsCarryWeights) {
     InducedSubgraphView<GraphW> view(base, subset);
 
     std::vector<std::pair<node, edgeweight>> out0;
-    for (const auto nb : view.outNeighbors<true>(0))
+    for (const auto &nb : view.outNeighbors<true>(0))
         out0.push_back(nb);
     std::sort(out0.begin(), out0.end());
 
