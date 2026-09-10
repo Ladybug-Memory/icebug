@@ -576,7 +576,7 @@ public:
 
     edgeweight getIthNeighborWeight(Unsafe, node u, index i) const {
         count j = 0;
-        for (const auto nb : outNeighbors<true>(u))
+        for (const auto &nb : outNeighbors<true>(u))
             if (j++ == i)
                 return neighborWeight(nb);
         return nullWeight;
@@ -591,7 +591,7 @@ public:
 
     std::pair<node, edgeweight> getIthNeighborWithWeight(Unsafe, node u, index i) const {
         count j = 0;
-        for (const auto nb : outNeighbors<true>(u))
+        for (const auto &nb : outNeighbors<true>(u))
             if (j++ == i)
                 return {neighborTarget(nb), neighborWeight(nb)};
         return {none, nullWeight};
