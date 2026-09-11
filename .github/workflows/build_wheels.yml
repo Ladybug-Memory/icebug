@@ -21,6 +21,12 @@ on:
 env:
   ARTIFACT_RETENTION: ${{ github.ref == 'refs/heads/main' && '30' || '7' }}
 
+# Merges queue up fast; a newer main supersedes an older smoke build. Release
+# builds must never cancel each other, so only non-release runs are cancelled.
+concurrency:
+  group: build-wheels-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'release' }}
+
 jobs:
   cpython-linux-x86_64:
     name: 'Linux CPython (${{ matrix.cibw_archs }}, ${{ matrix.manylinux_image }})'
