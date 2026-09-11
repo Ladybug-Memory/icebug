@@ -1634,6 +1634,8 @@ cdef class InducedSubgraphView:
 		The base-graph id behind the view id `u`. Raises if `u` is not in the view.
 		On a non-compact view this is the identity.
 		"""
+		if not self.hasNode(u):
+			raise RuntimeError("InducedSubgraphView: node is not in the view")
 		if self._wv:
 			return dereference(self._wv).toBaseId(u)
 		return dereference(self._rv).toBaseId(u)
@@ -1691,8 +1693,9 @@ cdef class InducedSubgraphView:
 		"""
 		addNode(u)
 
-		Add one node, given as a base-graph id, to the subset. On a compact view the
-		compact ids of pre-existing members may shift.
+		Add one node, given as a base-graph id, to the subset. The batch is atomic: a
+		failed call adds nothing. On a compact view the compact ids of pre-existing
+		members may shift.
 
 		Parameters
 		----------
@@ -1709,7 +1712,8 @@ cdef class InducedSubgraphView:
 		"""
 		addNodes(nodes)
 
-		Add nodes, given as base-graph ids, to the subset. On a compact view the compact
+		Add nodes, given as base-graph ids, to the subset. The batch is atomic: if any id
+		is absent from the base graph, nothing is added. On a compact view the compact
 		ids of pre-existing members may shift.
 
 		Parameters
