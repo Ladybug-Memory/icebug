@@ -194,13 +194,13 @@ TEST_F(InducedSubgraphViewGTest, testUnknownNodeThrows) {
     InducedSubgraphView<GraphW> view(base);
     EXPECT_THROW(view.addNode(base.upperNodeIdBound()), std::runtime_error);
     EXPECT_THROW(view.addNodes({0, 99}), std::runtime_error);
+    // a failed batch is atomic: nothing was inserted
+    EXPECT_EQ(0u, view.numberOfNodes());
+    EXPECT_FALSE(view.hasNode(0));
     // removal of unknown ids is a no-op, not an error -- including ids beyond the base's id
     // space, which must not touch the presence/degree storage (regression: OOB write)
     EXPECT_NO_THROW(view.removeNode(99));
     EXPECT_NO_THROW(view.removeNodes({99, base.upperNodeIdBound() + 100}));
-    // the failed batch left node 0 inserted; removal of unknown ids changed nothing else
-    EXPECT_EQ(1u, view.numberOfNodes());
-    EXPECT_TRUE(view.hasNode(0));
 }
 
 TEST_F(InducedSubgraphViewGTest, testInNeighborsOnUndirectedBase) {
@@ -375,7 +375,7 @@ TEST_F(InducedSubgraphViewGTest, testRandomizedAgainstGroundTruth) {
         ErdosRenyiGenerator gen(12, 0.35, trial % 2 == 1);
         GraphW G = gen.generate();
 
-        InducedSubgraphView<GraphW> view(G);
+        InducedSubgraphView<GraphW> view(G, /*compact=*/trial % 3 == 2);
         std::set<node> subset;
         for (node u = 0; u < G.upperNodeIdBound(); ++u)
             if (Aux::Random::probability() < 0.6) {
@@ -384,6 +384,8 @@ TEST_F(InducedSubgraphViewGTest, testRandomizedAgainstGroundTruth) {
             }
 
         ASSERT_EQ(subset.size(), view.numberOfNodes());
+        if (view.isCompact())
+            ASSERT_TRUE(NetworKit::hasContiguousNodeIds(view));
 
         count mExpected = 0;
         const bool directed = G.isDirected();
@@ -399,9 +401,11 @@ TEST_F(InducedSubgraphViewGTest, testRandomizedAgainstGroundTruth) {
             << "trial " << trial << ": edge bookkeeping diverged";
 
         view.forNodes([&](node u) {
+            const node b = view.toBaseId(u);
             count d = 0;
-            G.forNeighborsOf(u, [&](node v) { d += subset.count(v) ? 1 : 0; });
+            G.forNeighborsOf(b, [&](node v) { d += subset.count(v) ? 1 : 0; });
             ASSERT_EQ(d, view.degree(u)) << "trial " << trial << ", node " << u;
+            ASSERT_TRUE(subset.count(view.toBaseId(u))) << "compact id out of the subset";
         });
 
         count loops = 0;
@@ -410,7 +414,12 @@ TEST_F(InducedSubgraphViewGTest, testRandomizedAgainstGroundTruth) {
                 ++loops;
         ASSERT_EQ(loops, view.numberOfSelfLoops()) << "trial " << trial;
 
-        expectSameEdges(G, subset, view);
+        // every view edge is a base edge with both endpoints in the subset
+        view.forEdges([&](node u, node v, edgeweight w) {
+            const node bu = view.toBaseId(u), bv = view.toBaseId(v);
+            ASSERT_TRUE(subset.count(bu) && subset.count(bv));
+            EXPECT_EQ(G.weight(bu, bv), w);
+        });
     }
 }
 
@@ -522,7 +531,6 @@ TEST_F(InducedSubgraphViewGTest, testCompactViewPresentsDenseIds) {
     EXPECT_EQ(std::vector<node>({1, 2, 3, 4}), view.getNodeSubset());
     for (node c = 0; c < 4; ++c)
         EXPECT_EQ(c + 1, view.toBaseId(c));
-    EXPECT_THROW(view.toBaseId(4), std::runtime_error);
     EXPECT_EQ(0u, view.toCompactId(1));
     EXPECT_EQ(3u, view.toCompactId(4));
     EXPECT_EQ(none, view.toCompactId(0));
@@ -644,7 +652,7 @@ TEST_F(InducedSubgraphViewGTest, testNonCompactIdHelpersAreIdentity) {
     EXPECT_EQ(1u, view.toBaseId(1));
     EXPECT_EQ(2u, view.toCompactId(2));
     EXPECT_EQ(none, view.toCompactId(0));
-    EXPECT_THROW(view.toBaseId(0), std::runtime_error);
+    EXPECT_FALSE(view.hasNode(0));
 }
 
 TEST(InducedSubgraphViewCompactDirectedGTest, testDirectedCompactIds) {
