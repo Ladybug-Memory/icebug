@@ -40,8 +40,22 @@ struct NoEmbeddedHandle {};
  *
  * The view spans a subset of the base graph's nodes and, implicitly, every base edge whose two
  * endpoints are in the subset. It works over any type satisfying the GraphLike concept --
- * GraphR, GraphW, CoarsenedGraphView, another InducedSubgraphView -- and keeps the base graph's
- * node ids, so results computed on the view map straight back onto the base graph.
+ * GraphR, GraphW, CoarsenedGraphView, another InducedSubgraphView.
+ *
+ * By default the view keeps the base graph's node ids, so results computed on the view map
+ * straight back onto the base graph. With @c compact=true the view instead presents dense ids
+ * @c [0, n): the compact id of a member is its rank in the ascending base-id order, so
+ * @c getNodeSubset()[c] is the base id behind compact id @c c. Compact ids stay dense across
+ * membership edits -- which renumbers the survivors -- so translate results back with
+ * @c toBaseId() before touching the base graph. The dense ids let algorithms that allocate
+ * per-node storage run on the view without paying for the base graph's id space, the same
+ * reason @c GraphTools::subgraphFromNodes offers its @c compact flag, but without
+ * materializing a copy.
+ *
+ * Id spaces at a glance (compact view): membership edits (@c addNodes / @c removeNodes),
+ * @c getNodeSubset(), @c frontier() and @c toCompactId() speak base-graph ids; every
+ * GraphLike primitive (@c hasNode, @c degree, neighborhoods, @c forNodes, ...) speaks compact
+ * view ids. In the default non-compact view both spaces coincide.
  *
  * Membership is edited in batches (@c addNodes / @c removeNodes). The induced degrees, the edge
  * count and the self-loop count are maintained incrementally while the batch is applied, which
@@ -66,29 +80,36 @@ public:
     /**
      * An empty view on @a base.
      * @param base The graph the view spans. Must outlive the view.
+     * @param compact When true, the view presents dense ids @c [0, n) instead of the base ids.
      */
-    explicit InducedSubgraphView(const BaseGraph &base)
-        : base_(&base), directed_(base.isDirected()) {
+    explicit InducedSubgraphView(const BaseGraph &base, bool compact = false)
+        : base_(&base), directed_(base.isDirected()), compact_(compact) {
         const index z = base.upperNodeIdBound();
         exists_.assign(z, 0);
         outDegree_.assign(z, 0);
         if (directed_)
             inDegree_.assign(z, 0);
+        if (compact_)
+            baseToCompact_.assign(z, none);
+        // An empty view's (empty) mapping is trivially clean, so parallel readers -- which
+        // only ever observe the mapping between edits -- never race on building it.
+        mappingDirty_ = false;
     }
 
     /**
      * A view on @a base spanning @a subset. Node ids must exist in the base graph; duplicates are
-     * ignored.
+     * ignored. @a subset always holds base-graph ids, even for a compact view.
      */
     template <typename NodeRange>
-    InducedSubgraphView(const BaseGraph &base, const NodeRange &subset)
-        : InducedSubgraphView(base) {
+    InducedSubgraphView(const BaseGraph &base, const NodeRange &subset, bool compact = false)
+        : InducedSubgraphView(base, compact) {
         addNodes(subset);
     }
 
     /// The initializer-list flavor of the subset constructor above.
-    InducedSubgraphView(const BaseGraph &base, std::initializer_list<node> subset)
-        : InducedSubgraphView(base) {
+    InducedSubgraphView(const BaseGraph &base, std::initializer_list<node> subset,
+                        bool compact = false)
+        : InducedSubgraphView(base, compact) {
         addNodes(subset);
     }
 
@@ -99,26 +120,32 @@ public:
 
     /* MEMBERSHIP EDITS */
 
-    /// Adds the single node @a u to the subset. Throws if @a u is not in the base graph.
+    /// Adds the single base-graph node @a u to the subset. Throws if @a u is not in the base
+    /// graph. On a compact view the compact ids of pre-existing members may shift.
     void addNode(node u) { addNodes(std::initializer_list<node>{u}); }
 
-    /// Adds @a nodes to the subset. Unknown ids throw; already present ids are ignored.
+    /// Adds base-graph @a nodes to the subset. Unknown ids throw; already present ids are
+    /// ignored. On a compact view the compact ids of pre-existing members may shift.
     void addNodes(std::initializer_list<node> nodes) { addNodesImpl(nodes); }
 
-    /// Adds every node of @a nodes to the subset. Unknown ids throw; already present ids are
-    /// ignored. The order of @a nodes does not matter.
+    /// Adds every base-graph node of @a nodes to the subset. Unknown ids throw; already present
+    /// ids are ignored. The order of @a nodes does not matter. On a compact view the compact
+    /// ids of pre-existing members may shift.
     template <typename NodeRange>
     void addNodes(const NodeRange &nodes) {
         addNodesImpl(nodes);
     }
 
-    /// Removes the single node @a u from the subset, if present.
+    /// Removes the single base-graph node @a u from the subset, if present. On a compact view
+    /// the survivors are renumbered to stay dense.
     void removeNode(node u) { removeNodes(std::initializer_list<node>{u}); }
 
-    /// Removes @a nodes from the subset. Absent ids are ignored.
+    /// Removes base-graph @a nodes from the subset. Absent ids are ignored. On a compact view
+    /// the survivors are renumbered to stay dense.
     void removeNodes(std::initializer_list<node> nodes) { removeNodesImpl(nodes); }
 
-    /// Removes every node of @a nodes from the subset. Absent ids are ignored.
+    /// Removes every base-graph node of @a nodes from the subset. Absent ids are ignored. On a
+    /// compact view the survivors are renumbered to stay dense.
     template <typename NodeRange>
     void removeNodes(const NodeRange &nodes) {
         removeNodesImpl(nodes);
@@ -131,15 +158,37 @@ public:
     /// The induced edge count; maintained incrementally, O(1).
     count numberOfEdges() const noexcept { return m_; }
 
-    /// The base graph's upper node id bound: the view keeps the base ids.
-    index upperNodeIdBound() const noexcept { return exists_.size(); }
+    /// The view's upper node id bound: the base bound by default, the member count when compact.
+    index upperNodeIdBound() const noexcept { return compact_ ? n_ : exists_.size(); }
 
-    bool hasNode(node u) const noexcept { return u < exists_.size() && exists_[u]; }
+    /// Whether @a u -- a base-graph id by default, a compact id when compact -- is in the view.
+    bool hasNode(node u) const noexcept {
+        if (compact_)
+            return u < n_;
+        return u < exists_.size() && exists_[u];
+    }
 
-    /// The induced out-degree of @a u; O(1). Requires hasNode(u).
+    /// Whether the view presents dense ids @c [0, n) instead of the base ids.
+    bool isCompact() const noexcept { return compact_; }
+
+    /// The base-graph id behind the view id @a u. Throws if @a u is not in the view.
+    node toBaseId(node u) const {
+        if (!hasNode(u))
+            throw std::runtime_error("InducedSubgraphView: node is not in the view");
+        return toBaseUnsafe(u);
+    }
+
+    /// The view id of the base-graph node @a v, or @c none when @a v is outside the subset.
+    node toCompactId(node v) const {
+        if (v >= exists_.size() || !exists_[v])
+            return none;
+        return toCompactUnsafe(v);
+    }
+
+    /// The induced out-degree of @a u, given as a view id; O(1). Requires hasNode(u).
     count degree(node u) const {
         assert(hasNode(u));
-        return outDegree_[u];
+        return outDegree_[toBaseUnsafe(u)];
     }
 
     bool isEmpty() const noexcept { return n_ == 0; }
@@ -163,6 +212,9 @@ public:
      *   order), or
      * - walking the subset members ascending and probing the base graph for adjacency (order:
      *   ascending ids).
+     *
+     * @a u is a view id; on a compact view the yielded neighbors are compact ids as well. The
+     * id translation is order-preserving, so ascending stays ascending on sorted bases.
      *
      * The second strategy engages only while the base neighborhoods stay sorted, so both orders
      * agree whenever it can run at all. It exists for small views over graphs with skewed
@@ -220,8 +272,10 @@ public:
         using Payload = std::conditional_t<Weighted, std::pair<node, edgeweight>, node>;
 
         NeighborRange(const InducedSubgraphView &view, node u)
-            : view_(&view), u_(u), scanSubset_(chooseScan(view, u)), base_(makeBaseRange(view, u)),
-              members_(&view.sortedMembers()) {}
+            : view_(&view), u_(view.toBaseUnsafe(u)), scanSubset_(chooseScan(view, u_)),
+              base_(makeBaseRange(view, u_)), members_(&view.sortedMembers()) {
+            view_->ensureMapping();
+        }
 
         /**
          * A self-contained cursor: it carries its own copy of the borrowed base range (kept
@@ -282,10 +336,12 @@ public:
                     ++baseIt_;
                     if (!view_->exists_[v])
                         continue;
+                    // u_ and members_ are base ids; the payload translates back to view ids.
+                    const node w = view_->toCompactUnsafe(v);
                     if constexpr (Weighted)
-                        current_ = {v, neighborWeight(nb)};
+                        current_ = {w, neighborWeight(nb)};
                     else
-                        current_ = v;
+                        current_ = w;
                     return;
                 }
                 atEnd_ = true;
@@ -299,10 +355,11 @@ public:
                     const node to = Incoming ? u_ : v;
                     if (!GraphIterationOps::hasEdge(*view_->base_, from, to))
                         continue;
+                    const node w = view_->toCompactUnsafe(v);
                     if constexpr (Weighted)
-                        current_ = {v, GraphIterationOps::weight(*view_->base_, from, to)};
+                        current_ = {w, GraphIterationOps::weight(*view_->base_, from, to)};
                     else
-                        current_ = v;
+                        current_ = w;
                     return;
                 }
                 atEnd_ = true;
@@ -333,10 +390,10 @@ public:
 
 public:
     /**
-     * The out-neighbors of @a u inside the view. The range borrows the base graph's storage and
-     * this view's flags, and is invalidated by any membership edit. @tparam Weighted selects the
-     * (node, weight) payload; an unweighted base has no weight array, so only request it when
-     * isWeighted() holds.
+     * The out-neighbors of @a u inside the view, with @a u given as a view id. The range
+     * borrows the base graph's storage and this view's flags, and is invalidated by any
+     * membership edit. @tparam Weighted selects the (node, weight) payload; an unweighted base
+     * has no weight array, so only request it when isWeighted() holds.
      */
     template <bool Weighted>
     NeighborRange<Weighted, false> outNeighbors(node u) const {
@@ -344,7 +401,8 @@ public:
         return NeighborRange<Weighted, false>(*this, u);
     }
 
-    /// The in-neighbors of @a u inside the view. On an undirected base these are the out-neighbors.
+    /// The in-neighbors of @a u inside the view, with @a u given as a view id. On an undirected
+    /// base these are the out-neighbors.
     template <bool Weighted>
     NeighborRange<Weighted, true> inNeighbors(node u) const {
         assert(hasNode(u));
@@ -476,10 +534,11 @@ public:
     /// O(1). Requires hasNode(u).
     count degreeOut(node u) const { return degree(u); }
 
-    /// O(1). Requires hasNode(u).
+    /// O(1). Requires hasNode(u); @a u is a view id.
     count degreeIn(node u) const {
         assert(hasNode(u));
-        return directed_ ? inDegree_[u] : outDegree_[u];
+        const node b = toBaseUnsafe(u);
+        return directed_ ? inDegree_[b] : outDegree_[b];
     }
 
     bool isIsolated(node u) const {
@@ -615,21 +674,23 @@ public:
     /// The graph the view spans.
     const BaseGraph &getBaseGraph() const noexcept { return *base_; }
 
-    /// The members of the subgraph, in ascending id order. Ascending is what the adaptive
-    /// neighbor ranges rely on; the index is rebuilt lazily after membership edits. O(z) once per
-    /// edit batch, O(1) otherwise.
+    /// The members of the subgraph as base-graph ids, in ascending id order. Ascending is what
+    /// the adaptive neighbor ranges rely on; the index is rebuilt lazily after membership edits.
+    /// O(z) once per edit batch, O(1) otherwise. On a compact view this doubles as the
+    /// compact-to-base mapping: entry @c c is the base id behind compact id @c c.
     const std::vector<node> &getNodeSubset() const { return sortedMembers(); }
 
     /**
-     * Nodes outside the view that are out-neighbors of a node inside it. Ascending and unique.
-     * This is the search frontier when the view grows one layer at a time.
+     * Base-graph nodes outside the view that are out-neighbors of a node inside it. Ascending
+     * and unique. This is the search frontier when the view grows one layer at a time.
      */
     std::vector<node> frontier() const {
         std::vector<node> result;
         for (node u : getNodeSubset())
             for (const auto nb : base_->template outNeighbors<false>(u)) {
                 const node v = neighborTarget(nb);
-                if (!hasNode(v))
+                // base-id space: hasNode() speaks view ids on a compact view.
+                if (v >= exists_.size() || !exists_[v])
                     result.push_back(v);
             }
         std::sort(result.begin(), result.end());
@@ -640,24 +701,27 @@ public:
     /**
      * Constructs an explicit mutable subgraph equivalent to this view.
      * @param compact Whether the subgraph should get compact node ids instead of the base ids.
+     * Independent of whether the view itself is compact.
      */
     GraphW realize(bool compact = false) const {
-        GraphW out(compact ? n_ : upperNodeIdBound(), isWeighted(), directed_);
         if (compact) {
+            GraphW out(n_, isWeighted(), directed_);
             std::vector<node> newId(upperNodeIdBound(), none);
             node next = 0;
             forNodes([&](node u) { newId[u] = next++; });
             forEdges([&](node u, node v, edgeweight w) {
                 out.addEdge(newId[u], newId[v], isWeighted() ? w : defaultEdgeWeight);
             });
-        } else {
-            for (node u = 0; u < upperNodeIdBound(); ++u)
-                if (!exists_[u])
-                    out.removeNode(u);
-            forEdges([&](node u, node v, edgeweight w) {
-                out.addEdge(u, v, isWeighted() ? w : defaultEdgeWeight);
-            });
+            return out;
         }
+        // Non-compact output keeps the base ids; forEdges() speaks view ids, so translate.
+        GraphW out(static_cast<count>(exists_.size()), isWeighted(), directed_);
+        for (node u = 0; u < exists_.size(); ++u)
+            if (!exists_[u])
+                out.removeNode(u);
+        forEdges([&](node u, node v, edgeweight w) {
+            out.addEdge(toBaseUnsafe(u), toBaseUnsafe(v), isWeighted() ? w : defaultEdgeWeight);
+        });
         return out;
     }
 
@@ -670,11 +734,52 @@ private:
     std::vector<count> inDegree_;
     count n_ = 0, m_ = 0, selfLoops_ = 0;
     bool directed_;
+    /// When true, the GraphLike primitives present dense ids @c [0, n) while the bookkeeping
+    /// above stays in base-id space. Immutable after construction.
+    bool compact_ = false;
 
     /// Ascending member ids, derived from exists_ on demand; see NeighborRange and
     /// getNodeSubset(). Mutable because a const range must be able to rebuild it.
     mutable std::vector<node> sortedMembers_;
     mutable bool membersDirty_ = true;
+    /// Compact id <-> base id translation, derived from sortedMembers() on demand. The compact
+    /// ids are the members' ranks in ascending base-id order, so the translation is
+    /// order-preserving. Rebuilt lazily after membership edits.
+    mutable std::vector<node> baseToCompact_;
+    mutable std::vector<node> compactToBase_;
+    mutable bool mappingDirty_ = true;
+
+    void ensureMapping() const {
+        if (!compact_ || !mappingDirty_)
+            return;
+        compactToBase_.clear();
+        compactToBase_.reserve(n_);
+        baseToCompact_.assign(exists_.size(), none);
+        for (const node b : sortedMembers()) {
+            baseToCompact_[b] = static_cast<node>(compactToBase_.size());
+            compactToBase_.push_back(b);
+        }
+        mappingDirty_ = false;
+    }
+
+    /// View id @a u to base id. Requires hasNode(u); callers establish that (outNeighbors
+    /// asserts it, iterators only translate members).
+    node toBaseUnsafe(node u) const {
+        if (!compact_)
+            return u;
+        ensureMapping();
+        assert(u < compactToBase_.size());
+        return compactToBase_[u];
+    }
+
+    /// Base id @a b to view id. Requires @a b to be a member.
+    node toCompactUnsafe(node b) const {
+        if (!compact_)
+            return b;
+        ensureMapping();
+        assert(b < baseToCompact_.size() && baseToCompact_[b] != none);
+        return baseToCompact_[b];
+    }
 
     const std::vector<node> &sortedMembers() const {
         if (membersDirty_) {
@@ -687,19 +792,37 @@ private:
         return sortedMembers_;
     }
 
+    /// Rebuilds the compact mapping when a batch changed the membership. Membership edits run
+    /// single-threaded and invalidate borrowed ranges, so rebuilding here -- rather than lazily
+    /// on first read -- keeps parallel readers (e.g. an algorithm's parallelForNodes calling
+    /// degree()) on a clean snapshot they only ever read.
+    void refreshMapping() {
+        if (compact_ && mappingDirty_)
+            ensureMapping();
+    }
+
     template <typename NodeRange>
     void addNodesImpl(const NodeRange &nodes) {
-        for (const node v : nodes) {
-            if (!base_->hasNode(v))
-                throw std::runtime_error("InducedSubgraphView: node is not in the base graph");
-            insertNode(v);
+        try {
+            for (const node v : nodes) {
+                if (!base_->hasNode(v))
+                    throw std::runtime_error("InducedSubgraphView: node is not in the base graph");
+                insertNode(v);
+            }
+        } catch (...) {
+            // A failed batch still applies partially; leave the mapping usable for whoever
+            // reads the view next, single-threaded or not.
+            refreshMapping();
+            throw;
         }
+        refreshMapping();
     }
 
     template <typename NodeRange>
     void removeNodesImpl(const NodeRange &nodes) {
         for (const node v : nodes)
             eraseNode(v);
+        refreshMapping();
     }
 
     /// Brings the counters in line with @a v joining the subset. Nodes are applied one at a
@@ -710,6 +833,7 @@ private:
         exists_[v] = 1;
         ++n_;
         membersDirty_ = true;
+        mappingDirty_ = true;
 
         count outDeg = 0;
         for (const auto nb : base_->template outNeighbors<false>(v)) {
@@ -791,6 +915,7 @@ private:
         exists_[v] = 0;
         --n_;
         membersDirty_ = true;
+        mappingDirty_ = true;
     }
 };
 
