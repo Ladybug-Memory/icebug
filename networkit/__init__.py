@@ -30,7 +30,7 @@ __credits__ = ["Eugenio Angriman", "Lukas Barth", "Miriam Beddig", "Elisabetta B
     "Moritz v. Looz", "Yassine Marrakchi", "Henning Meyerhenke", "Manuel Penschuck", "Lucas Archimedes Gregorio Henr Petersen", "Marcel Radermacher", "Klara Reichard", \
 	"Marvin Ritter", "Aleksejs Sazonovs", "Arun Sharma", "Hung Tran", "Alexander van der Grinten", "Florian Weber", "Michael Wegner", "Jörg Weisbarth"]
 __license__ = "MIT"
-__version__ = "13.3"
+__version__ = "13.4"
 
 # standard library modules
 import csv
