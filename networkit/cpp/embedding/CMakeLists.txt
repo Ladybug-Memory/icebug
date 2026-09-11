@@ -1,6 +1,7 @@
 networkit_add_module(embedding
     AliasSampler.cpp
     BiasedRandomWalk.cpp
+    FastRP.cpp
     LearnEmbedding.cpp
     Node2Vec.cpp
     )
