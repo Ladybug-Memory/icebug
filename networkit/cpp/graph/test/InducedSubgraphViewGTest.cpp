@@ -502,6 +502,211 @@ TEST_F(InducedSubgraphViewGTest, testHandleIsEmbeddedAndIdentityBound) {
     EXPECT_EQ(borrowed.numberOfEdges(), copiedHandle.numberOfEdges());
 }
 
+TEST_F(InducedSubgraphViewGTest, testCompactViewPresentsDenseIds) {
+    const std::set<node> subset{1, 2, 3, 4};
+    InducedSubgraphView<GraphW> view(base, subset, true);
+
+    EXPECT_TRUE(view.isCompact());
+    EXPECT_EQ(4u, view.numberOfNodes());
+    EXPECT_EQ(4u, view.upperNodeIdBound());
+    EXPECT_EQ(6u, view.numberOfEdges());
+    EXPECT_EQ(0u, view.numberOfSelfLoops());
+    EXPECT_TRUE(NetworKit::hasContiguousNodeIds(view));
+
+    // view ids are dense; base ids above n_ - 1 are not members
+    for (node c = 0; c < 4; ++c)
+        EXPECT_TRUE(view.hasNode(c));
+    EXPECT_FALSE(view.hasNode(4));
+
+    // compact id is the rank in ascending base-id order
+    EXPECT_EQ(std::vector<node>({1, 2, 3, 4}), view.getNodeSubset());
+    for (node c = 0; c < 4; ++c)
+        EXPECT_EQ(c + 1, view.toBaseId(c));
+    EXPECT_THROW(view.toBaseId(4), std::runtime_error);
+    EXPECT_EQ(0u, view.toCompactId(1));
+    EXPECT_EQ(3u, view.toCompactId(4));
+    EXPECT_EQ(none, view.toCompactId(0));
+    EXPECT_EQ(none, view.toCompactId(base.upperNodeIdBound() + 10));
+
+    // degrees in compact space: every member keeps 3 induced neighbors
+    for (node c = 0; c < 4; ++c)
+        EXPECT_EQ(3u, view.degree(c));
+
+    // neighborhoods yield compact ids covering the same base edges
+    std::vector<node> nbhd;
+    for (const auto v : view.outNeighbors<false>(0))
+        nbhd.push_back(view.toBaseId(v));
+    std::sort(nbhd.begin(), nbhd.end());
+    EXPECT_EQ(std::vector<node>({2, 3, 4}), nbhd);
+
+    // weights ride along with the translated targets
+    std::vector<std::pair<node, edgeweight>> weighted;
+    for (const auto &nb : view.outNeighbors<true>(0))
+        weighted.emplace_back(view.toBaseId(nb.first), nb.second);
+    std::sort(weighted.begin(), weighted.end());
+    ASSERT_EQ(3u, weighted.size());
+    EXPECT_DOUBLE_EQ(4.0, weighted[0].second); // base edge 1-2
+    EXPECT_DOUBLE_EQ(1.0, weighted[1].second); // base edge 3-1
+    EXPECT_DOUBLE_EQ(5.0, weighted[2].second); // base edge 1-4
+
+    // lookups and aggregates speak compact ids
+    EXPECT_TRUE(view.hasEdge(0, 1));
+    EXPECT_FALSE(view.hasEdge(0, 0));
+    EXPECT_DOUBLE_EQ(4.0, view.weight(0, 1));
+    EXPECT_EQ(nullWeight, view.weight(0, 0));
+    // base edges incident to 1 carry weights 1.0 (3-1), 4.0 (2-1) and 5.0 (1-4)
+    EXPECT_DOUBLE_EQ(10.0, view.weightedDegree(0));
+    const index pos = view.indexOfNeighbor(0, 1);
+    EXPECT_NE(none, pos);
+    EXPECT_EQ(1u, view.getIthNeighbor(0, pos));
+    EXPECT_EQ(none, view.indexOfNeighbor(0, 0));
+}
+
+TEST_F(InducedSubgraphViewGTest, testCompactViewMatchesCompactSubgraph) {
+    const std::vector<node> subset{1, 2, 3, 4}; // ascending, so both mappings agree
+    InducedSubgraphView<GraphW> view(base, subset, true);
+    GraphW reference = GraphTools::subgraphFromNodes(base, subset.begin(), subset.end(), true);
+
+    EXPECT_EQ(reference.numberOfNodes(), view.numberOfNodes());
+    EXPECT_EQ(reference.numberOfEdges(), view.numberOfEdges());
+    EXPECT_EQ(reference.upperNodeIdBound(), view.upperNodeIdBound());
+    EXPECT_DOUBLE_EQ(reference.totalEdgeWeight(), view.totalEdgeWeight());
+
+    for (node c = 0; c < view.upperNodeIdBound(); ++c) {
+        EXPECT_EQ(reference.degree(c), view.degree(c));
+        std::vector<node> viewNbhd;
+        for (const auto v : view.outNeighbors<false>(c))
+            viewNbhd.push_back(v);
+        std::vector<node> refNbhd;
+        reference.forNeighborsOf(c, [&](node v) { refNbhd.push_back(v); });
+        std::sort(viewNbhd.begin(), viewNbhd.end());
+        std::sort(refNbhd.begin(), refNbhd.end());
+        EXPECT_EQ(refNbhd, viewNbhd);
+    }
+}
+
+TEST_F(InducedSubgraphViewGTest, testCompactViewEditsRenumber) {
+    InducedSubgraphView<GraphW> view(base, {1, 2, 3, 4}, true);
+    ASSERT_EQ(4u, view.upperNodeIdBound());
+
+    // removing base node 1 leaves the 2-3-4 triangle, renumbered to 0..2
+    view.removeNode(1);
+    EXPECT_EQ(3u, view.numberOfNodes());
+    EXPECT_EQ(3u, view.upperNodeIdBound());
+    EXPECT_EQ(std::vector<node>({2, 3, 4}), view.getNodeSubset());
+    for (node c = 0; c < 3; ++c) {
+        EXPECT_TRUE(view.hasNode(c));
+        EXPECT_EQ(2u, view.degree(c));
+        EXPECT_EQ(c + 2, view.toBaseId(c));
+    }
+    EXPECT_EQ(3u, view.numberOfEdges());
+
+    // growing back prepends base node 0 as compact id 0 and shifts the rest
+    view.addNode(0);
+    EXPECT_EQ(4u, view.numberOfNodes());
+    EXPECT_EQ(std::vector<node>({0, 2, 3, 4}), view.getNodeSubset());
+    EXPECT_EQ(0u, view.toCompactId(0));
+    EXPECT_EQ(1u, view.toCompactId(2));
+    // base node 0 brings its self-loop plus the 0-2 edge into the view
+    EXPECT_EQ(1u, view.numberOfSelfLoops());
+    EXPECT_EQ(5u, view.numberOfEdges());
+
+    // an empty compact view stays dense
+    view.removeNodes({0, 2, 3, 4});
+    EXPECT_EQ(0u, view.numberOfNodes());
+    EXPECT_EQ(0u, view.upperNodeIdBound());
+    EXPECT_TRUE(view.isEmpty());
+}
+
+TEST_F(InducedSubgraphViewGTest, testCompactRealizeFromCompactView) {
+    const std::vector<node> subset{1, 2, 3, 4};
+    InducedSubgraphView<GraphW> view(base, subset, true);
+
+    // realize(false) restores the base ids however the view itself is laid out
+    GraphW keep = view.realize(false);
+    GraphW referenceKeep = GraphTools::subgraphFromNodes(base, subset.begin(), subset.end(), false);
+    EXPECT_EQ(5u, keep.upperNodeIdBound());
+    EXPECT_EQ(referenceKeep.numberOfEdges(), keep.numberOfEdges());
+    EXPECT_DOUBLE_EQ(referenceKeep.totalEdgeWeight(), keep.totalEdgeWeight());
+    EXPECT_TRUE(keep.hasEdge(1, 2));
+    EXPECT_FALSE(keep.hasNode(0));
+
+    // realize(true) on a compact view agrees with the compact materialization
+    GraphW dense = view.realize(true);
+    EXPECT_EQ(4u, dense.upperNodeIdBound());
+    EXPECT_EQ(6u, dense.numberOfEdges());
+    EXPECT_DOUBLE_EQ(31.0, dense.totalEdgeWeight());
+}
+
+TEST_F(InducedSubgraphViewGTest, testNonCompactIdHelpersAreIdentity) {
+    InducedSubgraphView<GraphW> view(base, {1, 2});
+    EXPECT_FALSE(view.isCompact());
+    EXPECT_EQ(1u, view.toBaseId(1));
+    EXPECT_EQ(2u, view.toCompactId(2));
+    EXPECT_EQ(none, view.toCompactId(0));
+    EXPECT_THROW(view.toBaseId(0), std::runtime_error);
+}
+
+TEST(InducedSubgraphViewCompactDirectedGTest, testDirectedCompactIds) {
+    GraphW D(5, true, true);
+    D.addEdge(0, 4, 1.0);
+    D.addEdge(4, 1, 2.0);
+    D.addEdge(1, 4, 3.0);
+    D.addEdge(4, 4, 4.0); // directed self-loop
+
+    // sorted subset [1, 4]: compact 0 is base 1, compact 1 is base 4
+    InducedSubgraphView<GraphW> view(D, {1, 4}, true);
+    EXPECT_EQ(2u, view.upperNodeIdBound());
+    EXPECT_EQ(0u, view.toCompactId(1));
+    EXPECT_EQ(1u, view.toCompactId(4));
+    EXPECT_EQ(4u, view.toBaseId(1));
+    EXPECT_EQ(3u, view.numberOfEdges());
+    EXPECT_EQ(1u, view.numberOfSelfLoops());
+    EXPECT_EQ(1u, view.degreeOut(0)); // base 1 -> base 4
+    EXPECT_EQ(1u, view.degreeIn(0));  // base 4 -> base 1
+    EXPECT_EQ(2u, view.degreeOut(1)); // base 4 -> base 1 and the loop
+    EXPECT_EQ(2u, view.degreeIn(1));  // base 1 -> base 4 and the loop
+    EXPECT_DOUBLE_EQ(2.0, view.weight(1, 0));
+    EXPECT_DOUBLE_EQ(3.0, view.weight(0, 1));
+
+    std::vector<node> inOf0;
+    for (const auto v : view.inNeighbors<false>(0))
+        inOf0.push_back(v);
+    std::sort(inOf0.begin(), inOf0.end());
+    EXPECT_EQ(std::vector<node>({1}), inOf0);
+}
+
+TEST(InducedSubgraphViewCompactOverGraphRGTest, testReadOnlyCompactBase) {
+    GraphR R = houseCSR();
+    InducedSubgraphView<GraphR> view(R, {1, 2, 3}, true);
+
+    EXPECT_TRUE(view.isCompact());
+    EXPECT_EQ(3u, view.upperNodeIdBound());
+    EXPECT_EQ(3u, view.numberOfEdges());
+    for (node c = 0; c < 3; ++c)
+        EXPECT_EQ(2u, view.degree(c));
+    EXPECT_EQ(2u, view.toBaseId(1));
+    EXPECT_EQ(none, view.toCompactId(0));
+
+    // the frontier still speaks base ids
+    InducedSubgraphView<GraphR> grown(R, {1}, true);
+    EXPECT_EQ(std::vector<node>({0, 2, 3, 4}), grown.frontier());
+}
+
+TEST_F(InducedSubgraphViewGTest, testCompactViewRunsExistingAlgorithms) {
+    const std::set<node> subset{1, 2, 3, 4};
+    InducedSubgraphView<GraphW> view(base, subset, true);
+    GraphW reference = GraphTools::subgraphFromNodes(base, subset.begin(), subset.end(), false);
+
+    CoreDecomposition kcore(view);
+    kcore.run();
+    CoreDecomposition referenceKcore(reference);
+    referenceKcore.run();
+
+    for (const node b : subset)
+        EXPECT_EQ(referenceKcore.score(b), kcore.score(view.toCompactId(b))) << "node " << b;
+}
+
 TEST_F(InducedSubgraphViewGTest, testHandleSurfaceOverViewArms) {
     const std::set<node> subset{1, 2, 3, 4};
     InducedSubgraphView<GraphW> wView(base, subset);

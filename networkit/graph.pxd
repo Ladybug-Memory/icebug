@@ -199,6 +199,7 @@ cdef extern from "<networkit/graph/GraphR.hpp>":
 cdef extern from "<networkit/graph/InducedSubgraphView.hpp>":
 	cdef cppclass _InducedSubgraphViewW "NetworKit::InducedSubgraphView<NetworKit::GraphW>":
 		_InducedSubgraphViewW(const _GraphW& base) except +
+		_InducedSubgraphViewW(const _GraphW& base, bool_t compact) except +
 		const _Graph& asGraph() noexcept
 		count numberOfNodes() except +
 		count numberOfEdges() except +
@@ -206,8 +207,11 @@ cdef extern from "<networkit/graph/InducedSubgraphView.hpp>":
 		index upperNodeIdBound() except +
 		bool_t isDirected() except +
 		bool_t isWeighted() except +
+		bool_t isCompact() except +
 		bool_t hasNode(node u) except +
 		count degree(node u) except +
+		node toBaseId(node u) except +
+		node toCompactId(node u) except +
 		void addNodes(vector[node] nodes) except +
 		void removeNodes(vector[node] nodes) except +
 		vector[node] getNodeSubset() except +
@@ -215,6 +219,7 @@ cdef extern from "<networkit/graph/InducedSubgraphView.hpp>":
 
 	cdef cppclass _InducedSubgraphViewR "NetworKit::InducedSubgraphView<NetworKit::GraphR>":
 		_InducedSubgraphViewR(const _GraphR& base) except +
+		_InducedSubgraphViewR(const _GraphR& base, bool_t compact) except +
 		const _Graph& asGraph() noexcept
 		count numberOfNodes() except +
 		count numberOfEdges() except +
@@ -222,8 +227,11 @@ cdef extern from "<networkit/graph/InducedSubgraphView.hpp>":
 		index upperNodeIdBound() except +
 		bool_t isDirected() except +
 		bool_t isWeighted() except +
+		bool_t isCompact() except +
 		bool_t hasNode(node u) except +
 		count degree(node u) except +
+		node toBaseId(node u) except +
+		node toCompactId(node u) except +
 		void addNodes(vector[node] nodes) except +
 		void removeNodes(vector[node] nodes) except +
 		vector[node] getNodeSubset() except +

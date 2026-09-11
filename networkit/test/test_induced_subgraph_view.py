@@ -110,6 +110,58 @@ class TestInducedSubgraphView(unittest.TestCase):
 		self.assertEqual(2, materialized.numberOfNodes())
 		self.assertEqual(2, materialized.upperNodeIdBound())
 
+	def testCompactViewPresentsDenseIds(self):
+		subset = [1, 2, 3, 4]
+		view = nk.graph.InducedSubgraphView(self.base, subset, compact=True)
+		backed = view.asGraph()
+
+		self.assertTrue(view.isCompact)
+		self.assertEqual(4, backed.numberOfNodes())
+		self.assertEqual(4, backed.upperNodeIdBound())
+		# the subset still speaks base ids and doubles as the compact-to-base map
+		self.assertEqual(subset, view.getNodeSubset())
+		for c in range(4):
+			self.assertEqual(c + 1, view.toBaseId(c))
+			self.assertEqual(c, view.toCompactId(c + 1))
+			self.assertTrue(backed.hasNode(c))
+			self.assertEqual(3, backed.degree(c))
+		self.assertEqual(nk.none, view.toCompactId(0))
+		with self.assertRaises(RuntimeError):
+			view.toBaseId(4)
+
+		# the live view agrees with the compact materialization
+		reference = nk.graphtools.subgraphFromNodes(self.base, subset, compact=True)
+		self.assertEqual(reference.numberOfEdges(), backed.numberOfEdges())
+		self.assertAlmostEqual(reference.totalEdgeWeight(), backed.totalEdgeWeight())
+		for c in range(4):
+			self.assertEqual(sorted(reference.iterNeighbors(c)), sorted(backed.iterNeighbors(c)))
+
+	def testCompactViewEditsRenumber(self):
+		view = nk.graph.InducedSubgraphView(self.base, [1, 2, 3, 4], compact=True)
+		backed = view.asGraph()
+
+		view.removeNode(1)
+		self.assertEqual([2, 3, 4], view.getNodeSubset())
+		self.assertEqual(3, backed.numberOfNodes())
+		self.assertEqual(3, backed.upperNodeIdBound())
+		self.assertEqual(0, view.toCompactId(2))
+
+		view.addNode(0)
+		self.assertEqual([0, 2, 3, 4], view.getNodeSubset())
+		self.assertEqual(0, view.toCompactId(0))
+		self.assertEqual(0, view.toBaseId(0))
+
+	def testCompactViewOverCSR(self):
+		base = nk.graph.Graph.fromCSR(5, False, [1, 2, 0, 2, 3, 4, 0, 1, 3, 4, 1, 2, 4, 1, 2, 3], [0, 2, 6, 10, 13, 16])
+		view = nk.graph.InducedSubgraphView(base, [1, 2, 3], compact=True)
+		backed = view.asGraph()
+		self.assertTrue(view.isCompact)
+		self.assertEqual(3, backed.upperNodeIdBound())
+		self.assertEqual(3, backed.numberOfEdges())
+		for c in range(3):
+			self.assertEqual(2, backed.degree(c))
+		self.assertEqual(c + 1, view.toBaseId(c))
+
 
 if __name__ == "__main__":
 	unittest.main()

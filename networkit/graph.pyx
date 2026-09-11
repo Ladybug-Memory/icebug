@@ -1549,8 +1549,7 @@ cdef class Graph:
 cdef class InducedSubgraphView:
 
 	"""
-	InducedSubgraphView(base)
-	InducedSubgraphView(base, nodes)
+	InducedSubgraphView(base, nodes=None, compact=False)
 
 	The subgraph of `base` induced by a set of nodes, without materializing it.
 
@@ -1559,7 +1558,21 @@ cdef class InducedSubgraphView:
 	:class:`Graph` cannot express live here -- every read goes through :meth:`asGraph`.
 
 	Non-owning: `base` is kept alive by this object and by any graph handed out by
-	:meth:`asGraph`, but the view never copies it. Node ids are `base`'s.
+	:meth:`asGraph`, but the view never copies it.
+
+	By default node ids are `base`'s, so results map straight back onto the base graph. With
+	``compact=True`` the view instead presents dense ids ``0..n-1`` -- the compact id of a
+	member is its rank in the ascending base-id order -- which lets algorithms that allocate
+	per-node storage run on the view without paying for the base graph's id space, the same
+	reason :meth:`GraphTools.subgraphFromNodes` offers its ``compact`` flag, but without
+	materializing a copy. Translate results back with :meth:`toBaseId` before touching the
+	base graph.
+
+	Id spaces on a compact view: membership edits (:meth:`addNodes`, :meth:`removeNodes`) and
+	:meth:`getNodeSubset` speak base-graph ids, while every read through :meth:`asGraph`
+	(:meth:`Graph.hasNode`, :meth:`Graph.degree`, neighborhoods, iterations) speaks compact
+	view ids. Membership edits renumber the survivors to stay dense, so compact ids of
+	pre-existing members may shift after an edit.
 
 	Parameters
 	----------
@@ -1567,20 +1580,23 @@ cdef class InducedSubgraphView:
 		The graph to view. May not itself be a view.
 	nodes : iterable of int, optional
 		Initial subset, given as base-graph ids. Ids absent from the base graph raise.
+	compact : bool, optional
+		Whether the view presents dense ids ``0..n-1`` rather than the base ids.
+		Default: False
 	"""
 
 	cdef shared_ptr[_InducedSubgraphViewW] _wv  # set exactly when the base is writable
 	cdef shared_ptr[_InducedSubgraphViewR] _rv  # set exactly when the base is CSR-backed
 	cdef object _base
 
-	def __cinit__(self, Graph base not None, nodes=None):
+	def __cinit__(self, Graph base not None, nodes=None, bool_t compact=False):
 		cdef vector[node] cnodes
 		# The only place that branches on which concrete graph a Graph holds: the view's
 		# constructors take a concrete graph, so that a view of a view cannot be built.
 		if base._w is not NULL:
-			self._wv = make_shared[_InducedSubgraphViewW](dereference(base._w))
+			self._wv = make_shared[_InducedSubgraphViewW](dereference(base._w), compact)
 		elif base._r is not NULL:
-			self._rv = make_shared[_InducedSubgraphViewR](dereference(base._r))
+			self._rv = make_shared[_InducedSubgraphViewR](dereference(base._r), compact)
 		else:
 			raise TypeError("cannot induce a view on a view")
 		if nodes is not None:
@@ -1602,6 +1618,37 @@ cdef class InducedSubgraphView:
 		"""
 		return self._base
 
+	@property
+	def isCompact(self):
+		"""
+		Whether the view presents dense ids ``0..n-1`` rather than the base ids.
+		"""
+		if self._wv:
+			return dereference(self._wv).isCompact()
+		return dereference(self._rv).isCompact()
+
+	def toBaseId(self, node u):
+		"""
+		toBaseId(u)
+
+		The base-graph id behind the view id `u`. Raises if `u` is not in the view.
+		On a non-compact view this is the identity.
+		"""
+		if self._wv:
+			return dereference(self._wv).toBaseId(u)
+		return dereference(self._rv).toBaseId(u)
+
+	def toCompactId(self, node v):
+		"""
+		toCompactId(v)
+
+		The view id of the base-graph node `v`, or ``none`` when `v` is outside the
+		subset. On a non-compact view this is the identity on members.
+		"""
+		if self._wv:
+			return dereference(self._wv).toCompactId(v)
+		return dereference(self._rv).toCompactId(v)
+
 	def numberOfNodes(self):
 		if self._wv:
 			return dereference(self._wv).numberOfNodes()
@@ -1616,7 +1663,8 @@ cdef class InducedSubgraphView:
 		"""
 		hasNode(u)
 
-		Returns whether `u`, given as a base-graph id, is in the subset.
+		Returns whether `u` is in the subset -- a base-graph id by default, a compact
+		view id on a compact view.
 		"""
 		if self._wv:
 			return dereference(self._wv).hasNode(u)
@@ -1626,7 +1674,8 @@ cdef class InducedSubgraphView:
 		"""
 		degree(u)
 
-		The number of the induced neighbors of `u`.
+		The number of the induced neighbors of `u`, given as a view id (a base-graph
+		id by default, a compact id on a compact view).
 		"""
 		if self._wv:
 			return dereference(self._wv).degree(u)
@@ -1642,7 +1691,8 @@ cdef class InducedSubgraphView:
 		"""
 		addNode(u)
 
-		Add one node, given as a base-graph id, to the subset.
+		Add one node, given as a base-graph id, to the subset. On a compact view the
+		compact ids of pre-existing members may shift.
 
 		Parameters
 		----------
@@ -1659,7 +1709,8 @@ cdef class InducedSubgraphView:
 		"""
 		addNodes(nodes)
 
-		Add nodes, given as base-graph ids, to the subset.
+		Add nodes, given as base-graph ids, to the subset. On a compact view the compact
+		ids of pre-existing members may shift.
 
 		Parameters
 		----------
@@ -1676,6 +1727,7 @@ cdef class InducedSubgraphView:
 		removeNode(u)
 
 		Remove one node, given as a base-graph id, from the subset. Ignored if not present.
+		On a compact view the survivors are renumbered to stay dense.
 		"""
 		self.removeNodes([u])
 		return self
@@ -1685,6 +1737,7 @@ cdef class InducedSubgraphView:
 		removeNodes(nodes)
 
 		Remove nodes, given as base-graph ids, from the subset. Absent ids are ignored.
+		On a compact view the survivors are renumbered to stay dense.
 		"""
 		cdef vector[node] cnodes = list(nodes)
 		if self._wv:
@@ -1700,7 +1753,8 @@ cdef class InducedSubgraphView:
 		Returns
 		-------
 		list(int)
-			The subset, always as base-graph ids, in ascending order.
+			The subset, always as base-graph ids, in ascending order. On a compact view
+			entry ``c`` is the base id behind compact id ``c``.
 		"""
 		if self._wv:
 			return dereference(self._wv).getNodeSubset()
@@ -1714,7 +1768,8 @@ cdef class InducedSubgraphView:
 		-------
 		networkit.Graph
 			A read-only graph reading through this view. Reflects later changes to the subset;
-			attempting to modify it raises RuntimeError.
+			attempting to modify it raises RuntimeError. Node ids are the base ids by default,
+			compact ids ``0..n-1`` on a compact view.
 
 		Notes
 		-----
