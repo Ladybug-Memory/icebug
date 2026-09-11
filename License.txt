@@ -2,6 +2,7 @@ Copyright (c) 2013-2022 Henning Meyerhenke, NetworKit Contributors
 Copyright (c) 2013-2017 Karlsruhe Institute of Technology
 Copyright (c) 2017-2018 University of Cologne
 Copyright (c) 2018-2022 Humboldt-Universität zu Berlin
+Copyright (c) 2025-2026 Ladybug Memory, Inc
 
 MIT License (http://opensource.org/licenses/MIT)
 

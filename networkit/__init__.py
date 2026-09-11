@@ -28,7 +28,7 @@ __copyright__ = "Copyright (c) 2014 Christan Staudt"
 __credits__ = ["Eugenio Angriman", "Lukas Barth", "Miriam Beddig", "Elisabetta Bergamini", "Stefan Bertsch", "Pratistha Bhattarai", "Andreas Bilke", "Simon Bischof", \
 	"Fabian Brandt-Tumescheit", "Guido Brückner", "Mark Erb",  "Kolja Esders", "Patrick Flick", "Michael Hamann", "Lukas Hartmann", "Daniel Hoske", "Gerd Lindner", \
     "Moritz v. Looz", "Yassine Marrakchi", "Henning Meyerhenke", "Manuel Penschuck", "Lucas Archimedes Gregorio Henr Petersen", "Marcel Radermacher", "Klara Reichard", \
-	"Marvin Ritter", "Aleksejs Sazonovs", "Hung Tran", "Alexander van der Grinten", "Florian Weber", "Michael Wegner", "Jörg Weisbarth"]
+	"Marvin Ritter", "Aleksejs Sazonovs", "Arun Sharma", "Hung Tran", "Alexander van der Grinten", "Florian Weber", "Michael Wegner", "Jörg Weisbarth"]
 __license__ = "MIT"
 __version__ = "13.2"
 
