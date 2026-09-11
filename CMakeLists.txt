@@ -719,7 +719,7 @@ add_subdirectory(networkit/cpp)
 set(NETWORKIT_LIBRARIES networkit)
 install(DIRECTORY include/networkit
 	DESTINATION ${NETWORKIT_INSTALL_INCLUDE_DIR}
-	FILES_MATCHING PATTERN "*.hpp")
+	FILES_MATCHING PATTERN "*.hpp" PATTERN "*.tpp")
 
 # Install ttmath header files
 install(DIRECTORY extlibs/ttmath/ttmath

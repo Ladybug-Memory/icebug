@@ -541,14 +541,14 @@ public:
     /// O(1). Requires hasNode(u); @a u is a view id.
     count degreeOut(node u) const {
         assert(hasNode(u));
-        return compact_ ? outDegreeC_.values()[u] : outDegree_[u];
+        return compact_ ? degreesC_.values()[u].out : outDegree_[u];
     }
 
     /// O(1). Requires hasNode(u); @a u is a view id. On an undirected base the in-degree is
     /// the out-degree.
     count degreeIn(node u) const {
         assert(hasNode(u));
-        return directed_ ? (compact_ ? inDegreeC_.values()[u] : inDegree_[u]) : degreeOut(u);
+        return directed_ ? (compact_ ? degreesC_.values()[u].in : inDegree_[u]) : degreeOut(u);
     }
 
     bool isIsolated(node u) const {
@@ -749,10 +749,15 @@ private:
     /// Compact-mode degree storage: keyed by base id (so the incremental updates during
     /// membership edits find their entries), with keys() sorted ascending. keys() is therefore
     /// the member set -- a compact id indexes keys()/values() directly -- and the flat_map is
-    /// updated in place by every edit, so readers never observe a stale mapping.
-    Aux::flat_map<node, count> outDegreeC_;
-    /// Only populated on a directed base.
-    Aux::flat_map<node, count> inDegreeC_;
+    /// updated in place by every edit, so readers never observe a stale mapping. In- and
+    /// out-degrees share one map because they have identical key sets; a second map would
+    /// duplicate the keys (n * sizeof(node) bytes) and double the sorted-insertion work.
+    /// The `in` field is unused on an undirected base.
+    struct CompactDegrees {
+        count out = 0;
+        count in = 0;
+    };
+    Aux::flat_map<node, CompactDegrees> degreesC_;
     count n_ = 0, m_ = 0, selfLoops_ = 0;
     bool directed_;
     /// When true, the GraphLike primitives present dense ids @c [0, n) while the membership
@@ -788,7 +793,7 @@ private:
             }
             return sortedMembers_;
         }
-        return outDegreeC_.keys();
+        return degreesC_.keys();
     }
 
     /// View id @a u to base id. Precondition: hasNode(u); callers establish that (outNeighbors
@@ -814,10 +819,18 @@ private:
     /// A member's stored out-degree, for the incremental updates during edits. On a compact
     /// view flat_map::operator[] finds the member's entry (inserting a zero for a node that
     /// is joining, which the caller then overwrites).
-    count &outDegreeAt(node b) { return compact_ ? outDegreeC_[b] : outDegree_[b]; }
+    count &outDegreeAt(node b) {
+        if (compact_)
+            return degreesC_[b].out;
+        return outDegree_[b];
+    }
 
     /// As outDegreeAt, over the in-degrees. Only called on a directed base.
-    count &inDegreeAt(node b) { return compact_ ? inDegreeC_[b] : inDegree_[b]; }
+    count &inDegreeAt(node b) {
+        if (compact_)
+            return degreesC_[b].in;
+        return inDegree_[b];
+    }
 
     template <typename NodeRange>
     void addNodesImpl(const NodeRange &nodes) {
@@ -924,10 +937,8 @@ private:
         }
 
         if (compact_) {
-            // the flat_maps' keys must equal the membership: drop @a v's entries
-            outDegreeC_.erase(v);
-            if (directed_)
-                inDegreeC_.erase(v);
+            // the flat_map's keys must equal the membership: drop @a v's entry
+            degreesC_.erase(v);
         } else {
             if (directed_)
                 inDegree_[v] = 0;
