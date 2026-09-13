@@ -35,6 +35,7 @@ networkit_add_module(centrality
     LocalPartitionCoverage.cpp
     LocalSquareClusteringCoefficient.cpp
     PageRank.cpp
+    ParallelCoreDecomposition.cpp
     PermanenceCentrality.cpp
     Sfigality.cpp
     SpanningEdgeCentrality.cpp
