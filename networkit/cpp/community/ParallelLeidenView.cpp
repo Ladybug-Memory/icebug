@@ -276,8 +276,7 @@ void ParallelLeidenView::run() {
                 result = std::move(p);
                 currentCoarsenedView = newCoarsenedView;
 
-            } else {
-                // First coarsening from original graph
+            } else { // First coarsening from original graph
                 ParallelPartitionCoarseningView ppcView(*currentGraph, refined);
                 ppcView.run();
                 auto newCoarsenedView = ppcView.getCoarsenedGraphView();
@@ -294,6 +293,9 @@ void ParallelLeidenView::run() {
                 currentGraph = nullptr;
             }
 
+            // Adaptive eager cache: materialize hot supernode neighborhoods once per level
+            // so inner move/refine iterations reuse them instead of re-aggregating.
+            currentCoarsenedView->ensureEagerCache();
             calculateVolumes(*currentCoarsenedView);
 
             const count currentCommunities = result.numberOfSubsets();
