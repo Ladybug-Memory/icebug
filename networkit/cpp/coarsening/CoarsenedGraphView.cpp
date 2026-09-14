@@ -8,7 +8,9 @@
 #include <networkit/auxiliary/Timer.hpp>
 #include <networkit/coarsening/CoarsenedGraphView.hpp>
 
-#include <unordered_map>
+#include <algorithm>
+#include <utility>
+#include <vector>
 
 namespace NetworKit {
 
@@ -98,35 +100,52 @@ const std::vector<node> &CoarsenedGraphView::getOriginalNodes(node supernode) co
 
 std::vector<std::pair<node, edgeweight>>
 CoarsenedGraphView::computeNeighbors(node supernode) const {
-    std::unordered_map<node, edgeweight> aggregatedWeights;
+    // Flat aggregation (InducedSubgraphView-style): stage (supernode, weight) pairs into a
+    // reusable thread-local buffer, sort, then combine runs. This avoids per-call
+    // std::unordered_map hashing and its per-node bucket allocations; the only allocation
+    // left is the returned vector. Sort order also makes the output deterministic.
+    thread_local std::vector<std::pair<node, edgeweight>> staged;
+    staged.clear();
 
-    // No locks needed here - supernodeToOriginal and nodeMapping are read-only after construction
-    // Iterate through all original nodes in this supernode
+    // No locks needed here - supernodeToOriginal and nodeMapping are read-only after
+    // construction. Iterate through all original nodes in this supernode.
     for (node originalNode : supernodeToOriginal[supernode]) {
         // Iterate through neighbors of each original node
         originalGraph.forNeighborsOf(originalNode, [&](node originalNeighbor, edgeweight weight) {
             node neighborSupernode = nodeMapping[originalNeighbor];
             /*
-             * An undirected edge sits in the adjacency of both endpoints, so an edge inside this
-             * supernode would be aggregated twice. Count it once, from the higher endpoint,
-             * mirroring ParallelPartitionCoarsening's aggregation.
+             * An undirected edge sits in the adjacency of both endpoints, so an edge inside
+             * this supernode would be aggregated twice. Count it once, from the higher
+             * endpoint, mirroring ParallelPartitionCoarsening's aggregation.
              */
             if (neighborSupernode == supernode && originalNode < originalNeighbor)
                 return;
-            // Aggregate weights to the same supernode
-            aggregatedWeights[neighborSupernode] += weight;
+            staged.emplace_back(neighborSupernode, weight);
         });
     }
 
-    // Convert to vector format
-    std::vector<std::pair<node, edgeweight>> neighbors;
-    neighbors.reserve(aggregatedWeights.size());
+    if (staged.empty())
+        return {};
 
-    for (const auto &entry : aggregatedWeights) {
-        if (entry.second > 0.0) { // Only include edges with positive weight
-            neighbors.emplace_back(entry.first, entry.second);
+    std::sort(staged.begin(), staged.end(),
+              [](const auto &a, const auto &b) { return a.first < b.first; });
+
+    // Combine runs of equal supernodes into the output vector.
+    std::vector<std::pair<node, edgeweight>> neighbors;
+    neighbors.reserve(staged.size());
+    node cur = staged[0].first;
+    edgeweight acc = 0.0;
+    for (const auto &entry : staged) {
+        if (entry.first != cur) {
+            if (acc > 0.0)
+                neighbors.emplace_back(cur, acc);
+            cur = entry.first;
+            acc = 0.0;
         }
+        acc += entry.second;
     }
+    if (acc > 0.0) // Only include edges with positive weight
+        neighbors.emplace_back(cur, acc);
 
     return neighbors;
 }
