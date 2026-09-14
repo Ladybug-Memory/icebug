@@ -6,12 +6,15 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <networkit/auxiliary/FlatMap.hpp>
 #include <networkit/community/ParallelLeidenView.hpp>
 #ifndef _WIN32
 #include <dlfcn.h>
 #endif
+#include <algorithm>
 #include <stdexcept>
-#include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace NetworKit {
 
@@ -433,9 +436,13 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
         currentNodes.reserve(tshare);
         std::vector<node> newNodes;
         newNodes.reserve(WORKING_SIZE);
-        // Sparse cutWeight[Community] storage avoids one dense community vector per thread.
-        std::unordered_map<index, double> cutWeights;
+        // Flat cut-weight storage (InducedSubgraphView-style): stage (community, weight)
+        // pairs once per visit, sort, and combine runs into parallel pointers/cutVals
+        // vectors. Binary search replaces hash lookups; per-thread staging vectors are
+        // reused across visits to avoid malloc/free churn.
+        std::vector<std::pair<index, double>> staged;
         std::vector<index> pointers;
+        std::vector<double> cutVals;
 
         auto moveLimitReached = [&](node candidate) {
             return movesPerNode[candidate].load() >= static_cast<unsigned int>(maxMovesPerNode);
@@ -538,51 +545,61 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
                 index bestCommunity = none;
                 double degree = 0;
                 count nodeMass = nodeSize(graph, u);
-                for (auto z : pointers) {
-                    // Reset the clearlist : Set all cutweights to 0 and clear the pointer vector
-                    cutWeights.erase(z);
-                }
+                staged.clear();
                 pointers.clear();
+                cutVals.clear();
 
                 graph.forNeighborsOf(u, [&](node neighbor, edgeweight ew) {
-                    index neighborCommunity = result[neighbor];
-                    if (cutWeights.find(neighborCommunity) == cutWeights.end()) {
-                        pointers.push_back(neighborCommunity);
-                    }
                     if (u == neighbor) {
-                        degree += ew;
+                        degree += 2 * ew;
                     } else {
-                        cutWeights[neighborCommunity] += ew;
+                        staged.emplace_back(result[neighbor], ew);
+                        degree += ew; // keep track of the nodes degree. Loops count twice
                     }
-                    degree += ew; // keep track of the nodes degree. Loops count twice
                 });
 
-                if (pointers.empty()) {
+                if (staged.empty()) {
                     finishProcessingNode(u);
                     continue;
                 }
 
+                // Sort + combine runs: one entry per adjacent community.
+                std::sort(staged.begin(), staged.end(),
+                          [](const auto &a, const auto &b) { return a.first < b.first; });
+                for (const auto &entry : staged) {
+                    if (!pointers.empty() && pointers.back() == entry.first) {
+                        cutVals.back() += entry.second;
+                    } else {
+                        pointers.push_back(entry.first);
+                        cutVals.push_back(entry.second);
+                    }
+                }
+                staged.clear();
+
+                auto cutOf = [&](index community) {
+                    auto it = std::lower_bound(pointers.begin(), pointers.end(), community);
+                    if (it == pointers.end() || *it != community)
+                        return 0.0;
+                    return cutVals[static_cast<size_t>(it - pointers.begin())];
+                };
+
                 double singletonScore = scoreCommunity(0.0, degree, 0.0, nodeMass, 0);
 
                 // Determine move score for all neighbor communities
-                for (auto community : pointers) {
+                for (size_t k = 0; k < pointers.size(); ++k) {
+                    index community = pointers[k];
                     // "Moving" a node to its current community is pointless
                     if (community != currentCommunity) {
-                        double delta;
-                        const auto cutWeightIt = cutWeights.find(community);
-                        const double cutWeight =
-                            cutWeightIt == cutWeights.end() ? 0.0 : cutWeightIt->second;
-                        delta = scoreCommunity(cutWeight, degree, communityVolumes[community],
-                                               nodeMass, communitySizes[community]);
+                        double delta =
+                            scoreCommunity(cutVals[k], degree, communityVolumes[community],
+                                           nodeMass, communitySizes[community]);
                         if (delta > maxDelta) {
                             maxDelta = delta;
                             bestCommunity = community;
                         }
                     }
                 }
-                const auto currentCutWeightIt = cutWeights.find(currentCommunity);
-                const double currentCutWeight =
-                    currentCutWeightIt == cutWeights.end() ? 0.0 : currentCutWeightIt->second;
+                const double currentCutWeight = cutOf(currentCommunity);
                 double modThreshold = scoreCurrentCommunityThreshold(
                     currentCutWeight, degree, communityVolumes[currentCommunity], nodeMass,
                     communitySizes[currentCommunity]);
@@ -693,6 +710,9 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
         TRACE("Thread ", omp_get_thread_num(), " worked ",
               totalNodesPerThread[omp_get_thread_num()], "Nodes and moved ",
               moved[omp_get_thread_num()]);
+        // Shrink after every phase: drop this thread's view-aggregation scratch so a
+        // high-water mark from this level cannot leak into the next.
+        CoarsenedGraphView::releaseThreadScratch();
     }
     result.setUpperBound(upperBound);
     assert(queue.empty());
@@ -760,8 +780,9 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph, bool &refin
 #pragma omp parallel
     {
         std::vector<index> neighComms;
-        // Keeps track of relevant Neighbor communities. Needed to reset the clearlist fast
-        std::unordered_map<index, double> cutWeights; // cut from Node to Communities
+        // Flat cut map (InducedSubgraphView-style): sorted-vector storage instead of a hash
+        // table; refinement neighborhoods are small so binary search beats hashing.
+        Aux::flat_map<index, double> cutWeights; // cut from Node to Communities
         auto &mt = Aux::Random::getURNG();
 #pragma omp for
         for (omp_index u = 0; u < static_cast<omp_index>(graph.upperNodeIdBound()); u++) {
@@ -958,6 +979,8 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph, bool &refin
             locks[bestC].unlock();
             locks[u].unlock();
         }
+        // Shrink after every phase: drop this thread's view-aggregation scratch.
+        CoarsenedGraphView::releaseThreadScratch();
     }
 
     refineMadeChanges = anyRefinementChanges.load();
