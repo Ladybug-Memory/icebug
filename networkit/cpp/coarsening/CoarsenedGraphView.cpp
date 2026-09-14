@@ -14,6 +14,18 @@
 
 namespace NetworKit {
 
+namespace {
+// Phase-scoped scratch for computeNeighbors(): reused across calls within a move/refine
+// phase, released via releaseThreadScratch() at each phase boundary so a high-water mark
+// from one coarsening level cannot leak into the next.
+thread_local std::vector<std::pair<node, edgeweight>> t_staged;
+} // namespace
+
+void CoarsenedGraphView::releaseThreadScratch() {
+    t_staged.clear();
+    t_staged.shrink_to_fit();
+}
+
 CoarsenedGraphView::CoarsenedGraphView(const Graph &originalGraph, const Partition &partition)
     : originalGraph(originalGraph) {
 
@@ -98,14 +110,14 @@ const std::vector<node> &CoarsenedGraphView::getOriginalNodes(node supernode) co
     return supernodeToOriginal[supernode];
 }
 
-std::vector<std::pair<node, edgeweight>>
-CoarsenedGraphView::computeNeighbors(node supernode) const {
-    // Flat aggregation (InducedSubgraphView-style): stage (supernode, weight) pairs into a
-    // reusable thread-local buffer, sort, then combine runs. This avoids per-call
+std::vector<std::pair<node, edgeweight>> CoarsenedGraphView::computeNeighbors(
+    node supernode) const { // Flat aggregation (InducedSubgraphView-style): stage (supernode,
+                            // weight) pairs into the
+    // phase-scoped thread-local buffer, sort, then combine runs. This avoids per-call
     // std::unordered_map hashing and its per-node bucket allocations; the only allocation
     // left is the returned vector. Sort order also makes the output deterministic.
-    thread_local std::vector<std::pair<node, edgeweight>> staged;
-    staged.clear();
+    // Call releaseThreadScratch() at phase boundaries to shrink after every phase.
+    t_staged.clear();
 
     // No locks needed here - supernodeToOriginal and nodeMapping are read-only after
     // construction. Iterate through all original nodes in this supernode.
@@ -120,22 +132,22 @@ CoarsenedGraphView::computeNeighbors(node supernode) const {
              */
             if (neighborSupernode == supernode && originalNode < originalNeighbor)
                 return;
-            staged.emplace_back(neighborSupernode, weight);
+            t_staged.emplace_back(neighborSupernode, weight);
         });
     }
 
-    if (staged.empty())
+    if (t_staged.empty())
         return {};
 
-    std::sort(staged.begin(), staged.end(),
+    std::sort(t_staged.begin(), t_staged.end(),
               [](const auto &a, const auto &b) { return a.first < b.first; });
 
     // Combine runs of equal supernodes into the output vector.
     std::vector<std::pair<node, edgeweight>> neighbors;
-    neighbors.reserve(staged.size());
-    node cur = staged[0].first;
+    neighbors.reserve(t_staged.size());
+    node cur = t_staged[0].first;
     edgeweight acc = 0.0;
-    for (const auto &entry : staged) {
+    for (const auto &entry : t_staged) {
         if (entry.first != cur) {
             if (acc > 0.0)
                 neighbors.emplace_back(cur, acc);

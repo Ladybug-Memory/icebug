@@ -710,6 +710,9 @@ ParallelLeidenView::MoveStats ParallelLeidenView::parallelMove(const GraphType &
         TRACE("Thread ", omp_get_thread_num(), " worked ",
               totalNodesPerThread[omp_get_thread_num()], "Nodes and moved ",
               moved[omp_get_thread_num()]);
+        // Shrink after every phase: drop this thread's view-aggregation scratch so a
+        // high-water mark from this level cannot leak into the next.
+        CoarsenedGraphView::releaseThreadScratch();
     }
     result.setUpperBound(upperBound);
     assert(queue.empty());
@@ -976,6 +979,8 @@ Partition ParallelLeidenView::parallelRefine(const GraphType &graph, bool &refin
             locks[bestC].unlock();
             locks[u].unlock();
         }
+        // Shrink after every phase: drop this thread's view-aggregation scratch.
+        CoarsenedGraphView::releaseThreadScratch();
     }
 
     refineMadeChanges = anyRefinementChanges.load();

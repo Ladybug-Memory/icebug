@@ -258,6 +258,13 @@ public:
      */
     const std::vector<node> &getOriginalNodes(node supernode) const;
 
+    /**
+     * Release the calling thread's computeNeighbors() scratch buffer (capacity included).
+     * Call at the end of a move/refine phase so a giant-supernode high-water mark from one
+     * level cannot leak into the next.
+     */
+    static void releaseThreadScratch();
+
 private:
     const Graph &originalGraph;
     std::vector<node> nodeMapping;                      // original_node -> supernode
