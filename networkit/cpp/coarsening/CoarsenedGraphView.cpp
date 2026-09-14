@@ -9,16 +9,32 @@
 #include <networkit/coarsening/CoarsenedGraphView.hpp>
 
 #include <algorithm>
+#include <cstdlib>
+#include <omp.h>
+#include <string>
 #include <utility>
 #include <vector>
+#include <tlx/unused.hpp>
 
 namespace NetworKit {
 
 namespace {
-// Phase-scoped scratch for computeNeighbors(): reused across calls within a move/refine
-// phase, released via releaseThreadScratch() at each phase boundary so a high-water mark
-// from one coarsening level cannot leak into the next.
+// Phase-scoped scratch for aggregation: reused across calls within a move/refine phase,
+// released via releaseThreadScratch() at each phase boundary so a high-water mark from one
+// coarsening level cannot leak into the next.
 thread_local std::vector<std::pair<node, edgeweight>> t_staged;
+
+size_t eagerThresholdFromEnv() {
+    if (const char *env = std::getenv("NETWORKIT_LEIDEN_EAGER_THRESHOLD")) {
+        try {
+            const unsigned long long parsed = std::stoull(env);
+            return static_cast<size_t>(parsed);
+        } catch (...) {
+            // Keep default if parsing fails.
+        }
+    }
+    return 2048;
+}
 } // namespace
 
 void CoarsenedGraphView::releaseThreadScratch() {
@@ -43,6 +59,7 @@ CoarsenedGraphView::CoarsenedGraphView(const Graph &originalGraph, const Partiti
         nodeMapping[u] = supernode;
         supernodeToOriginal[supernode].push_back(u);
     });
+    initCache();
 
     TRACE("Created CoarsenedGraphView with ", numSupernodes, " supernodes from ",
           originalGraph.numberOfNodes(), " original nodes");
@@ -65,9 +82,31 @@ CoarsenedGraphView::CoarsenedGraphView(const CoarsenedGraphView &baseView,
         nodeMapping[originalNode] = supernode;
         supernodeToOriginal[supernode].push_back(originalNode);
     });
+    initCache();
 
     TRACE("Created layered CoarsenedGraphView with ", numSupernodes, " supernodes from ",
           baseView.numberOfNodes(), " base supernodes");
+}
+
+void CoarsenedGraphView::initCache() {
+    eagerNeighborThreshold = eagerThresholdFromEnv();
+    neighborCache_.resize(numSupernodes);
+    neighborCached_.assign(numSupernodes, 0);
+    cacheMutexes_ = std::vector<std::mutex>(numSupernodes);
+}
+
+count CoarsenedGraphView::numberOfCachedNeighborhoods() const {
+    count cached = 0;
+    for (char flag : neighborCached_)
+        cached += flag ? 1 : 0;
+    return cached;
+}
+
+size_t CoarsenedGraphView::aggregationWork(node supernode) const {
+    size_t work = 0;
+    for (node originalNode : supernodeToOriginal[supernode])
+        work += static_cast<size_t>(originalGraph.degree(originalNode));
+    return work;
 }
 
 count CoarsenedGraphView::numberOfEdges() const {
@@ -110,14 +149,15 @@ const std::vector<node> &CoarsenedGraphView::getOriginalNodes(node supernode) co
     return supernodeToOriginal[supernode];
 }
 
-std::vector<std::pair<node, edgeweight>> CoarsenedGraphView::computeNeighbors(
-    node supernode) const { // Flat aggregation (InducedSubgraphView-style): stage (supernode,
-                            // weight) pairs into the
+std::vector<std::pair<node, edgeweight>>
+CoarsenedGraphView::aggregateNeighbors(node supernode, size_t &workOut) const {
+    // Flat aggregation (InducedSubgraphView-style): stage (supernode, weight) pairs into the
     // phase-scoped thread-local buffer, sort, then combine runs. This avoids per-call
     // std::unordered_map hashing and its per-node bucket allocations; the only allocation
     // left is the returned vector. Sort order also makes the output deterministic.
     // Call releaseThreadScratch() at phase boundaries to shrink after every phase.
     t_staged.clear();
+    workOut = 0;
 
     // No locks needed here - supernodeToOriginal and nodeMapping are read-only after
     // construction. Iterate through all original nodes in this supernode.
@@ -159,7 +199,63 @@ std::vector<std::pair<node, edgeweight>> CoarsenedGraphView::computeNeighbors(
     if (acc > 0.0) // Only include edges with positive weight
         neighbors.emplace_back(cur, acc);
 
+    workOut = t_staged.size();
     return neighbors;
+}
+
+std::vector<std::pair<node, edgeweight>>
+CoarsenedGraphView::computeNeighbors(node supernode) const {
+    if (!hasNode(supernode))
+        return {};
+    {
+        std::lock_guard<std::mutex> guard(cacheMutexes_[supernode]);
+        if (neighborCached_[supernode])
+            return neighborCache_[supernode];
+    }
+    // Uncached: aggregate without holding the lock, then publish under it. A loser of the
+    // race recomputes the identical vector and discards it.
+    size_t work = 0;
+    auto neighbors = aggregateNeighbors(supernode, work);
+    // Lazy promotion: hot supernodes pay aggregation on every visit, so keep the result.
+    if (work >= eagerNeighborThreshold) {
+        std::lock_guard<std::mutex> guard(cacheMutexes_[supernode]);
+        if (!neighborCached_[supernode]) {
+            neighborCache_[supernode] = neighbors;
+            neighborCached_[supernode] = 1;
+        }
+    }
+    return neighbors;
+}
+
+void CoarsenedGraphView::ensureEagerCache() {
+    // Eager path: materialize hot supernodes up front, in parallel. The work estimate is
+    // O(members) per supernode from already-resident mapping storage. Each entry has its
+    // own mutex, so supernodes proceed independently.
+    if (eagerNeighborThreshold == none) {
+        return; // caching disabled
+    }
+#pragma omp parallel for schedule(dynamic)
+    for (omp_index s = 0; s < static_cast<omp_index>(numSupernodes); ++s) {
+        const node supernode = static_cast<node>(s);
+        // Eligibility check under the entry lock; aggregation itself runs unlocked
+        // (t_staged is thread-local) and publishes under the lock.
+        bool eligible = false;
+        {
+            std::lock_guard<std::mutex> guard(cacheMutexes_[supernode]);
+            eligible =
+                !neighborCached_[supernode] && aggregationWork(supernode) >= eagerNeighborThreshold;
+        }
+        if (!eligible)
+            continue;
+        size_t work = 0;
+        auto neighbors = aggregateNeighbors(supernode, work);
+        tlx::unused(work);
+        std::lock_guard<std::mutex> guard(cacheMutexes_[supernode]);
+        if (!neighborCached_[supernode]) {
+            neighborCache_[supernode] = std::move(neighbors);
+            neighborCached_[supernode] = 1;
+        }
+    }
 }
 
 } /* namespace NetworKit */

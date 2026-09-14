@@ -7,6 +7,7 @@
 #ifndef NETWORKIT_COARSENING_COARSENED_GRAPH_VIEW_HPP_
 #define NETWORKIT_COARSENING_COARSENED_GRAPH_VIEW_HPP_
 
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -265,6 +266,29 @@ public:
      */
     static void releaseThreadScratch();
 
+    /**
+     * Adaptive eager neighbor cache (InducedSubgraphView-style eager-vs-lazy tradeoff).
+     *
+     * The view itself is immutable, so a cached aggregation never invalidates within the
+     * view's lifetime. Aggregation work for a supernode scales with the sum of its members'
+     * base degrees; recomputing that on every visit (lazy) is wasteful for hot supernodes
+     * but cheaper than storing it for cold ones. ensureEagerCache() materializes entries
+     * whose estimated work exceeds eagerNeighborThreshold (in staged edge-endpoints),
+     * while computeNeighbors() promotes any other supernode to the cache once its observed
+     * work crosses the same threshold. Supernodes below the threshold stay lazy.
+     *
+     * Set to 0 to cache everything (a full materialization, ~ParallelLeiden's memory
+     * profile) or to none to disable caching entirely (pure lazy, status quo ante).
+     * Tune via the NETWORKIT_LEIDEN_EAGER_THRESHOLD environment variable.
+     */
+    void ensureEagerCache();
+
+    /// Aggregate work threshold for eager caching / lazy promotion (staged edge-endpoints).
+    size_t eagerNeighborThreshold = 2048;
+
+    /// Number of cached supernode neighborhoods (for observability / tests).
+    count numberOfCachedNeighborhoods() const;
+
 private:
     const Graph &originalGraph;
     std::vector<node> nodeMapping;                      // original_node -> supernode
@@ -272,9 +296,23 @@ private:
     count numSupernodes;
 
     /**
-     * Compute the aggregated neighbors of a supernode (on demand, no caching)
+     * Compute the aggregated neighbors of a supernode, consulting / populating the
+     * adaptive cache as described at ensureEagerCache(). Thread-safe.
      */
     std::vector<std::pair<node, edgeweight>> computeNeighbors(node supernode) const;
+
+    // Estimated aggregation work for @a supernode: sum of its members' base degrees.
+    size_t aggregationWork(node supernode) const;
+
+    // Aggregate without consulting the cache; stores the staged pair count in @a workOut.
+    std::vector<std::pair<node, edgeweight>> aggregateNeighbors(node supernode,
+                                                                size_t &workOut) const;
+
+    mutable std::vector<std::vector<std::pair<node, edgeweight>>> neighborCache_;
+    mutable std::vector<char> neighborCached_;
+    mutable std::vector<std::mutex> cacheMutexes_;
+
+    void initCache();
 };
 
 static_assert(GraphLike<CoarsenedGraphView>,
