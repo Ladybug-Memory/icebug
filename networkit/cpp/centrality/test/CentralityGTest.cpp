@@ -10,7 +10,11 @@
 #include <iostream>
 #include <random>
 
+#include <omp.h>
+#include "../ParallelCoreDecompositionInternal.hpp"
+#include <arrow/api.h>
 #include <gtest/gtest.h>
+#include <networkit/graph/GraphR.hpp>
 
 #include <networkit/auxiliary/Log.hpp>
 #include <networkit/auxiliary/Timer.hpp>
@@ -46,6 +50,7 @@
 #include <networkit/centrality/LocalPartitionCoverage.hpp>
 #include <networkit/centrality/LocalSquareClusteringCoefficient.hpp>
 #include <networkit/centrality/PageRank.hpp>
+#include <networkit/centrality/ParallelCoreDecomposition.hpp>
 #include <networkit/centrality/PermanenceCentrality.hpp>
 #include <networkit/centrality/Sfigality.hpp>
 #include <networkit/centrality/SpanningEdgeCentrality.hpp>
@@ -1521,6 +1526,222 @@ TEST_F(CentralityGTest, testCoreDecomposition) {
     H.addEdge(0, 1);
     H.addEdge(1, 1);
     EXPECT_ANY_THROW(CoreDecomposition CoreDec(H));
+}
+
+TEST_F(CentralityGTest, testParallelCoreDecompositionMatchesSequentialOracle) {
+    Aux::Random::setSeed(42, false);
+    GraphW G = ErdosRenyiGenerator(1000, 0.02, false).generate();
+
+    CoreDecomposition reference(G, false, true);
+    reference.run();
+
+    ParallelCoreDecomposition parallel(G);
+    parallel.run();
+
+    EXPECT_EQ(reference.scores(), parallel.scores());
+    EXPECT_EQ(reference.maxCoreNumber(), parallel.maxCoreNumber());
+    EXPECT_LE(parallel.numberOfRestarts(), 1u);
+}
+
+TEST_F(CentralityGTest, testParallelCoreDecompositionHierarchicalBuckets) {
+    GraphW G = ErdosRenyiGenerator(520, 1.0, false).generate();
+    ParallelCoreDecomposition parallel(G);
+    parallel.run();
+
+    EXPECT_EQ(519u, parallel.maxCoreNumber());
+    G.forNodes([&](node u) { EXPECT_EQ(519, parallel.score(u)); });
+}
+
+TEST_F(CentralityGTest, testParallelCoreDecompositionSampling) {
+    GraphW G(25001);
+    for (node leaf = 1; leaf < G.numberOfNodes(); ++leaf) {
+        G.addEdge(0, leaf);
+    }
+
+    ParallelCoreDecomposition parallel(G);
+    parallel.run();
+
+    EXPECT_EQ(1u, parallel.maxCoreNumber());
+    G.forNodes([&](node u) { EXPECT_EQ(1, parallel.score(u)); });
+    EXPECT_LE(parallel.numberOfRestarts(), 1u);
+}
+
+TEST_F(CentralityGTest, testParallelCoreDecompositionThreadMatrixAndGraphR) {
+    struct RestoreThreads {
+        int threads = omp_get_max_threads();
+        ~RestoreThreads() { omp_set_num_threads(threads); }
+    } restore;
+
+    // A high-degree center exercises sampling and the GraphR indexed-neighbor path.
+    GraphW writable(25001);
+    for (node u = 1; u < writable.numberOfNodes(); ++u) {
+        writable.addEdge(0, u);
+    }
+    arrow::UInt64Builder indicesBuilder, offsetsBuilder;
+    uint64_t offset = 0;
+    ASSERT_TRUE(offsetsBuilder.Append(offset).ok());
+    writable.forNodes([&](node u) {
+        writable.forNeighborsOf(u, [&](node v) {
+            ASSERT_TRUE(indicesBuilder.Append(v).ok());
+            ++offset;
+        });
+        ASSERT_TRUE(offsetsBuilder.Append(offset).ok());
+    });
+    std::shared_ptr<arrow::UInt64Array> indices, offsets;
+    ASSERT_TRUE(indicesBuilder.Finish(&indices).ok());
+    ASSERT_TRUE(offsetsBuilder.Finish(&offsets).ok());
+    GraphR readonly(writable.numberOfNodes(), false, indices, offsets);
+    GraphW clique = ErdosRenyiGenerator(520, 1.0, false).generate();
+
+    for (int threads : {1, 2, 4, 15}) {
+        omp_set_num_threads(threads);
+        for (const Graph *graph :
+             {&static_cast<const Graph &>(writable), &static_cast<const Graph &>(readonly),
+              &static_cast<const Graph &>(clique)}) {
+            for (bool sampling : {false, true}) {
+                SCOPED_TRACE(threads);
+                CoreDecomposition reference(*graph, false, true);
+                reference.run();
+                ParallelCoreDecomposition parallel(*graph, false, sampling);
+                parallel.run();
+                EXPECT_EQ(reference.scores(), parallel.scores());
+                EXPECT_EQ(reference.maxCoreNumber(), parallel.maxCoreNumber());
+                if (!sampling)
+                    EXPECT_EQ(0u, parallel.numberOfRestarts());
+            }
+        }
+    }
+}
+
+TEST_F(CentralityGTest, testParallelCoreDecompositionSamplingRecovery) {
+    GraphW graph(25001);
+    for (node u = 1; u < graph.numberOfNodes(); ++u)
+        graph.addEdge(0, u);
+    CoreDecomposition reference(graph, false, true);
+    reference.run();
+    std::vector<double> scores(graph.numberOfNodes(), -1.0);
+    // Accept initial recounts, then reject a sampled recount after level-one peeling.
+    const auto rejectAfterPeeling = +[](node, count level) { return level == 0; };
+    const auto recovered =
+        CoreDecompositionDetail::runWithRecovery(graph, scores, true, rejectAfterPeeling);
+    EXPECT_EQ(1u, recovered.restarts);
+    EXPECT_EQ(reference.scores(), scores);
+    EXPECT_EQ(reference.maxCoreNumber(), recovered.maxCore);
+    // Exact execution must ignore sampling fault injection and start from fresh state.
+    const auto exact =
+        CoreDecompositionDetail::runWithRecovery(graph, scores, false, rejectAfterPeeling);
+    EXPECT_EQ(0u, exact.restarts);
+    EXPECT_EQ(reference.scores(), scores);
+}
+
+TEST_F(CentralityGTest, testParallelCoreDecompositionInternalComponents) {
+    Aux::CoreBuckets::Storage buckets;
+    for (count degree : {0u, 7u, 8u, 15u, 16u, 511u, 512u}) {
+        Aux::CoreBuckets::add(buckets, degree, degree, 0);
+    }
+    EXPECT_EQ((std::vector<node>{0}), buckets[0]);
+    EXPECT_EQ((std::vector<node>{7}), buckets[7]);
+    EXPECT_EQ((std::vector<node>{8, 15}), buckets[8]);
+    EXPECT_EQ((std::vector<node>{16}), buckets[9]);
+    EXPECT_EQ((std::vector<node>{511}), buckets[13]);
+    Aux::CoreBuckets::Storage moved;
+    Aux::CoreBuckets::move(moved, 1, 15, 0); // Cross from [16, 32) to [8, 16).
+    Aux::CoreBuckets::move(moved, 2, 14, 0); // Stay in the same interval.
+    EXPECT_EQ((std::vector<node>{1}), moved[8]);
+    Aux::CoreBuckets::add(moved, 3, 519, 512);
+    EXPECT_EQ((std::vector<node>{3}), moved[7]);
+
+    CoreDecompositionDetail::Sampler sampler;
+    sampler.reset(100, 1.0);
+    count triggers = 0;
+#pragma omp parallel for reduction(+ : triggers)
+    for (int i = 0; i < 1000; ++i)
+        triggers += sampler.sample(0);
+    EXPECT_EQ(1u, triggers);
+    EXPECT_GE(sampler.numberOfHits(), 100u);
+    sampler.reset(10, 0.0);
+    EXPECT_FALSE(sampler.sample(0));
+    EXPECT_EQ(0u, sampler.numberOfHits());
+}
+
+TEST_F(CentralityGTest, testParallelCoreDecompositionSparseSelectionAndLongChains) {
+    struct RestoreThreads {
+        int threads = omp_get_max_threads();
+        ~RestoreThreads() { omp_set_num_threads(threads); }
+    } restore;
+    // Disconnected long path, a cycle and isolates distinguish core numbers 0, 1 and 2.
+    GraphW graph(10010);
+    for (node u = 1; u < 10000; ++u)
+        graph.addEdge(u - 1, u);
+    graph.addEdge(10000, 10001);
+    graph.addEdge(10001, 10002);
+    graph.addEdge(10002, 10000);
+    EXPECT_TRUE(CoreDecompositionDetail::preferSparsePeeling(graph));
+    CoreDecomposition reference(graph, false, true);
+    reference.run();
+    for (int threads : {1, 2, 4, 15}) {
+        omp_set_num_threads(threads);
+        for (bool sampling : {false, true}) {
+            ParallelCoreDecomposition algorithm(graph, false, sampling);
+            algorithm.run();
+            EXPECT_EQ(reference.scores(), algorithm.scores());
+            EXPECT_EQ(2u, algorithm.maxCoreNumber());
+            EXPECT_EQ(0u, algorithm.numberOfRestarts());
+            // Also exercise the engine directly: serial queue reuse must terminate and agree
+            // with the oracle even when adaptive selection would normally use sparse peeling.
+            std::vector<double> scores(graph.numberOfNodes(), 0.0);
+            CoreDecompositionDetail::ParallelKCoreSolver solver(graph, scores, sampling);
+            ASSERT_TRUE(solver.run());
+            EXPECT_EQ(reference.scores(), scores);
+        }
+    }
+    GraphW star(1000);
+    for (node u = 1; u < star.numberOfNodes(); ++u)
+        star.addEdge(0, u);
+    EXPECT_FALSE(CoreDecompositionDetail::preferSparsePeeling(star));
+    GraphW clique = ErdosRenyiGenerator(520, 1.0, false).generate();
+    EXPECT_FALSE(CoreDecompositionDetail::preferSparsePeeling(clique));
+}
+
+TEST_F(CentralityGTest, testParallelCoreDecompositionNormalizedAndEmpty) {
+    for (count n : {0u, 1u, 4u}) {
+        GraphW graph(n);
+        if (n == 4) {
+            graph.addEdge(0, 1);
+            graph.addEdge(1, 2);
+            graph.addEdge(2, 0);
+            graph.addEdge(2, 3);
+        }
+        for (bool normalized : {false, true}) {
+            ParallelCoreDecomposition algorithm(graph, normalized);
+            EXPECT_EQ(n == 4 ? (normalized ? 1.0 : 3.0) : 0.0, algorithm.maximum());
+            algorithm.run();
+            const auto firstScores = algorithm.scores();
+            algorithm.run();
+            EXPECT_EQ(firstScores, algorithm.scores());
+            EXPECT_EQ(n == 4 ? 2u : 0u, algorithm.maxCoreNumber());
+            if (n == 4) {
+                EXPECT_NEAR(0.2, algorithm.centralization(), 1e-12);
+                const double divisor = normalized ? 3.0 : 1.0;
+                EXPECT_EQ((std::vector<double>{2 / divisor, 2 / divisor, 2 / divisor, 1 / divisor}),
+                          algorithm.scores());
+            } else {
+                EXPECT_EQ(std::vector<double>(n, 0.0), algorithm.scores());
+            }
+            const auto partition = algorithm.getPartition();
+            const auto cover = algorithm.getCover();
+            EXPECT_EQ(n, partition.numberOfElements());
+            EXPECT_EQ(n, cover.numberOfElements());
+            for (node u = 0; u < n; ++u) {
+                const index expected = n == 4 ? (u == 3 ? 1 : 2) : 0;
+                EXPECT_EQ(expected, partition.subsetOf(u));
+                std::set<index> memberships;
+                for (index core = 0; core <= expected; ++core)
+                    memberships.insert(core);
+                EXPECT_EQ(memberships, cover.subsetsOf(u));
+            }
+        }
+    }
 }
 
 TEST_F(CentralityGTest, benchCoreDecompositionLocal) {
