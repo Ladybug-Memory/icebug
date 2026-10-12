@@ -172,7 +172,10 @@ private:
 
     void initialize() {
         count maxDegree = 0;
+// MSVC classic OpenMP (NETWORKIT_OMP2) lacks reduction(max); fall back to serial.
+#ifndef NETWORKIT_OMP2
 #pragma omp parallel for reduction(max : maxDegree) schedule(static)
+#endif
         for (omp_index u = 0; u < static_cast<omp_index>(z); ++u) {
             const count degree = G.degree(static_cast<node>(u));
             degrees[u].store(degree, std::memory_order_relaxed);
@@ -688,7 +691,10 @@ inline bool preferSparsePeeling(const Graph &graph) {
     if (n == 0 || graph.numberOfEdges() / n >= kHbsSwitchCore / 2)
         return false;
     count maximumDegree = 0;
+// MSVC classic OpenMP (NETWORKIT_OMP2) lacks reduction(max); fall back to serial.
+#ifndef NETWORKIT_OMP2
 #pragma omp parallel for reduction(max : maximumDegree) schedule(static) if (n > 256)
+#endif
     for (omp_index u = 0; u < static_cast<omp_index>(n); ++u) {
         maximumDegree = std::max(maximumDegree, graph.degree(static_cast<node>(u)));
     }

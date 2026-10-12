@@ -69,4 +69,4 @@ void move(Buckets &target, NetworKit::node u, NetworKit::count degree, NetworKit
 
 } // namespace CoreBuckets
 } // namespace Aux
-#endif
+#endif // NETWORKIT_AUXILIARY_HIERARCHICAL_CORE_BUCKETS_HPP_

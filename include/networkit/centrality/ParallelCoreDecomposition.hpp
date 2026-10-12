@@ -7,11 +7,11 @@
 #ifndef NETWORKIT_CENTRALITY_PARALLEL_CORE_DECOMPOSITION_HPP_
 #define NETWORKIT_CENTRALITY_PARALLEL_CORE_DECOMPOSITION_HPP_
 
+#include <vector>
 #include <networkit/centrality/Centrality.hpp>
 #include <networkit/graph/Graph.hpp>
 #include <networkit/structures/Cover.hpp>
 #include <networkit/structures/Partition.hpp>
-#include <vector>
 
 namespace NetworKit {
 

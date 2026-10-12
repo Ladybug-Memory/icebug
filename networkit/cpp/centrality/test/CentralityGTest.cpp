@@ -10,11 +10,11 @@
 #include <iostream>
 #include <random>
 
-#include <gtest/gtest.h>
 #include <omp.h>
-#include <arrow/api.h>
-#include <networkit/graph/GraphR.hpp>
 #include "../ParallelCoreDecompositionInternal.hpp"
+#include <arrow/api.h>
+#include <gtest/gtest.h>
+#include <networkit/graph/GraphR.hpp>
 
 #include <networkit/auxiliary/Log.hpp>
 #include <networkit/auxiliary/Timer.hpp>
@@ -1736,7 +1736,8 @@ TEST_F(CentralityGTest, testParallelCoreDecompositionNormalizedAndEmpty) {
                 const index expected = n == 4 ? (u == 3 ? 1 : 2) : 0;
                 EXPECT_EQ(expected, partition.subsetOf(u));
                 std::set<index> memberships;
-                for (index core = 0; core <= expected; ++core) memberships.insert(core);
+                for (index core = 0; core <= expected; ++core)
+                    memberships.insert(core);
                 EXPECT_EQ(memberships, cover.subsetsOf(u));
             }
         }
