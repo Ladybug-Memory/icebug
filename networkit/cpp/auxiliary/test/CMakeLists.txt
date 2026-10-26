@@ -1,7 +1,9 @@
 networkit_add_test(auxiliary AuxGTest)
 networkit_add_test(auxiliary FlatMapGTest)
+networkit_add_test(auxiliary HierarchicalBucketPQGTest)
 networkit_add_test(auxiliary SparseVectorGTest)
 networkit_add_test(auxiliary SortedListGTest)
 
 networkit_add_benchmark(auxiliary AuxRandomBenchmark)
+networkit_add_benchmark(auxiliary HierarchicalBucketPQBenchmark)
 
