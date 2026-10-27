@@ -5,255 +5,87 @@
  *      Author: Ian Chen (ianchen3@illinois.edu)
  */
 
-#include <iterator>
-#include <span>
+#include <algorithm>
+#include <atomic>
+#include <initializer_list>
 #include <stdexcept>
+#include <utility>
 
-#include "networkit/auxiliary/Vector2Arrow.hpp"
+#include <networkit/auxiliary/Parallel.hpp>
+#include <networkit/auxiliary/Parallelism.hpp>
 #include <networkit/centrality/CoreDecomposition.hpp>
-#include <networkit/graph/BFS.hpp>
-#include <networkit/scd/SelectiveCommunityDetector.hpp>
 #include <networkit/scd/ShellStruct.hpp>
 #include <networkit/structures/ConcurrentUnionFind.hpp>
-#include <networkit/structures/LeastCommonAncestor.hpp>
 
+#include <arrow/api.h>
 #include <arrow/io/api.h>
 #include <arrow/ipc/api.h>
-#include <arrow/type_fwd.h>
 #include <arrow/util/compression.h>
 
 namespace NetworKit {
 
-using indptr = int64_t;
+namespace {
 
-template <typename LocalState, typename ProcessFunc, typename CombineFunc>
-static void forNeighborsOfSet(const Graph &G, std::span<const node> S, ProcessFunc F,
-                              CombineFunc Combine) {
-#pragma omp parallel
-    {
-        LocalState local_state;
-#pragma omp for schedule(guided)
-        for (omp_index i = 0; i < S.size(); ++i) {
-            node v = S[i];
-            G.forNeighborsOf(v, [&](node neighbor) { F(v, neighbor, local_state); });
-        }
-#pragma omp critical
-        Combine(local_state);
-    }
-}
+/*
+ * Stable parallel counting sort of the indices of keys, after count_sort of ParlayLib:
+ *
+ * Blelloch, G. E., Anderson, D., & Dhulipala, L. (2020).
+ * ParlayLib - A Toolkit for Parallel Algorithms on Shared-Memory Multicore Machines. SPAA 2020.
+ * https://github.com/cmuparlay/parlaylib
+ *
+ * Every key must be below numKeys. Returns the indices grouped by key, each group increasing,
+ * and numKeys + 1 offsets: group k is values[offsets[k], offsets[k + 1]).
+ */
+std::pair<std::vector<index>, std::vector<int64_t>> countSort(std::span<const index> keys,
+                                                              count numKeys) {
+    const count n = keys.size();
+    // ParlayLib's block count keeps the per-block counts to a small fraction of n.
+    count numBlocks = 1 + n * sizeof(index) / std::max<count>(numKeys * 500, 5000);
+    if (n < 8192 || Aux::getMaxNumberOfThreads() == 1)
+        numBlocks = 1;
+    const count blockSize = (n + numBlocks - 1) / numBlocks;
 
-template <typename KeyFunc, typename ValueFunc, typename Index>
-static void append_to_csr(std::vector<Index> &indptr, std::vector<node> &indices,
-                          std::span<const node> items, size_t num_keys, KeyFunc key_func,
-                          ValueFunc val_func) {
-    if (num_keys == 0)
-        return;
-
-    std::vector<size_t> counts(num_keys, 0);
-    for (const auto &item : items)
-        counts[key_func(item)]++;
-
-    size_t start_pos = indices.size();
-    indices.resize(start_pos + std::size(items));
-
-    std::vector<size_t> write_offsets(num_keys);
-    Index current_offset = start_pos;
-
-    for (Index i = 0; i < static_cast<Index>(num_keys); ++i) {
-        write_offsets[i] = current_offset;
-        current_offset += counts[i];
-        indptr.push_back(current_offset);
-    }
-
-    for (const auto &item : items) {
-        size_t key = key_func(item);
-        indices[write_offsets[key]++] = val_func(item);
-    }
-}
-
-ShellStruct::ShellStruct(const Graph &g) : SelectiveCommunityDetector(g), built(false) {}
-
-void ShellStruct::build() {
-    NetworKit::CoreDecomposition coredecomp(*g);
-    coredecomp.run();
-
-    const std::vector<double> &scores = coredecomp.scores();
-    auto vec = std::vector<uint64_t>();
-    vec.reserve(scores.size());
-    for (auto s : scores)
-        vec.push_back(static_cast<uint64_t>(s));
-
-    build(Aux::vectorToArrow<uint64_t, arrow::UInt64Array>(vec));
-}
-
-void ShellStruct::build(const std::shared_ptr<arrow::UInt64Array> &coredecomp) {
-    index n = g->upperNodeIdBound();
-
-    index max_k = 0;
-    for (node i = 0; i < static_cast<node>(coredecomp->length()); ++i)
-        max_k = std::max(max_k, coredecomp->Value(i));
-
-    std::vector<index> shell_indptr(max_k + 2, 0);
-    for (node i = 0; i < n; ++i)
-        shell_indptr[coredecomp->Value(i)]++;
-
-    index current_offset = 0;
-    for (index k = 0; k <= max_k; ++k) {
-        index count = shell_indptr[k];
-        shell_indptr[k] = current_offset;
-        current_offset += count;
-    }
-    shell_indptr[max_k + 1] = current_offset;
-
-    std::vector<node> shell_nodes(n);
-    std::vector<index> insert_offsets = shell_indptr;
-    for (node i = 0; i < n; ++i) {
-        index k = coredecomp->Value(i);
-        shell_nodes[insert_offsets[k]++] = i;
-    }
-
-    count next_id = 0;
-    std::vector<node> tree_ids(n, none), tree_v, tree_c;
-    std::vector<indptr> tree_v_indptr = {0}, tree_c_indptr = {0};
-    std::vector<index> coreness_vec, assignment_vec(n, none);
-    ConcurrentUnionFind dsu(n);
-
-    std::vector<node> new_ids(n, none);
-
-    for (index k = max_k; k > 0; --k) {
-        size_t shell_size = shell_indptr[k + 1] - shell_indptr[k];
-        if (shell_size == 0)
-            continue;
-        std::span<const node> V_k(shell_nodes.data() + shell_indptr[k], shell_size);
-
-        // Phase 2a: Identifies roots of neighboring components in higher k-shells.
-        std::vector<node> touched;
-        forNeighborsOfSet<std::vector<node>>(
-            *g, V_k,
-            [&](node /*v*/, node neighbor, std::vector<node> &local_touched) {
-                index neighbor_k = coredecomp->Value(neighbor);
-                if (neighbor_k > k) {
-                    node old_root = dsu.find(neighbor);
-                    if (tree_ids[old_root] != none)
-                        local_touched.push_back(old_root);
-                }
-            },
-            [&](const std::vector<node> &local_touched) {
-                touched.insert(touched.end(), local_touched.begin(), local_touched.end());
-            });
-
-        std::sort(touched.begin(), touched.end());
-        touched.erase(std::unique(touched.begin(), touched.end()), touched.end());
-
-        // Phase 2b: Contracts k-shell into components.
-        forNeighborsOfSet<int>(
-            *g, V_k,
-            [&](node v, node neighbor, int &) {
-                index neighbor_k = coredecomp->Value(neighbor);
-                if (neighbor_k >= k)
-                    dsu.merge(v, neighbor);
-            },
-            [&](const int &) {});
-
-        // Phase 3: Assigns new hierarchical tree node IDs to newly formed disjoint components.
-        std::vector<node> new_roots;
-        for (index i = 0; i < shell_size; ++i) {
-            node root = dsu.find(V_k[i]);
-            if (new_ids[root] == none) {
-                new_roots.push_back(root);
-                new_ids[root] = next_id++;
-                coreness_vec.push_back(k);
-            }
-        }
-
+    std::vector<int64_t> counts(numBlocks * numKeys, 0);
 #pragma omp parallel for schedule(static)
-        for (omp_index i = 0; i < shell_size; ++i)
-            assignment_vec[V_k[i]] = new_ids[dsu.find(V_k[i])];
+    for (omp_index b = 0; b < static_cast<omp_index>(numBlocks); ++b)
+        for (index i = b * blockSize; i < std::min(n, (b + 1) * blockSize); ++i)
+            ++counts[b * numKeys + keys[i]];
 
-        // Phases 4: Builds the tree CSR (and the inverse assignment)
-        count num_new_trees = new_roots.size();
-        count base_tree_id = next_id - num_new_trees;
-        append_to_csr(
-            tree_v_indptr, tree_v, V_k, num_new_trees,
-            [&](node v) { return new_ids[dsu.find(v)] - base_tree_id; }, [&](node v) { return v; });
-        append_to_csr(
-            tree_c_indptr, tree_c, touched, num_new_trees,
-            [&](node v) { return new_ids[dsu.find(v)] - base_tree_id; },
-            [&](node v) { return tree_ids[v]; });
-
-        // Phase 5: Cleanup
-        for (node old_root : touched)
-            tree_ids[old_root] = none;
-        for (node root : new_roots) {
-            tree_ids[root] = new_ids[root];
-            new_ids[root] = none;
-        }
+    std::vector<int64_t> offsets(numKeys + 1);
+    int64_t start = 0;
+    for (index k = 0; k < numKeys; ++k) {
+        offsets[k] = start;
+        for (index b = 0; b < numBlocks; ++b)
+            start += std::exchange(counts[b * numKeys + k], start);
     }
+    offsets[numKeys] = start;
 
-    // Phase 6: ensure tree is connected
-    size_t shell_size_0 = shell_indptr[1] - shell_indptr[0];
-    std::span<const node> V_0(shell_nodes.data() + shell_indptr[0], shell_size_0);
-    std::vector<node> forest_roots;
-    for (node id : tree_ids)
-        if (id != none)
-            forest_roots.push_back(id);
-    node root = next_id++;
-    coreness_vec.push_back(0);
+    std::vector<index> values(n);
+#pragma omp parallel for schedule(static)
+    for (omp_index b = 0; b < static_cast<omp_index>(numBlocks); ++b)
+        for (index i = b * blockSize; i < std::min(n, (b + 1) * blockSize); ++i)
+            values[counts[b * numKeys + keys[i]]++] = i;
 
-    for (omp_index i = 0; i < shell_size_0; ++i)
-        assignment_vec[V_0[i]] = root;
-
-    append_to_csr(
-        tree_v_indptr, tree_v, V_0, 1, [&](node) { return 0; }, [&](node v) { return v; });
-    append_to_csr(
-        tree_c_indptr, tree_c, forest_roots, 1, [&](node) { return 0; },
-        [&](node child) { return child; });
-
-    // Final Phase: convert to member types
-
-    treeIndptr = Aux::vectorToArrow<indptr, arrow::UInt64Array>(tree_c_indptr);
-    treeIndices = Aux::vectorToArrow<uint64_t, arrow::UInt64Array>(tree_c);
-    tree = GraphR(next_id, true, treeIndices, treeIndptr);
-    lca = std::make_unique<NetworKit::LeastCommonAncestor>(*tree, root);
-
-    auto offsets_arr = Aux::vectorToArrow<indptr, arrow::Int64Array>(tree_v_indptr);
-    auto tree_v_arr = Aux::vectorToArrow<uint64_t, arrow::UInt64Array>(tree_v);
-    vertices = std::static_pointer_cast<arrow::LargeListArray>(
-        arrow::LargeListArray::FromArrays(*offsets_arr, *tree_v_arr).ValueOrDie());
-
-    assignment = Aux::vectorToArrow<uint64_t, arrow::UInt64Array>(assignment_vec);
-    coreness = Aux::vectorToArrow<uint64_t, arrow::UInt64Array>(coreness_vec);
-
-    // mark as built
-    built = true;
+    return {std::move(values), std::move(offsets)};
 }
 
-std::set<node> ShellStruct::expandOneCommunity(const std::set<node> &s) {
-    if (!built)
-        throw std::runtime_error("Need to build() or load() the shell struct");
+// Post-order ids of a tree whose nodes are numbered children before parents, with the root last.
+std::vector<node> postOrder(std::span<const node> parent) {
+    const count numNodes = parent.size();
+    std::vector<count> size(numNodes, 1);
+    for (node t = 0; t + 1 < numNodes; ++t)
+        size[parent[t]] += size[t];
 
-    std::vector<node> output;
-    if (s.empty())
-        return std::set<node>(output.begin(), output.end());
-
-    std::vector<node> query;
-    query.reserve(s.size());
-    for (node u : s)
-        query.push_back(assignment->Value(u));
-    node ancestor = lca->Query(std::vector<node>(query.begin(), query.end()));
-
-    const uint64_t *raw_v =
-        std::static_pointer_cast<arrow::UInt64Array>(vertices->values())->raw_values();
-    const indptr *raw_offsets = vertices->raw_value_offsets();
-
-    Traversal::BFSfrom(*tree, ancestor, [&](node u) {
-        output.insert(output.end(), raw_v + raw_offsets[u], raw_v + raw_offsets[u + 1]);
-    });
-
-    return std::set<node>(output.begin(), output.end());
+    std::vector<node> post(numNodes), start(numNodes, 0);
+    for (node t = numNodes; t-- > 0;) {
+        if (t + 1 < numNodes)
+            start[t] = std::exchange(start[parent[t]], start[parent[t]] + size[t]);
+        post[t] = start[t] + size[t] - 1;
+    }
+    return post;
 }
 
-static arrow::Result<arrow::ipc::IpcWriteOptions> makeIpcOptions(const std::string &compression) {
+arrow::Result<arrow::ipc::IpcWriteOptions> makeIpcOptions(const std::string &compression) {
     auto opts = arrow::ipc::IpcWriteOptions::Defaults();
     arrow::Compression::type codec;
     if (compression == "ZSTD")
@@ -263,15 +95,15 @@ static arrow::Result<arrow::ipc::IpcWriteOptions> makeIpcOptions(const std::stri
     else if (compression == "NONE")
         return opts; // uncompressed default
     else
-        return arrow::Status::Invalid("ShellStruct::save — unknown compression: " + compression);
+        return arrow::Status::Invalid("ShellStruct: unknown compression: " + compression);
 
     ARROW_ASSIGN_OR_RAISE(auto c, arrow::util::Codec::Create(codec));
     opts.codec = std::shared_ptr<arrow::util::Codec>(std::move(c));
     return opts;
 }
 
-static arrow::Status writeTable(const std::shared_ptr<arrow::Table> &table, const std::string &path,
-                                const std::string &compression) {
+arrow::Status writeTable(const std::shared_ptr<arrow::Table> &table, const std::string &path,
+                         const std::string &compression) {
     ARROW_ASSIGN_OR_RAISE(auto sink, arrow::io::FileOutputStream::Open(path));
     ARROW_ASSIGN_OR_RAISE(auto opts, makeIpcOptions(compression));
     ARROW_ASSIGN_OR_RAISE(auto writer, arrow::ipc::MakeFileWriter(sink, table->schema(), opts));
@@ -280,21 +112,317 @@ static arrow::Status writeTable(const std::shared_ptr<arrow::Table> &table, cons
     return sink->Close();
 }
 
-static arrow::Status readTable(const std::string &path, std::shared_ptr<arrow::Table> *out) {
+arrow::Status readTable(const std::string &path, std::shared_ptr<arrow::Table> *out) {
     ARROW_ASSIGN_OR_RAISE(auto src, arrow::io::ReadableFile::Open(path));
     ARROW_ASSIGN_OR_RAISE(auto reader, arrow::ipc::RecordBatchFileReader::Open(src));
+    ARROW_ASSIGN_OR_RAISE(*out, reader->ToTable());
+    return arrow::Status::OK();
+}
 
-    std::vector<std::shared_ptr<arrow::RecordBatch>> batches;
-    batches.reserve(reader->num_record_batches());
-    for (int i = 0; i < reader->num_record_batches(); ++i) {
-        auto result = reader->ReadRecordBatch(i);
-        if (!result.ok())
-            return result.status();
-        batches.push_back(std::move(result).ValueOrDie());
+// The named column of table as one array, which must have the given type.
+arrow::Result<std::shared_ptr<arrow::Array>>
+readColumn(const arrow::Table &table, const std::string &name,
+           const std::shared_ptr<arrow::DataType> &type) {
+    const auto column = table.GetColumnByName(name);
+    if (!column)
+        return arrow::Status::Invalid("ShellStruct: missing column '" + name + "'");
+    if (!column->type()->Equals(*type))
+        return arrow::Status::Invalid("ShellStruct: column '" + name + "' must have type "
+                                      + type->ToString());
+    if (column->num_chunks() == 0)
+        return arrow::MakeEmptyArray(type);
+    if (column->num_chunks() == 1)
+        return column->chunk(0);
+    return arrow::Concatenate(column->chunks(), arrow::default_memory_pool());
+}
+
+// The checks of buildInternal that are linear in the size of the index.
+arrow::Status verifyColumns(const arrow::UInt64Array &assignment,
+                            const arrow::UInt64Array &coreness,
+                            const arrow::LargeListArray &vertices,
+                            const arrow::LargeListArray &children) {
+    const auto &vertexValues = static_cast<const arrow::UInt64Array &>(*vertices.values());
+    for (const arrow::Array *array : std::initializer_list<const arrow::Array *>{
+             &assignment, &coreness, &vertices, &children, &vertexValues, children.values().get()})
+        if (array->null_count() != 0 || array->offset() != 0)
+            return arrow::Status::Invalid("ShellStruct: columns must have no nulls or offsets");
+    if (vertices.value_offset(0) != 0 || children.value_offset(0) != 0)
+        return arrow::Status::Invalid("ShellStruct: list offsets must start at 0");
+
+    const auto n = static_cast<node>(assignment.length());
+    std::vector<bool> listed(n, false);
+    for (node t = 0; t < static_cast<node>(vertices.length()); ++t)
+        for (int64_t j = vertices.value_offset(t); j < vertices.value_offset(t + 1); ++j) {
+            const node v = vertexValues.Value(j);
+            if (v >= n || listed[v] || assignment.Value(v) != t)
+                return arrow::Status::Invalid(
+                    "ShellStruct: every vertex must be listed once, under its tree node");
+            listed[v] = true;
+        }
+    return arrow::Status::OK();
+}
+
+// The size of the subtree of every tree node. With verify, children must be a post-order tree
+// rooted at the last node.
+arrow::Result<std::vector<count>> subtreeSizes(const arrow::LargeListArray &children,
+                                               bool verify) {
+    const auto &childValues = static_cast<const arrow::UInt64Array &>(*children.values());
+    const auto numNodes = static_cast<node>(children.length());
+    std::vector<count> sizes(numNodes, 1);
+    for (node t = 0; t < numNodes; ++t) {
+        node next = t;
+        for (int64_t j = children.value_offset(t + 1); j-- > children.value_offset(t);) {
+            const node c = childValues.Value(j);
+            if (verify && (next == 0 || c != next - 1))
+                return arrow::Status::Invalid("ShellStruct: children is not a post-order tree");
+            next -= sizes[c];
+            sizes[t] += sizes[c];
+        }
+    }
+    if (verify && sizes.back() != numNodes)
+        return arrow::Status::Invalid("ShellStruct: the last node must be the root");
+    return sizes;
+}
+
+} // namespace
+
+ShellStruct::ShellStruct(const Graph &g, bool validate)
+    : SelectiveCommunityDetector(g), validate(validate) {}
+
+void ShellStruct::build() {
+    CoreDecomposition coreDecomposition(*g);
+    coreDecomposition.run();
+    const std::vector<double> &scores = coreDecomposition.scores();
+    build(std::vector<count>(scores.begin(), scores.end()));
+}
+
+void ShellStruct::build(std::span<const count> coredecomp) {
+    // 3: compute coreness, the core decomposition of G (given)
+    const count n = g->upperNodeIdBound();
+    if (coredecomp.size() != n)
+        throw std::invalid_argument("ShellStruct: coredecomp must have one entry per node id");
+
+    // S_k for every k: the vertices grouped by coreness
+    const count maxK =
+        n == 0 ? 0 : *Aux::Parallel::max_element(coredecomp.begin(), coredecomp.end());
+    const auto [shellNodes, shellOffsets] = countSort(coredecomp, maxK + 1);
+
+    // 4: UF <- UnionFind(V)
+    ConcurrentUnionFind<> uf(n);
+    // T_{r,k}: the tree node on top of the component of each union-find root r; none otherwise.
+    std::vector<node> treeNode(n, none);
+    // Tree nodes -> coreness and parent, in creation order.
+    std::vector<count> treeCoreness;
+    std::vector<node> treeParent;
+    // Vertices -> tree nodes.
+    std::vector<node> vertexAssignment(n, none);
+
+    // Helper functions: lines 6-10 inside the main-loop.
+    // Each is called inside an omp parallel region.
+
+    auto touchedTreeNodes = [&](std::span<const node> shell, count k,
+                                std::vector<std::pair<node, node>> &touched) {
+        std::vector<std::pair<node, node>> local;
+#pragma omp for schedule(guided) nowait
+        for (omp_index i = 0; i < static_cast<omp_index>(shell.size()); ++i)
+            g->forNeighborsOf(shell[i], [&](node v) {
+                if (coredecomp[v] <= k)
+                    return;
+                node r = uf.find(v), t;
+                std::atomic_ref<node> entry(treeNode[r]);
+                // Only the first edge to a component writes, so the others do not contend.
+                if (entry.load(std::memory_order_relaxed) != none
+                    && (t = entry.exchange(none, std::memory_order_relaxed)) != none)
+                    local.emplace_back(r, t);
+            });
+#pragma omp critical
+        touched.insert(touched.end(), local.begin(), local.end());
+#pragma omp barrier
+    };
+
+    auto unionShell = [&](std::span<const node> shell, count k) {
+#pragma omp for schedule(guided)
+        for (omp_index i = 0; i < static_cast<omp_index>(shell.size()); ++i)
+            g->forNeighborsOf(shell[i], [&](node v) {
+                if (coredecomp[v] >= k)
+                    uf.merge(shell[i], v);
+            });
+    };
+
+    auto createTreeNodes = [&](std::span<const node> shell, count k) {
+#pragma omp single
+        for (node u : shell) {
+            const node r = uf.find(u);
+            if (treeNode[r] != none)
+                continue;
+            treeNode[r] = treeCoreness.size();
+            treeCoreness.push_back(k);
+            treeParent.push_back(none);
+        }
+    };
+
+    auto assignShell = [&](std::span<const node> shell) {
+#pragma omp for schedule(static)
+        for (omp_index i = 0; i < static_cast<omp_index>(shell.size()); ++i)
+            vertexAssignment[shell[i]] = treeNode[uf.find(shell[i])];
+    };
+
+    auto setParents = [&](std::span<const std::pair<node, node>> touched) {
+#pragma omp for schedule(static)
+        for (omp_index i = 0; i < static_cast<omp_index>(touched.size()); ++i)
+            treeParent[touched[i].second] = treeNode[uf.find(touched[i].first)];
+    };
+
+    // 5: for S_k the non-empty k-shell in descending k
+    for (count k = maxK; k > 0; --k) {
+        const std::span<const node> shell(shellNodes.data() + shellOffsets[k],
+                                          shellOffsets[k + 1] - shellOffsets[k]);
+        if (shell.empty())
+            continue;
+
+        std::vector<std::pair<node, node>> touched;
+#pragma omp parallel
+        {
+            // 6: parinit P_k <- { (r, T_r) | uv in E, u in S_k, coreness(v) > k, r = UF.find(v) }
+            touchedTreeNodes(shell, k, touched);
+
+            // 7: parfor uv, u in S_k, coreness(v) >= k: UF.union(u, v)
+            unionShell(shell, k);
+
+            // 8: for each distinct UF.find(u), u in S_k: create tree node T_{root,k}
+            //    (tree nodes numbered in creation order, so parents after children)
+            createTreeNodes(shell, k);
+
+            // 9: parfor u in S_k: assign u to T_{UF.find(u),k}
+            assignShell(shell);
+
+            // 10: parfor T in P_k: parent of T <- T_{UF.find(root of T),k}
+            setParents(touched);
+        }
     }
 
-    ARROW_ASSIGN_OR_RAISE(*out, arrow::Table::FromRecordBatches(reader->schema(), batches));
+    // 11: root of coreness 0: parent of every remaining parentless node, holds the vertices of S_0
+    const node root = treeCoreness.size();
+    std::ranges::replace(treeParent, none, root);
+    treeCoreness.push_back(0);
+    treeParent.push_back(none);
+    for (node u : std::span(shellNodes).first(shellOffsets[1]))
+        vertexAssignment[u] = root;
+
+    if (auto status = prepareAndBuild(std::move(vertexAssignment), treeCoreness, treeParent);
+        !status.ok())
+        throw std::logic_error("ShellStruct: " + status.ToString());
+}
+
+arrow::Status ShellStruct::prepareAndBuild(std::vector<node> vertexAssignment,
+                                           std::span<const count> treeCoreness,
+                                           std::span<const node> treeParent) {
+    // post <- the post-order id of each tree node; renumber coreness, parent and assignment by post
+    const count numTreeNodes = treeCoreness.size();
+    const std::vector<node> post = postOrder(treeParent);
+    std::vector<count> postCoreness(numTreeNodes);
+    for (node t = 0; t < numTreeNodes; ++t)
+        postCoreness[post[t]] = treeCoreness[t];
+    std::vector<node> postParent(numTreeNodes - 1);
+    for (node t = 0; t + 1 < numTreeNodes; ++t)
+        postParent[post[t]] = post[treeParent[t]];
+    std::ranges::transform(vertexAssignment, vertexAssignment.begin(),
+                           [&](node t) { return post[t]; });
+    // vertices <- the vertices grouped by assignment; children <- the tree nodes grouped by parent
+    auto [vertexValues, vertexOffsets] = countSort(vertexAssignment, numTreeNodes);
+    auto [childValues, childOffsets] = countSort(postParent, numTreeNodes);
+
+    // Lengths are taken first: the vectors are moved into the buffers below.
+    const auto numVertices = static_cast<int64_t>(vertexAssignment.size());
+    const auto numNodes = static_cast<int64_t>(numTreeNodes);
+    const auto listType = arrow::large_list(arrow::uint64());
+    auto assignmentArray = std::make_shared<arrow::UInt64Array>(
+        numVertices, arrow::Buffer::FromVector(std::move(vertexAssignment)));
+    auto corenessArray = std::make_shared<arrow::UInt64Array>(
+        numNodes, arrow::Buffer::FromVector(std::move(postCoreness)));
+    auto verticesArray = std::make_shared<arrow::LargeListArray>(
+        listType, numNodes, arrow::Buffer::FromVector(std::move(vertexOffsets)),
+        std::make_shared<arrow::UInt64Array>(numVertices,
+                                             arrow::Buffer::FromVector(std::move(vertexValues))));
+    auto childrenArray = std::make_shared<arrow::LargeListArray>(
+        listType, numNodes, arrow::Buffer::FromVector(std::move(childOffsets)),
+        std::make_shared<arrow::UInt64Array>(numNodes - 1,
+                                             arrow::Buffer::FromVector(std::move(childValues))));
+
+    return buildInternal(std::move(assignmentArray), std::move(corenessArray),
+                         std::move(verticesArray), std::move(childrenArray), false);
+}
+
+arrow::Status ShellStruct::buildInternal(std::shared_ptr<arrow::UInt64Array> assignment,
+                                         std::shared_ptr<arrow::UInt64Array> coreness,
+                                         std::shared_ptr<arrow::LargeListArray> vertices,
+                                         std::shared_ptr<arrow::LargeListArray> children,
+                                         bool verify) {
+    const auto n = static_cast<int64_t>(g->upperNodeIdBound());
+    const int64_t numNodes = coreness->length();
+    const auto vertexValues = std::static_pointer_cast<arrow::UInt64Array>(vertices->values());
+    const auto childValues = std::static_pointer_cast<arrow::UInt64Array>(children->values());
+    if (assignment->length() != n)
+        return arrow::Status::Invalid("ShellStruct: assignment must have one entry per node id");
+    if (numNodes == 0 || vertices->length() != numNodes || children->length() != numNodes)
+        return arrow::Status::Invalid(
+            "ShellStruct: coreness, vertices and children must have the same nonzero length");
+    if (vertices->value_offset(numNodes) - vertices->value_offset(0) != n
+        || children->value_offset(numNodes) - children->value_offset(0) != numNodes - 1
+        || vertices->value_offset(numNodes) > vertexValues->length()
+        || children->value_offset(numNodes) > childValues->length())
+        return arrow::Status::Invalid(
+            "ShellStruct: the tree must list every vertex and have one edge less than nodes");
+
+    if (verify)
+        ARROW_RETURN_NOT_OK(verifyColumns(*assignment, *coreness, *vertices, *children));
+    ARROW_ASSIGN_OR_RAISE(auto sizes, subtreeSizes(*children, verify));
+
+    this->assignment = std::move(assignment);
+    this->coreness = std::move(coreness);
+    this->vertices = std::move(vertices);
+    this->children = std::move(children);
+    subtreeSize = std::move(sizes);
+    tree.emplace(numNodes, true, childValues,
+                 std::make_shared<arrow::UInt64Array>(numNodes + 1,
+                                                      this->children->value_offsets()));
+    lca = std::make_unique<LeastCommonAncestor>(*tree, numNodes - 1);
     return arrow::Status::OK();
+}
+
+node ShellStruct::treeNodeOf(const std::set<node> &s) {
+    if (*s.rbegin() >= static_cast<node>(assignment->length()))
+        throw std::out_of_range("ShellStruct: seed is not a node id");
+    std::vector<node> nodes;
+    nodes.reserve(s.size());
+    for (node u : s)
+        nodes.push_back(assignment->Value(u));
+    return lca->Query(nodes);
+}
+
+std::span<const node> ShellStruct::community(const std::set<node> &s) {
+    if (!lca)
+        throw std::runtime_error("ShellStruct: call build() or load() first");
+    if (s.empty())
+        return {};
+    const node t = treeNodeOf(s);
+    const uint64_t *values =
+        std::static_pointer_cast<arrow::UInt64Array>(vertices->values())->raw_values();
+    return {values + vertices->value_offset(t + 1 - subtreeSize[t]),
+            values + vertices->value_offset(t + 1)};
+}
+
+std::set<node> ShellStruct::expandOneCommunity(const std::set<node> &s) {
+    const std::span<const node> members = community(s);
+    return {members.begin(), members.end()};
+}
+
+count ShellStruct::score(const std::set<node> &s) {
+    if (!lca)
+        throw std::runtime_error("ShellStruct: call build() or load() first");
+    if (s.empty())
+        throw std::invalid_argument("ShellStruct: score needs at least one seed");
+    return coreness->Value(treeNodeOf(s));
 }
 
 arrow::Status ShellStruct::saveInternal(const std::string &components_path,
@@ -309,21 +437,12 @@ arrow::Status ShellStruct::saveInternal(const std::string &components_path,
         auto schema = arrow::schema({
             arrow::field("coreness", arrow::uint64()),
             arrow::field("vertices", arrow::large_list(arrow::uint64())),
-            arrow::field("csr_indptr", arrow::uint64()),
-            arrow::field("csr_indices", arrow::uint64()),
+            arrow::field("children", arrow::large_list(arrow::uint64())),
         });
-        auto indptr = std::static_pointer_cast<arrow::UInt64Array>(
-            treeIndptr->Slice(0, treeIndptr->length() - 1));
-        arrow::UInt64Builder builder;
-        ARROW_RETURN_NOT_OK(builder.AppendValues(treeIndices->raw_values(), treeIndices->length()));
-        ARROW_RETURN_NOT_OK(builder.AppendNull());
-        std::shared_ptr<arrow::Array> indices;
-        ARROW_RETURN_NOT_OK(builder.Finish(&indices));
         auto table = arrow::Table::Make(schema, {
                                                     std::make_shared<arrow::ChunkedArray>(coreness),
                                                     std::make_shared<arrow::ChunkedArray>(vertices),
-                                                    std::make_shared<arrow::ChunkedArray>(indptr),
-                                                    std::make_shared<arrow::ChunkedArray>(indices),
+                                                    std::make_shared<arrow::ChunkedArray>(children),
                                                 });
         ARROW_RETURN_NOT_OK(writeTable(table, tree_path, compression));
     }
@@ -332,82 +451,34 @@ arrow::Status ShellStruct::saveInternal(const std::string &components_path,
 
 arrow::Status ShellStruct::loadInternal(const std::string &components_path,
                                         const std::string &tree_path) {
-    {
-        std::shared_ptr<arrow::Table> table;
-        ARROW_RETURN_NOT_OK(readTable(components_path, &table));
+    std::shared_ptr<arrow::Table> components, treeTable;
+    ARROW_RETURN_NOT_OK(readTable(components_path, &components));
+    ARROW_RETURN_NOT_OK(readTable(tree_path, &treeTable));
 
-        auto col = table->GetColumnByName("assignment");
-        if (!col)
-            return arrow::Status::Invalid("components file missing 'assignment' column");
-        ARROW_ASSIGN_OR_RAISE(auto combined,
-                              arrow::Concatenate(col->chunks(), arrow::default_memory_pool()));
-        assignment = std::static_pointer_cast<arrow::UInt64Array>(combined);
-    }
-
-    {
-        std::shared_ptr<arrow::Table> table;
-        ARROW_RETURN_NOT_OK(readTable(tree_path, &table));
-
-        auto load_uint64 = [&](const std::string &name,
-                               std::shared_ptr<arrow::UInt64Array> &out) -> arrow::Status {
-            auto col = table->GetColumnByName(name);
-            if (!col)
-                return arrow::Status::Invalid("tree file missing '" + name + "' column");
-            ARROW_ASSIGN_OR_RAISE(auto combined,
-                                  arrow::Concatenate(col->chunks(), arrow::default_memory_pool()));
-            out = std::static_pointer_cast<arrow::UInt64Array>(combined);
-            return arrow::Status::OK();
-        };
-
-        std::shared_ptr<arrow::UInt64Array> indptr, indices;
-        ARROW_RETURN_NOT_OK(load_uint64("coreness", coreness));
-        ARROW_RETURN_NOT_OK(load_uint64("csr_indptr", indptr));
-        ARROW_RETURN_NOT_OK(load_uint64("csr_indices", indices));
-        treeIndices =
-            std::static_pointer_cast<arrow::UInt64Array>(indices->Slice(0, indices->length() - 1));
-        arrow::UInt64Builder builder;
-        ARROW_RETURN_NOT_OK(builder.AppendValues(indptr->raw_values(), indptr->length()));
-        ARROW_RETURN_NOT_OK(builder.Append(treeIndices->length()));
-        ARROW_RETURN_NOT_OK(builder.Finish(&treeIndptr));
-        {
-            auto col = table->GetColumnByName("vertices");
-            if (!col)
-                return arrow::Status::Invalid("tree file missing 'vertices' column");
-            ARROW_ASSIGN_OR_RAISE(auto combined,
-                                  arrow::Concatenate(col->chunks(), arrow::default_memory_pool()));
-            vertices = std::static_pointer_cast<arrow::LargeListArray>(combined);
-        }
-
-        count n = treeIndptr->length() - 1;
-        tree.emplace(n, true, treeIndices, treeIndptr);
-
-        node root = none;
-        for (node v = 0; v < n && root == none; ++v)
-            if (coreness->Value(v) == 0)
-                root = v;
-
-        tree = GraphR(n, true, treeIndices, treeIndptr);
-        lca = std::make_unique<NetworKit::LeastCommonAncestor>(*tree, root);
-    }
-
-    built = true;
-    return arrow::Status::OK();
+    const auto listType = arrow::large_list(arrow::uint64());
+    ARROW_ASSIGN_OR_RAISE(auto assignmentColumn,
+                          readColumn(*components, "assignment", arrow::uint64()));
+    ARROW_ASSIGN_OR_RAISE(auto corenessColumn, readColumn(*treeTable, "coreness", arrow::uint64()));
+    ARROW_ASSIGN_OR_RAISE(auto verticesColumn, readColumn(*treeTable, "vertices", listType));
+    ARROW_ASSIGN_OR_RAISE(auto childrenColumn, readColumn(*treeTable, "children", listType));
+    return buildInternal(std::static_pointer_cast<arrow::UInt64Array>(assignmentColumn),
+                         std::static_pointer_cast<arrow::UInt64Array>(corenessColumn),
+                         std::static_pointer_cast<arrow::LargeListArray>(verticesColumn),
+                         std::static_pointer_cast<arrow::LargeListArray>(childrenColumn),
+                         validate);
 }
 
 void ShellStruct::save(const std::string &components_path, const std::string &tree_path,
                        const std::string &compression) const {
-    if (!built)
-        throw std::runtime_error("ShellStruct::save called before build()");
-
-    auto status = saveInternal(components_path, tree_path, compression);
-    if (!status.ok())
-        throw std::runtime_error("ShellStruct::save failed: " + status.ToString());
+    if (!lca)
+        throw std::runtime_error("ShellStruct: call build() or load() first");
+    if (auto status = saveInternal(components_path, tree_path, compression); !status.ok())
+        throw std::runtime_error("ShellStruct: save failed: " + status.ToString());
 }
 
 void ShellStruct::load(const std::string &components_path, const std::string &tree_path) {
-    auto status = loadInternal(components_path, tree_path);
-    if (!status.ok())
-        throw std::runtime_error("ShellStruct::load failed: " + status.ToString());
+    if (auto status = loadInternal(components_path, tree_path); !status.ok())
+        throw std::runtime_error("ShellStruct: load failed: " + status.ToString());
 }
 
 } // namespace NetworKit

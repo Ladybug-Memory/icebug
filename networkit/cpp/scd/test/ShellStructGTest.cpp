@@ -178,11 +178,69 @@ TEST_F(ShellStructGTest, LoadSave) {
     GraphW g = getCliqueChain(cliques);
     ShellStruct shell(g);
     shell.build();
-    shell.save("output/shellstruct_comp.parquet", "output/shellstruct_tree.parquet");
+    shell.save("output/shellstruct_comp.feather", "output/shellstruct_tree.feather");
 
     ShellStruct index(g);
-    index.load("output/shellstruct_comp.parquet", "output/shellstruct_tree.parquet");
+    index.load("output/shellstruct_comp.feather", "output/shellstruct_tree.feather");
     verifyPairs(index, cliques);
+}
+
+TEST_F(ShellStructGTest, LoadSaveValidate) {
+    std::vector<count> cliques{3, 4, 5, 6, 5, 4, 3, 5, 7, 9, 11, 9, 7, 5, 3, 4, 5, 6, 4, 3};
+    GraphW g = getCliqueChain(cliques);
+    ShellStruct shell(g);
+    shell.build();
+    shell.save("output/shellstruct_comp.feather", "output/shellstruct_tree.feather");
+
+    ShellStruct index(g, true);
+    index.load("output/shellstruct_comp.feather", "output/shellstruct_tree.feather");
+    verifyPairs(index, cliques);
+}
+
+TEST_F(ShellStructGTest, LoadOtherGraphThrows) {
+    GraphW g = getCliqueChain({3, 4, 3});
+    ShellStruct shell(g);
+    shell.build();
+    shell.save("output/shellstruct_comp.feather", "output/shellstruct_tree.feather");
+
+    GraphW other = getCliqueChain({3, 4, 4});
+    ShellStruct index(other);
+    EXPECT_THROW(index.load("output/shellstruct_comp.feather", "output/shellstruct_tree.feather"),
+                 std::runtime_error);
+}
+
+TEST_F(ShellStructGTest, EmptyGraph) {
+    GraphW g(0, false, false);
+    ShellStruct shell(g);
+    shell.build();
+    EXPECT_TRUE(shell.community({}).empty());
+    shell.save("output/shellstruct_comp.feather", "output/shellstruct_tree.feather");
+
+    ShellStruct index(g, true);
+    index.load("output/shellstruct_comp.feather", "output/shellstruct_tree.feather");
+    EXPECT_TRUE(index.expandOneCommunity(std::set<node>{}).empty());
+}
+
+TEST_F(ShellStructGTest, InvalidSeeds) {
+    GraphW g = getCliqueChain({3, 4, 3});
+    ShellStruct shell(g);
+    EXPECT_THROW(shell.community({0}), std::runtime_error);
+    shell.build();
+    EXPECT_THROW(shell.community({g.upperNodeIdBound()}), std::out_of_range);
+    EXPECT_THROW(shell.score({}), std::invalid_argument);
+    EXPECT_EQ(shell.score({0, 9}), count{2});
+    EXPECT_EQ(shell.score({3, 4}), count{3});
+}
+
+// Enough vertices for the parallel path of the shell grouping.
+TEST_F(ShellStructGTest, ManyCliques_Singleton) {
+    std::vector<count> cliques(2500);
+    for (count i = 0; i < cliques.size(); ++i)
+        cliques[i] = 3 + i % 4;
+    GraphW g = getCliqueChain(cliques);
+    ShellStruct shell(g);
+    shell.build();
+    verifySingletons(shell, cliques);
 }
 
 } /* namespace NetworKit */

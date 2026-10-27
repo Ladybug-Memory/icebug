@@ -1,17 +1,24 @@
+from libc.stdint cimport uint64_t
 from libcpp cimport bool as bool_t
 from libcpp.map cimport map
 from libcpp.set cimport set
 from libcpp.utility cimport pair
 from libcpp.vector cimport vector
 from libcpp.string cimport string
+from libcpp.span cimport span
 
 from cython.operator import dereference
 
 from .base cimport _Algorithm, Algorithm
-from .structures cimport _Cover, Cover
+from .structures cimport _Cover, Cover, count
 from .helpers import stdstring
 
 import os
+import numpy as np
+
+## workaround of Cython parser
+## this is fixed in v3.3.0a1 (https://github.com/cython/cython/issues/6294)
+ctypedef const uint64_t const_count
 
 cdef class SelectiveCommunityDetector:
 	"""
@@ -598,45 +605,63 @@ cdef class LocalT(SelectiveCommunityDetector):
 
 cdef extern from "<networkit/scd/ShellStruct.hpp>":
 	cdef cppclass _ShellStruct "NetworKit::ShellStruct"(_SelectiveCommunityDetector):
-		_ShellStruct(const _Graph& G) except +
+		_ShellStruct(const _Graph& G, bool_t validate) except +
 
 		void build() except +
+		void build(span[const_count] coredecomp) except +
 		void save(string components_path, string tree_path, string compression) except +
 		void load(string components_path, string tree_path) except +
+		count score(set[node] seeds) except +
+		span[const_count] community(set[node] seeds) except +
 
 cdef class ShellStruct(SelectiveCommunityDetector):
 	"""
   	The ShellStruct index for fast online k-core community search.
+  	The community of a seed set is the connected component of the k-core containing it, for the
+  	largest k in which it is connected.
  
   	This is an implementation of the algorithm proposed in:
  
-  	Fang, Y., Cheng, C. K., Luo, S., & Hu, J. (2016).
-  	Effective community search for large attributed graphs.
-  	Proceedings of the VLDB Endowment.
-  	https://doi.org/10.14778/2994509.2994538
+  	Chen, I., Yi, H., Sharma, A., Chacko, G., & Warnow, T. (2026).
+  	Improved Methods for k-core Community Search.
+  	arXiv preprint arXiv:2609.17822.
+  	https://arxiv.org/abs/2609.17822
 
     Parameters
     ----------
 	G : networkit.Graph
 		Graph in which the community shell be found.
+	validate : bool, optional
+		Check the invariants of the files read by load(); has no effect on build(). Default: False
 	"""
-	def __cinit__(self, Graph G):
+	def __cinit__(self, Graph G, bool_t validate = False):
 		self._G = G
-		self._this = new _ShellStruct(dereference(G._view()))
+		self._this = new _ShellStruct(dereference(G._view()), validate)
 
-	def build(self):
+	def build(self, coreness=None):
 		"""
 		build()
 
 		Initializes the ShellStruct.
+
+	    Parameters
+	    ----------
+		coreness: numpy.ndarray[uint64], optional
+			Precalculated core numbers for each count.
 		"""
-		(<_ShellStruct*>(self._this)).build()
+		if coreness is None or coreness.size == 0:
+			(<_ShellStruct*>(self._this)).build()
+			return
+
+		cdef const uint64_t[::1] mv
+		mv = coreness
+		(<_ShellStruct*>(self._this)).build(span[const_count](&mv[0], <size_t>mv.size))
 
 	def save(self, components_path, tree_path, compression="ZSTD"):
 		"""
 		save()
 
-		Saves the shellstruct index to disk in .parquet files.
+		Saves the shellstruct index to disk as Feather (Arrow IPC) files.
 
 		Parameters
 		----------
@@ -654,7 +679,7 @@ cdef class ShellStruct(SelectiveCommunityDetector):
 		"""
 		load()
 
-		Loads the shellstruct index from disk in .parquet files.
+		Loads the shellstruct index from disk from Feather (Arrow IPC) files.
 
 		Parameters
 		----------
@@ -667,3 +692,37 @@ cdef class ShellStruct(SelectiveCommunityDetector):
 		tree_path = os.fspath(tree_path).encode("utf-8")
 		(<_ShellStruct*>(self._this)).load(components_path, tree_path)
 
+	def score(self, set[node] seeds):
+		"""
+		score()
+
+     	Finding the coreness of a set of seeds is much faster.
+     	This method does that.
+
+		Parameters
+		----------
+     	seeds : set[node]
+     		The seed nodes.
+		"""
+		return (<_ShellStruct*>(self._this)).score(seeds)
+
+	def community(self, set[node] seeds):
+		"""
+		community(seeds)
+
+		Returns the community of the seeds without building a set.
+
+		Parameters
+		----------
+		seeds : set[node]
+			The seed nodes.
+
+		Returns
+		-------
+		numpy.ndarray[uint64]
+			The nodes of the community, in no particular order; empty if there are no seeds.
+		"""
+		cdef span[const_count] members = (<_ShellStruct*>(self._this)).community(seeds)
+		if members.size() == 0:
+			return np.empty(0, dtype=np.uint64)
+		return np.array(<uint64_t[:members.size()]> <uint64_t*> members.data())
