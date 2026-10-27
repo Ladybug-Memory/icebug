@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <omp.h>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 #include <tlx/unused.hpp>
@@ -24,6 +25,11 @@ namespace {
 // coarsening level cannot leak into the next.
 thread_local std::vector<std::pair<node, edgeweight>> t_staged;
 
+// Hash accumulator for heavy supernodes, sized by distinct neighbours.
+thread_local std::unordered_map<node, edgeweight> t_accMap;
+
+constexpr size_t kDefaultStageCap = size_t{1} << 16;
+
 size_t eagerThresholdFromEnv() {
     if (const char *env = std::getenv("NETWORKIT_LEIDEN_EAGER_THRESHOLD")) {
         try {
@@ -35,11 +41,27 @@ size_t eagerThresholdFromEnv() {
     }
     return 2048;
 }
+
+// Staged entries above which aggregation switches to hashing (0 = always).
+size_t stageCapFromEnv() {
+    static const size_t cap = [] {
+        if (const char *env = std::getenv("ICEBUG_VIEW_STAGE_CAP")) {
+            try {
+                return static_cast<size_t>(std::stoull(env));
+            } catch (...) {
+            }
+        }
+        return kDefaultStageCap;
+    }();
+    return cap;
+}
+
 } // namespace
 
 void CoarsenedGraphView::releaseThreadScratch() {
     t_staged.clear();
     t_staged.shrink_to_fit();
+    std::unordered_map<node, edgeweight>().swap(t_accMap);
 }
 
 CoarsenedGraphView::CoarsenedGraphView(const Graph &originalGraph, const Partition &partition)
@@ -156,8 +178,12 @@ CoarsenedGraphView::aggregateNeighbors(node supernode, size_t &workOut) const {
     // std::unordered_map hashing and its per-node bucket allocations; the only allocation
     // left is the returned vector. Sort order also makes the output deterministic.
     // Call releaseThreadScratch() at phase boundaries to shrink after every phase.
-    t_staged.clear();
+    // Supernodes above the stage cap are hashed, so duplicated edges are removed before being cached.
     workOut = 0;
+    if (aggregationWork(supernode) > stageCapFromEnv())
+        return aggregateNeighborsBounded(supernode, workOut);
+
+    t_staged.clear();
 
     // No locks needed here - supernodeToOriginal and nodeMapping are read-only after
     // construction. Iterate through all original nodes in this supernode.
@@ -182,24 +208,45 @@ CoarsenedGraphView::aggregateNeighbors(node supernode, size_t &workOut) const {
     std::sort(t_staged.begin(), t_staged.end(),
               [](const auto &a, const auto &b) { return a.first < b.first; });
 
-    // Combine runs of equal supernodes into the output vector.
-    std::vector<std::pair<node, edgeweight>> neighbors;
-    neighbors.reserve(t_staged.size());
-    node cur = t_staged[0].first;
-    edgeweight acc = 0.0;
-    for (const auto &entry : t_staged) {
-        if (entry.first != cur) {
-            if (acc > 0.0)
-                neighbors.emplace_back(cur, acc);
-            cur = entry.first;
-            acc = 0.0;
-        }
-        acc += entry.second;
-    }
-    if (acc > 0.0) // Only include edges with positive weight
-        neighbors.emplace_back(cur, acc);
-
     workOut = t_staged.size();
+
+    // De-duplicate t_staged
+    size_t k = 0;
+    for (size_t i = 0; i < t_staged.size();) {
+        const node cur = t_staged[i].first;
+        edgeweight acc = 0.0;
+        for (; i < t_staged.size() && t_staged[i].first == cur; ++i)
+            acc += t_staged[i].second;
+        if (acc > 0.0) // Only include edges with positive weight
+            t_staged[k++] = {cur, acc};
+    }
+    return {t_staged.begin(), t_staged.begin() + k};
+}
+
+std::vector<std::pair<node, edgeweight>>
+CoarsenedGraphView::aggregateNeighborsBounded(node supernode, size_t &workOut) const {
+    // Hash-map based neighbor aggregation
+    t_accMap.clear();
+    size_t staged = 0;
+    for (node originalNode : supernodeToOriginal[supernode]) {
+        originalGraph.forNeighborsOf(originalNode, [&](node originalNeighbor, edgeweight weight) {
+            const node neighborSupernode = nodeMapping[originalNeighbor];
+            if (neighborSupernode == supernode && originalNode < originalNeighbor)
+                return;
+            ++staged;
+            t_accMap[neighborSupernode] += weight;
+        });
+    }
+    workOut = staged;
+
+    std::vector<std::pair<node, edgeweight>> neighbors;
+    neighbors.reserve(t_accMap.size());
+    for (const auto &kv : t_accMap)
+        if (kv.second > 0.0) // Only include edges with positive weight
+            neighbors.emplace_back(kv.first, kv.second);
+    t_accMap.clear();
+    std::sort(neighbors.begin(), neighbors.end(),
+              [](const auto &a, const auto &b) { return a.first < b.first; });
     return neighbors;
 }
 

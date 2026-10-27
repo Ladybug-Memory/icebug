@@ -260,7 +260,7 @@ public:
     const std::vector<node> &getOriginalNodes(node supernode) const;
 
     /**
-     * Release the calling thread's computeNeighbors() scratch buffer (capacity included).
+     * Release the calling thread's computeNeighbors() scratch buffers (capacity included).
      * Call at the end of a move/refine phase so a giant-supernode high-water mark from one
      * level cannot leak into the next.
      */
@@ -307,6 +307,11 @@ private:
     // Aggregate without consulting the cache; stores the staged pair count in @a workOut.
     std::vector<std::pair<node, edgeweight>> aggregateNeighbors(node supernode,
                                                                 size_t &workOut) const;
+
+    // Hash-based aggregateNeighbors() for supernodes above the stage cap. Hashing keeps
+    // memory proportional to distinct supernode neighbors, instead of constituent edges.
+    std::vector<std::pair<node, edgeweight>> aggregateNeighborsBounded(node supernode,
+                                                                       size_t &workOut) const;
 
     mutable std::vector<std::vector<std::pair<node, edgeweight>>> neighborCache_;
     mutable std::vector<char> neighborCached_;
