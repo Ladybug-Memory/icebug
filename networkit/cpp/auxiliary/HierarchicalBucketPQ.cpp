@@ -16,6 +16,28 @@ namespace Aux {
 
 namespace {
 constexpr count parallelThreshold = 4096;
+
+// Minimum of key(i) over i in [0, n), or the maximum count if n is 0.
+template <typename F>
+count parallelMin(count n, F key) {
+    count result = std::numeric_limits<count>::max();
+#ifndef NETWORKIT_OMP2
+#pragma omp parallel for reduction(min : result) if (n >= parallelThreshold)
+    for (omp_index i = 0; i < static_cast<omp_index>(n); ++i)
+        result = std::min(result, key(i));
+#else
+#pragma omp parallel if (n >= parallelThreshold)
+    {
+        count localMin = std::numeric_limits<count>::max();
+#pragma omp for nowait
+        for (omp_index i = 0; i < static_cast<omp_index>(n); ++i)
+            localMin = std::min(localMin, key(i));
+#pragma omp critical
+        result = std::min(result, localMin);
+    }
+#endif
+    return result;
+}
 } // namespace
 
 HierarchicalBucketPQ::HierarchicalBucketPQ(count capacity, count numIds, count log2SingleBuckets,
@@ -113,10 +135,7 @@ void HierarchicalBucketPQ::extractBucket(count bucket, std::vector<Value> &out) 
 }
 
 void HierarchicalBucketPQ::redistribute(const std::vector<Value> &values) {
-    Key minKey = infiniteKey;
-#pragma omp parallel for reduction(min : minKey) if (values.size() >= parallelThreshold)
-    for (omp_index i = 0; i < static_cast<omp_index>(values.size()); ++i)
-        minKey = std::min(minKey, getKey(values[i]));
+    const Key minKey = parallelMin(values.size(), [&](count i) { return getKey(values[i]); });
     baseKey = minKey & ~(numSingleBuckets - 1);
 
     // Thread t pushes into the bucket set of id t, so at most numIds threads take part.
