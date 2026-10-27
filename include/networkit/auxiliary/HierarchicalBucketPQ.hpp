@@ -179,13 +179,15 @@ private:
 inline bool HierarchicalBucketPQ::insert(Key key, Value value, count id) {
     assert(key <= maxKey && id < bucketSets.size());
     const Entry newKey = static_cast<Entry>(std::max(key, currentKey));
-    Entry expected = absentEntry;
-    if (entries[value].compare_exchange_strong(expected, newKey, std::memory_order_relaxed)) {
+    Entry old = entries[value].load(std::memory_order_relaxed);
+    if (old == absentEntry
+        && entries[value].compare_exchange_strong(old, newKey, std::memory_order_relaxed)) {
         numQueued.fetch_add(1, std::memory_order_relaxed);
         bucketSets[id].buckets[bucketOf(newKey)].push_back(value);
         return true;
     }
-    lower(value, id, [&](Entry) { return newKey; });
+    if (isPresent(old) && newKey < old)
+        lower(value, id, [&](Entry) { return newKey; });
     return false;
 }
 
