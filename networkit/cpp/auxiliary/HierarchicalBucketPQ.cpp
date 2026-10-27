@@ -18,9 +18,13 @@ namespace {
 constexpr count parallelThreshold = 4096;
 } // namespace
 
-HierarchicalBucketPQ::HierarchicalBucketPQ(count capacity, count numIds)
-    : entries(capacity), bucketSets(numIds) {
+HierarchicalBucketPQ::HierarchicalBucketPQ(count capacity, count numIds, count log2SingleBuckets,
+                                           count numIntermediateBuckets)
+    : log2SingleBuckets(log2SingleBuckets), numSingleBuckets(count{1} << log2SingleBuckets),
+      numBuckets(numSingleBuckets + numIntermediateBuckets), entries(capacity),
+      bucketSets(numIds, BucketSet{std::vector<std::vector<Value>>(numBuckets)}) {
     assert(capacity <= std::numeric_limits<Value>::max());
+    assert(log2SingleBuckets < 63 && numIntermediateBuckets >= 1);
 #pragma omp parallel for
     for (omp_index value = 0; value < static_cast<omp_index>(capacity); ++value)
         entries[value].store(absentEntry, std::memory_order_relaxed);
@@ -68,7 +72,9 @@ HierarchicalBucketPQ::Key HierarchicalBucketPQ::getMinKey() const {
 }
 
 count HierarchicalBucketPQ::firstNonEmptyBucket() const {
-    for (count bucket = 0; bucket < numBuckets; ++bucket)
+    // No present key is below currentKey, and bucketOf is monotone for keys from baseKey on.
+    const count first = currentKey < baseKey ? 0 : bucketOf(currentKey);
+    for (count bucket = first; bucket < numBuckets; ++bucket)
         for (const BucketSet &set : bucketSets)
             if (!set.buckets[bucket].empty())
                 return bucket;

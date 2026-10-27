@@ -9,7 +9,6 @@
 #define NETWORKIT_AUXILIARY_HIERARCHICAL_BUCKET_PQ_HPP_
 
 #include <algorithm>
-#include <array>
 #include <atomic>
 #include <bit>
 #include <cassert>
@@ -56,8 +55,12 @@ public:
      * std::numeric_limits<Value>::max().
      * @param capacity number of admissible values
      * @param numIds number of admissible ids; queries use at most @p numIds threads
+     * @param log2SingleBuckets number of buckets spanning a key-range of one.
+     * @param numIntermediateBuckets number of buckets spanning exponentially growing key-ranges;
+     * requires @p numIntermediateBuckets >= 1.
      */
-    explicit HierarchicalBucketPQ(count capacity, count numIds = 1);
+    explicit HierarchicalBucketPQ(count capacity, count numIds = 1, count log2SingleBuckets = 3,
+                                  count numIntermediateBuckets = 6);
 
     /**
      * Insert @p value with @p key, or lower its key if it is already present. No effect if
@@ -138,13 +141,9 @@ private:
     using Entry = int64_t;
     static constexpr Entry absentEntry = std::numeric_limits<Entry>::max();
 
-    static constexpr count log2SingleBuckets = 3;
-    static constexpr count numSingleBuckets = count{1} << log2SingleBuckets;
-    static constexpr count numBuckets = numSingleBuckets + 6;
-
     // Aligned so that updates with different ids do not share cache lines.
     struct alignas(64) BucketSet {
-        std::array<std::vector<Value>, numBuckets> buckets;
+        std::vector<std::vector<Value>> buckets;
     };
 
     static bool isPresent(Entry entry) { return 0 <= entry && entry != absentEntry; }
@@ -165,6 +164,9 @@ private:
     // numSingleBuckets, and push values into their buckets relative to it.
     void redistribute(const std::vector<Value> &values);
 
+    const count log2SingleBuckets;
+    const count numSingleBuckets;
+    const count numBuckets;
     std::vector<std::atomic<Entry>> entries;
     std::vector<BucketSet> bucketSets; // indexed by id
     std::vector<Value> frontier;
