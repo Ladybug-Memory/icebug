@@ -31,8 +31,8 @@ using count = NetworKit::count;
  *
  * Phase-concurrency. Methods are
  * - updates: insert, decreaseKey, decreaseKeyRelative, tryExtract,
- * - accessors: getKey, contains, empty, size,
- * - queries: extractMin, getMinKey.
+ * - accessors: getKey, contains,
+ * - queries: extractMin, getMinKey, empty, size.
  * Updates and accessors may run concurrently. Queries must be serial.
  *
  * Implementation: buckets follow the hierarchical bucketing structure of
@@ -94,10 +94,12 @@ public:
 
     /**
      * Extract @p value if it is present and its key equals the key of the last extractMin.
+     * Requires @p id < numIds.
      * @param value value to extract
+     * @param id caller's id; concurrent calls must pass different ids
      * @return whether this call extracted @p value
      */
-    bool tryExtract(Value value);
+    bool tryExtract(Value value, count id = 0);
 
     /**
      * @param value value to look up
@@ -133,7 +135,12 @@ public:
     /**
      * @return number of present values
      */
-    count size() const { return numQueued.load(std::memory_order_relaxed); }
+    count size() const {
+        count total = 0;
+        for (const Potential &potential : potentials)
+            total += potential.value.load(std::memory_order_relaxed);
+        return total;
+    }
 
 private:
     // One word per value so that every update checks and changes the state and key atomically:
@@ -144,6 +151,10 @@ private:
     // Aligned so that updates with different ids do not share cache lines.
     struct alignas(64) BucketSet {
         std::vector<std::vector<Value>> buckets;
+    };
+    // #inserts - #extracts by calls passing this id; the sum of potentials is size().
+    struct alignas(64) Potential {
+        std::atomic<count> value{0};
     };
 
     static bool isPresent(Entry entry) { return 0 <= entry && entry != absentEntry; }
@@ -167,22 +178,22 @@ private:
     const count log2SingleBuckets;
     const count numSingleBuckets;
     const count numBuckets;
+    const count numIds;
     std::vector<std::atomic<Entry>> entries;
     std::vector<BucketSet> bucketSets; // indexed by id
+    std::vector<Potential> potentials; // indexed by id
     std::vector<Value> frontier;
     Key currentKey{0};
     Key baseKey{0}; // multiple of numSingleBuckets
-    // Own cache line, so that changing it does not slow down reads of currentKey and baseKey.
-    alignas(64) std::atomic<count> numQueued{0};
 };
 
 inline bool HierarchicalBucketPQ::insert(Key key, Value value, count id) {
-    assert(key <= maxKey && id < bucketSets.size());
+    assert(key <= maxKey && id < numIds);
     const Entry newKey = static_cast<Entry>(std::max(key, currentKey));
     Entry old = entries[value].load(std::memory_order_relaxed);
     if (old == absentEntry
         && entries[value].compare_exchange_strong(old, newKey, std::memory_order_relaxed)) {
-        numQueued.fetch_add(1, std::memory_order_relaxed);
+        potentials[id].value.fetch_add(1, std::memory_order_relaxed);
         bucketSets[id].buckets[bucketOf(newKey)].push_back(value);
         return true;
     }
@@ -192,24 +203,25 @@ inline bool HierarchicalBucketPQ::insert(Key key, Value value, count id) {
 }
 
 inline bool HierarchicalBucketPQ::decreaseKey(Key newKey, Value value, count id) {
-    assert(id < bucketSets.size());
+    assert(id < numIds);
     const Entry target = static_cast<Entry>(std::clamp(newKey, currentKey, maxKey));
     return lower(value, id, [&](Entry) { return target; });
 }
 
 inline bool HierarchicalBucketPQ::decreaseKeyRelative(Key delta, Value value, count id) {
-    assert(id < bucketSets.size());
+    assert(id < numIds);
     return lower(value, id, [&](Entry old) {
         return old - static_cast<Entry>(std::min(delta, static_cast<Key>(old) - currentKey));
     });
 }
 
-inline bool HierarchicalBucketPQ::tryExtract(Value value) {
+inline bool HierarchicalBucketPQ::tryExtract(Value value, count id) {
+    assert(id < numIds);
     Entry expected = static_cast<Entry>(currentKey);
     if (!entries[value].compare_exchange_strong(expected, extractedEntry(currentKey),
                                                 std::memory_order_relaxed))
         return false;
-    numQueued.fetch_sub(1, std::memory_order_relaxed);
+    potentials[id].value.fetch_sub(1, std::memory_order_relaxed);
     return true;
 }
 

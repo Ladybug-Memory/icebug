@@ -43,8 +43,9 @@ count parallelMin(count n, F key) {
 HierarchicalBucketPQ::HierarchicalBucketPQ(count capacity, count numIds, count log2SingleBuckets,
                                            count numIntermediateBuckets)
     : log2SingleBuckets(log2SingleBuckets), numSingleBuckets(count{1} << log2SingleBuckets),
-      numBuckets(numSingleBuckets + numIntermediateBuckets), entries(capacity),
-      bucketSets(numIds, BucketSet{std::vector<std::vector<Value>>(numBuckets)}) {
+      numBuckets(numSingleBuckets + numIntermediateBuckets), numIds(numIds), entries(capacity),
+      bucketSets(numIds, BucketSet{std::vector<std::vector<Value>>(numBuckets)}),
+      potentials(numIds) {
     assert(capacity <= std::numeric_limits<Value>::max());
     assert(log2SingleBuckets < 63 && numIntermediateBuckets >= 1);
 #pragma omp parallel for
@@ -67,7 +68,7 @@ HierarchicalBucketPQ::extractMin() {
 #pragma omp parallel for if (frontier.size() >= parallelThreshold)
     for (omp_index i = 0; i < static_cast<omp_index>(frontier.size()); ++i)
         entries[frontier[i]].store(extractedEntry(currentKey), std::memory_order_relaxed);
-    numQueued.fetch_sub(frontier.size(), std::memory_order_relaxed);
+    potentials[0].value.fetch_sub(frontier.size(), std::memory_order_relaxed);
     return {currentKey, frontier};
 }
 
@@ -105,14 +106,13 @@ count HierarchicalBucketPQ::firstNonEmptyBucket() const {
 }
 
 void HierarchicalBucketPQ::extractBucket(count bucket, std::vector<Value> &out) {
-    const count numSets = bucketSets.size();
     count total = 0;
     for (const BucketSet &set : bucketSets)
         total += set.buckets[bucket].size();
 
-    std::vector<count> offsets(numSets + 1, 0);
+    std::vector<count> offsets(numIds + 1, 0);
 #pragma omp parallel for if (total >= parallelThreshold)
-    for (omp_index id = 0; id < static_cast<omp_index>(numSets); ++id) {
+    for (omp_index id = 0; id < static_cast<omp_index>(numIds); ++id) {
         std::vector<Value> &source = bucketSets[id].buckets[bucket];
         std::erase_if(source, [&](Value value) {
             const Entry entry = entries[value].load(std::memory_order_relaxed);
@@ -125,9 +125,9 @@ void HierarchicalBucketPQ::extractBucket(count bucket, std::vector<Value> &out) 
     }
     std::partial_sum(offsets.begin(), offsets.end(), offsets.begin());
 
-    out.resize(offsets[numSets]);
+    out.resize(offsets[numIds]);
 #pragma omp parallel for if (total >= parallelThreshold)
-    for (omp_index id = 0; id < static_cast<omp_index>(numSets); ++id) {
+    for (omp_index id = 0; id < static_cast<omp_index>(numIds); ++id) {
         std::vector<Value> &source = bucketSets[id].buckets[bucket];
         std::copy(source.begin(), source.end(), out.begin() + offsets[id]);
         source.clear();
@@ -140,7 +140,7 @@ void HierarchicalBucketPQ::redistribute(const std::vector<Value> &values) {
 
     // Thread t pushes into the bucket set of id t, so at most numIds threads take part.
     const int numThreads =
-        static_cast<int>(std::min<count>(bucketSets.size(), omp_get_max_threads()));
+        static_cast<int>(std::min<count>(numIds, omp_get_max_threads()));
 #pragma omp parallel num_threads(numThreads) if (values.size() >= parallelThreshold)
     {
         BucketSet &set = bucketSets[omp_get_thread_num()];
