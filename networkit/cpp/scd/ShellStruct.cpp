@@ -224,7 +224,7 @@ void ShellStruct::build(std::span<const count> coredecomp) {
                                 std::vector<std::pair<node, node>> &touched) {
         std::vector<std::pair<node, node>> local;
 #pragma omp for schedule(guided) nowait
-        for (omp_index i = 0; i < static_cast<omp_index>(shell.size()); ++i)
+        for (omp_index i = 0; i < static_cast<omp_index>(shell.size()); ++i) {
             g->forNeighborsOf(shell[i], [&](node v) {
                 if (coredecomp[v] <= k)
                     return;
@@ -235,6 +235,7 @@ void ShellStruct::build(std::span<const count> coredecomp) {
                     && (t = entry.exchange(none, std::memory_order_relaxed)) != none)
                     local.emplace_back(r, t);
             });
+        }
 #pragma omp critical
         touched.insert(touched.end(), local.begin(), local.end());
 #pragma omp barrier
@@ -242,11 +243,12 @@ void ShellStruct::build(std::span<const count> coredecomp) {
 
     auto unionShell = [&](std::span<const node> shell, count k) {
 #pragma omp for schedule(guided)
-        for (omp_index i = 0; i < static_cast<omp_index>(shell.size()); ++i)
+        for (omp_index i = 0; i < static_cast<omp_index>(shell.size()); ++i) {
             g->forNeighborsOf(shell[i], [&](node v) {
                 if (coredecomp[v] >= k)
                     uf.merge(shell[i], v);
             });
+        }
     };
 
     auto createTreeNodes = [&](std::span<const node> shell, count k) {
