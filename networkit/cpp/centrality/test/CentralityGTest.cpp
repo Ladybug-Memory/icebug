@@ -1635,22 +1635,6 @@ TEST_F(CentralityGTest, testParallelCoreDecompositionSamplingRecovery) {
 }
 
 TEST_F(CentralityGTest, testParallelCoreDecompositionInternalComponents) {
-    Aux::CoreBuckets::Storage buckets;
-    for (count degree : {0u, 7u, 8u, 15u, 16u, 511u, 512u}) {
-        Aux::CoreBuckets::add(buckets, degree, degree, 0);
-    }
-    EXPECT_EQ((std::vector<node>{0}), buckets[0]);
-    EXPECT_EQ((std::vector<node>{7}), buckets[7]);
-    EXPECT_EQ((std::vector<node>{8, 15}), buckets[8]);
-    EXPECT_EQ((std::vector<node>{16}), buckets[9]);
-    EXPECT_EQ((std::vector<node>{511}), buckets[13]);
-    Aux::CoreBuckets::Storage moved;
-    Aux::CoreBuckets::move(moved, 1, 15, 0); // Cross from [16, 32) to [8, 16).
-    Aux::CoreBuckets::move(moved, 2, 14, 0); // Stay in the same interval.
-    EXPECT_EQ((std::vector<node>{1}), moved[8]);
-    Aux::CoreBuckets::add(moved, 3, 519, 512);
-    EXPECT_EQ((std::vector<node>{3}), moved[7]);
-
     CoreDecompositionDetail::Sampler sampler;
     sampler.reset(100, 1.0);
     count triggers = 0;

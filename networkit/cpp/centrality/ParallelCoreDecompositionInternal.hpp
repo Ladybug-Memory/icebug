@@ -14,7 +14,7 @@
 #include <omp.h>
 
 #include "CoreSampler.hpp"
-#include <networkit/auxiliary/HierarchicalCoreBuckets.hpp>
+#include <networkit/auxiliary/HierarchicalBucketPQ.hpp>
 #include <networkit/centrality/CoreDecomposition.hpp>
 #include <networkit/centrality/ParallelCoreDecomposition.hpp>
 
@@ -33,12 +33,9 @@ constexpr count kLocalQueueSize = 128;
 constexpr count kNeighborParallelismThreshold = 128;
 constexpr count kParallelFrontierThreshold = 256;
 constexpr count kHbsSwitchCore = 16;
-
-using BucketArray = Aux::CoreBuckets::Storage;
-using namespace Aux::CoreBuckets;
+constexpr count kSampleWindow = 512;
 
 struct ThreadScratch final {
-    BucketArray buckets;
     std::vector<node> recounts;
 };
 
@@ -77,10 +74,8 @@ public:
     ParallelKCoreSolver(const Graph &G, std::vector<double> &scores, bool samplingEnabled,
                         bool (*acceptRecount)(node, count) = nullptr)
         : G(G), scores(scores), samplingEnabled(samplingEnabled), acceptRecount(acceptRecount),
-          z(G.upperNodeIdBound()), degrees(new std::atomic<count>[z]),
-          active(new std::atomic<char>[z]), threadScratch(omp_get_max_threads()),
-          filterCounts(omp_get_max_threads()), filterOffsets(omp_get_max_threads()),
-          seenAtEpoch(z, 0) {}
+          z(G.upperNodeIdBound()), queue(z, omp_get_max_threads()),
+          active(new std::atomic<char>[z]), threadScratch(omp_get_max_threads()) {}
 
     bool run() {
         const count n = G.numberOfNodes();
@@ -90,52 +85,22 @@ public:
 
         initialize();
 
-        std::vector<node> remaining(z);
-#pragma omp parallel for schedule(static)
-        for (omp_index u = 0; u < static_cast<omp_index>(z); ++u) {
-            remaining[u] = static_cast<node>(u);
-        }
-
-        const count averageDegree = G.numberOfEdges() * 2 / n;
-        count firstHbsLevel = 0;
-        if (averageDegree < kHbsSwitchCore) {
-            for (count level = 0; level < kHbsSwitchCore && !remaining.empty(); ++level) {
-                buckets[0].clear();
-                if (!buildSparseBucket(remaining, level)) {
+        while (!queue.empty()) {
+            // Keys cannot drop below an extracted level, so sampled vertices are rechecked
+            // before the queue reaches each window, including windows without vertices.
+            if (samplingPossible && queue.getMinKey() >= nextSampleWindow) {
+                if (!recountUnsafeSamples(nextSampleWindow)) {
                     return false;
                 }
-                if (!processLevel(level, level, false)) {
-                    return false;
-                }
-                firstHbsLevel = level + 1;
+                nextSampleWindow += kSampleWindow;
+                continue;
             }
-            filterRemaining(remaining);
-        }
 
-        for (count baseLevel = 0; !remaining.empty(); baseLevel += kBucketStride) {
-            if (baseLevel > maximumInitialDegree) {
+            const auto extracted = queue.extractMin();
+            if (!processLevel(extracted.first, std::vector<node>(extracted.second.begin(),
+                                                                 extracted.second.end()))) {
                 return false;
             }
-
-            clearBuckets();
-            const count levelBegin = std::max(baseLevel, firstHbsLevel);
-            if (!buildBuckets(remaining, levelBegin, baseLevel + kBucketStride, baseLevel, true)) {
-                return false;
-            }
-
-            for (count level = levelBegin; level < baseLevel + kBucketStride && !remaining.empty();
-                 ++level) {
-                if (level != baseLevel && (level & kBucketMask) == 0) {
-                    redistributeIntermediateBucket(level);
-                }
-
-                const count bucketBase = level & ~kBucketMask;
-                if (!processLevel(level, bucketBase, true)) {
-                    return false;
-                }
-            }
-
-            filterRemaining(remaining);
         }
 
         return true;
@@ -150,25 +115,22 @@ private:
     // Per-run internal validation hook; never shared globally or exposed through the public API.
     bool (*acceptRecount)(node, count);
     count z;
-    std::unique_ptr<std::atomic<count>[]> degrees;
+    Aux::HierarchicalBucketPQ queue;
     std::unique_ptr<Sampler[]> samplers;
     std::unique_ptr<std::atomic<bool>[]> recountQueued;
     // Atomics protect accesses within a peeling round. Relaxed ordering is sufficient:
     // OpenMP region/barrier boundaries publish sampler configuration and scratch buffers
     // between initialization, peeling and recount phases. No flag publishes other data.
+    // A vertex stays active until it is processed, which is after the queue extracts it.
     std::unique_ptr<std::atomic<char>[]> active;
     std::unique_ptr<std::atomic<char>[]> sampleMode;
-    BucketArray buckets;
     std::vector<ThreadScratch> threadScratch;
-    std::vector<count> filterCounts;
-    std::vector<count> filterOffsets;
-    std::vector<node> filterBuffer;
-    std::vector<count> seenAtEpoch;
+    // High-degree vertices extracted by the serial small-frontier path but not yet processed.
+    std::vector<node> deferred;
     count scratchInUse{1};
     bool samplingPossible{false};
-    count currentEpoch{0};
+    count nextSampleWindow{0};
     index maxCore{0};
-    count maximumInitialDegree{0};
 
     void initialize() {
         count maxDegree = 0;
@@ -178,11 +140,11 @@ private:
 #endif
         for (omp_index u = 0; u < static_cast<omp_index>(z); ++u) {
             const count degree = G.degree(static_cast<node>(u));
-            degrees[u].store(degree, std::memory_order_relaxed);
+            queue.insert(degree, static_cast<Aux::HierarchicalBucketPQ::Value>(u),
+                         omp_get_thread_num());
             active[u].store(1, std::memory_order_relaxed);
             maxDegree = std::max(maxDegree, degree);
         }
-        maximumInitialDegree = maxDegree;
         samplingPossible = samplingEnabled && maxDegree * kInitialReduceRatio >= kSampleThreshold;
 
         if (samplingPossible) {
@@ -204,7 +166,7 @@ private:
             return;
         }
 
-        const count degree = degrees[u].load(std::memory_order_relaxed);
+        const count degree = queue.getKey(u);
         const double reducedDegree = degree * kInitialReduceRatio;
         const double remainingAfterReduction =
             (degree - std::min(degree, level)) * (1.0 - kInitialReduceRatio);
@@ -223,7 +185,7 @@ private:
     }
 
     bool sampleIsSafe(node u, count horizon) const {
-        const count degree = degrees[u].load(std::memory_order_relaxed);
+        const count degree = queue.getKey(u);
         if (degree * kInitialReduceRatio * kBiasFactor < horizon || degree <= horizon) {
             return false;
         }
@@ -242,21 +204,7 @@ private:
 
     void resetScratch(count numberOfThreads) {
         for (count thread = 0; thread < numberOfThreads; ++thread) {
-            auto &scratch = threadScratch[thread];
-            scratch.recounts.clear();
-            for (auto &bucket : scratch.buckets) {
-                bucket.clear();
-            }
-        }
-    }
-
-    void mergeScratchBuckets(count numberOfThreads) {
-        for (count thread = 0; thread < numberOfThreads; ++thread) {
-            auto &scratch = threadScratch[thread];
-            for (count bucket = 0; bucket < kNumBuckets; ++bucket) {
-                auto &source = scratch.buckets[bucket];
-                buckets[bucket].insert(buckets[bucket].end(), source.begin(), source.end());
-            }
+            threadScratch[thread].recounts.clear();
         }
     }
 
@@ -275,110 +223,27 @@ private:
         return recounts;
     }
 
-    void clearBuckets() {
-        for (auto &bucket : buckets) {
-            bucket.clear();
-        }
-    }
-
-    bool buildBuckets(const std::vector<node> &remaining, count level, count horizon,
-                      count baseLevel, bool useHbs) {
+    bool recountUnsafeSamples(count level) {
         resetScratch(threadScratch.size());
 #pragma omp parallel for schedule(static)
-        for (omp_index i = 0; i < static_cast<omp_index>(remaining.size()); ++i) {
-            const node u = remaining[i];
-            const count degree = degrees[u].load(std::memory_order_relaxed);
-            auto &scratch = threadScratch[omp_get_thread_num()];
-            Aux::CoreBuckets::add(scratch.buckets, u, degree, baseLevel);
-            if (samplingPossible && sampleMode[u].load(std::memory_order_relaxed)
-                && !sampleIsSafe(u, horizon)) {
+        for (omp_index u = 0; u < static_cast<omp_index>(z); ++u) {
+            if (active[u].load(std::memory_order_relaxed)
+                && sampleMode[u].load(std::memory_order_relaxed)
+                && !sampleIsSafe(static_cast<node>(u), level + kSampleWindow)) {
                 bool expected = false;
                 if (recountQueued[u].compare_exchange_strong(expected, true,
                                                              std::memory_order_relaxed)) {
-                    scratch.recounts.push_back(u);
+                    threadScratch[omp_get_thread_num()].recounts.push_back(static_cast<node>(u));
                 }
             }
         }
-        mergeScratchBuckets(threadScratch.size());
-        return recountVertices(collectScratchRecounts(threadScratch.size()), level, baseLevel,
-                               useHbs);
+        return recountVertices(collectScratchRecounts(threadScratch.size()), level);
     }
 
-    bool buildSparseBucket(std::vector<node> &remaining, count level) {
-        resetScratch(threadScratch.size());
-        // Compact the previous level and build the next frontier in the same scan.
-        filterRemaining(remaining, true, level);
-        mergeScratchBuckets(threadScratch.size());
-        return recountVertices(collectScratchRecounts(threadScratch.size()), level, level, false);
-    }
-
-    std::vector<node> uniqueActive(std::vector<node> candidates) {
-        ++currentEpoch;
-        if (currentEpoch == 0) {
-            std::fill(seenAtEpoch.begin(), seenAtEpoch.end(), 0);
-            ++currentEpoch;
-        }
-
-        size_t output = 0;
-        for (node u : candidates) {
-            if (active[u].load(std::memory_order_relaxed) && seenAtEpoch[u] != currentEpoch) {
-                seenAtEpoch[u] = currentEpoch;
-                candidates[output++] = u;
-            }
-        }
-        candidates.resize(output);
-        return candidates;
-    }
-
-    std::vector<node> takeExactBucket(count level, bool useHbs) {
-        const count bucket = useHbs ? (level & kBucketMask) : 0;
-        std::vector<node> candidates;
-        candidates.swap(buckets[bucket]);
-        candidates = uniqueActive(std::move(candidates));
-
-        candidates.erase(std::remove_if(candidates.begin(), candidates.end(),
-                                        [&](node u) {
-                                            return degrees[u].load(std::memory_order_relaxed)
-                                                   != level;
-                                        }),
-                         candidates.end());
-        return candidates;
-    }
-
-    void redistributeIntermediateBucket(count level) {
-        count intermediate = kNumIntermediateBuckets;
-        for (count i = kNumIntermediateBuckets; i-- > 0;) {
-            const count mask = (kNumSingleBuckets << i) - 1;
-            if ((level & mask) == 0) {
-                intermediate = i;
-                break;
-            }
-        }
-        if (intermediate == kNumIntermediateBuckets) {
-            return;
-        }
-
-        const count bucket = kNumSingleBuckets + intermediate;
-        std::vector<node> candidates;
-        candidates.swap(buckets[bucket]);
-        candidates = uniqueActive(std::move(candidates));
-
-        resetScratch(threadScratch.size());
-#pragma omp parallel for schedule(static)
-        for (omp_index i = 0; i < static_cast<omp_index>(candidates.size()); ++i) {
-            const node u = candidates[i];
-            const count degree = degrees[u].load(std::memory_order_relaxed);
-            Aux::CoreBuckets::add(threadScratch[omp_get_thread_num()].buckets, u, degree, level);
-        }
-        mergeScratchBuckets(threadScratch.size());
-    }
-
-    void decrementNeighbor(node source, node target, count level, count bucketBase, bool useHbs,
+    void decrementNeighbor(node source, node target, count level, count thread,
                            bool allowLocalQueue, std::array<node, kLocalQueueSize> &localQueue,
-                           count &rear, BucketArray &localBuckets,
-                           std::vector<node> &localRecounts) {
-        count oldDegree = degrees[target].load(std::memory_order_relaxed);
-        if (oldDegree <= level) {
+                           count &rear, std::vector<node> &localRecounts) {
+        if (queue.getKey(target) <= level) {
             return;
         }
 
@@ -396,24 +261,14 @@ private:
             return;
         }
 
-        while (oldDegree > level) {
-            if (degrees[target].compare_exchange_weak(oldDegree, oldDegree - 1,
-                                                      std::memory_order_relaxed)) {
-                const count newDegree = oldDegree - 1;
-                if (newDegree == level && allowLocalQueue && rear < kLocalQueueSize) {
-                    localQueue[rear++] = target;
-                } else if (useHbs) {
-                    Aux::CoreBuckets::move(localBuckets, target, newDegree, bucketBase);
-                } else if (newDegree == level) {
-                    localBuckets[0].push_back(target);
-                }
-                return;
-            }
+        if (queue.decreaseKeyRelative(1, target, thread) && allowLocalQueue
+            && rear < kLocalQueueSize && queue.getKey(target) == level
+            && queue.tryExtract(target, thread)) {
+            localQueue[rear++] = target;
         }
     }
 
-    count processRootSequential(node root, count level, count bucketBase, bool useHbs,
-                                bool deferHighDegree, BucketArray &localBuckets,
+    count processRootSequential(node root, count level, count thread, bool deferHighDegree,
                                 std::vector<node> &localRecounts) {
         std::array<node, kLocalQueueSize> localQueue;
         count front = 0;
@@ -436,8 +291,7 @@ private:
 
             // Use original degree: even a low residual degree still scans the full CSR row.
             if (deferHighDegree && G.degree(u) >= kNeighborParallelismThreshold) {
-                const count bucket = useHbs ? (level & kBucketMask) : 0;
-                localBuckets[bucket].push_back(u);
+                deferred.push_back(u);
                 continue;
             }
 
@@ -445,30 +299,26 @@ private:
             scores[u] = level;
             ++processed;
             G.forNeighborsOf(u, [&](node v) {
-                decrementNeighbor(u, v, level, bucketBase, useHbs, true, localQueue, rear,
-                                  localBuckets, localRecounts);
+                decrementNeighbor(u, v, level, thread, true, localQueue, rear, localRecounts);
             });
         }
         return processed;
     }
 
-    count processLargeFrontier(const std::vector<node> &frontier, count level, count bucketBase,
-                               bool useHbs) {
+    count processLargeFrontier(const std::vector<node> &frontier, count level) {
         scratchInUse = threadScratch.size();
         resetScratch(scratchInUse);
         count processed = 0;
 #pragma omp parallel for schedule(dynamic, 64) reduction(+ : processed)
         for (omp_index i = 0; i < static_cast<omp_index>(frontier.size()); ++i) {
-            auto &scratch = threadScratch[omp_get_thread_num()];
-            processed += processRootSequential(frontier[i], level, bucketBase, useHbs, false,
-                                               scratch.buckets, scratch.recounts);
+            const count thread = omp_get_thread_num();
+            processed += processRootSequential(frontier[i], level, thread, false,
+                                               threadScratch[thread].recounts);
         }
-        mergeScratchBuckets(scratchInUse);
         return processed;
     }
 
-    count processSmallFrontier(const std::vector<node> &frontier, count level, count bucketBase,
-                               bool useHbs) {
+    count processSmallFrontier(const std::vector<node> &frontier, count level) {
         std::vector<node> highDegreeRoots;
         for (node root : frontier) {
             if (G.degree(root) >= kNeighborParallelismThreshold) {
@@ -477,18 +327,11 @@ private:
         }
 
         scratchInUse = highDegreeRoots.empty() ? 1 : threadScratch.size();
-        const bool directBuckets = highDegreeRoots.empty();
-        if (directBuckets) {
-            threadScratch[0].recounts.clear();
-        } else {
-            resetScratch(scratchInUse);
-        }
+        resetScratch(scratchInUse);
         count processed = 0;
         for (node root : frontier) {
             if (G.degree(root) < kNeighborParallelismThreshold) {
-                processed += processRootSequential(
-                    root, level, bucketBase, useHbs, true,
-                    directBuckets ? buckets : threadScratch[0].buckets, threadScratch[0].recounts);
+                processed += processRootSequential(root, level, 0, true, threadScratch[0].recounts);
             }
         }
 
@@ -511,7 +354,8 @@ private:
         if (!edgeBlocks.empty()) {
 #pragma omp parallel
             {
-                auto &scratch = threadScratch[omp_get_thread_num()];
+                const count thread = omp_get_thread_num();
+                auto &scratch = threadScratch[thread];
                 std::array<node, kLocalQueueSize> unusedQueue;
                 count unusedRear = 0;
 #pragma omp for schedule(dynamic, 8)
@@ -521,46 +365,41 @@ private:
                     for (index neighborIndex = block.begin; neighborIndex < block.end;
                          ++neighborIndex) {
                         const node v = G.getIthNeighbor(Unsafe{}, block.source, neighborIndex);
-                        decrementNeighbor(block.source, v, level, bucketBase, useHbs, false,
-                                          unusedQueue, unusedRear, scratch.buckets,
-                                          scratch.recounts);
+                        decrementNeighbor(block.source, v, level, thread, false, unusedQueue,
+                                          unusedRear, scratch.recounts);
                     }
                 }
             }
         }
 
-        if (!directBuckets)
-            mergeScratchBuckets(scratchInUse);
         return processed;
     }
 
-    bool processLevel(count level, count bucketBase, bool useHbs) {
-        std::vector<node> frontier = takeExactBucket(level, useHbs);
+    bool processLevel(count level, std::vector<node> frontier) {
         while (!frontier.empty()) {
             const count processed = frontier.size() > kParallelFrontierThreshold
-                                        ? processLargeFrontier(frontier, level, bucketBase, useHbs)
-                                        : processSmallFrontier(frontier, level, bucketBase, useHbs);
+                                        ? processLargeFrontier(frontier, level)
+                                        : processSmallFrontier(frontier, level);
             if (processed > 0) {
                 maxCore = std::max<index>(maxCore, level);
             }
 
             const std::vector<node> recounts = collectScratchRecounts(scratchInUse);
-            if (!recounts.empty() && !recountVertices(recounts, level, bucketBase, useHbs)) {
+            if (!recounts.empty() && !recountVertices(recounts, level)) {
                 return false;
             }
-            frontier = takeExactBucket(level, useHbs);
+            frontier.swap(deferred);
+            deferred.clear();
         }
         return true;
     }
 
-    bool recountVertices(const std::vector<node> &vertices, count level, count bucketBase,
-                         bool useHbs) {
+    bool recountVertices(const std::vector<node> &vertices, count level) {
         if (vertices.empty()) {
             return true;
         }
 
         std::atomic<bool> samplingError{false};
-        resetScratch(threadScratch.size());
 
 #pragma omp parallel for schedule(dynamic, 1) if (vertices.size() > 1)
         for (omp_index i = 0; i < static_cast<omp_index>(vertices.size()); ++i) {
@@ -582,8 +421,8 @@ private:
             if (exactDegree < level) {
                 count previousRoundDegree = 0;
                 G.forNeighborsOf(u, [&](node v) {
-                    previousRoundDegree += active[v].load(std::memory_order_relaxed)
-                                           || degrees[v].load(std::memory_order_relaxed) == level;
+                    previousRoundDegree +=
+                        active[v].load(std::memory_order_relaxed) || queue.getKey(v) == level;
                 });
 
                 if (previousRoundDegree < level) {
@@ -593,79 +432,11 @@ private:
                 exactDegree = level;
             }
 
-            degrees[u].store(exactDegree, std::memory_order_relaxed);
-            auto &scratch = threadScratch[omp_get_thread_num()];
-            if (exactDegree == level) {
-                const count bucket = useHbs ? (level & kBucketMask) : 0;
-                scratch.buckets[bucket].push_back(u);
-            } else if (useHbs) {
-                Aux::CoreBuckets::add(scratch.buckets, u, exactDegree, bucketBase);
-            }
+            queue.decreaseKey(exactDegree, u, omp_get_thread_num());
             setSampler(u, level);
         }
 
-        mergeScratchBuckets(threadScratch.size());
         return !samplingError.load(std::memory_order_relaxed);
-    }
-
-    void filterRemaining(std::vector<node> &remaining, bool buildSparse = false, count level = 0) {
-        if (remaining.empty())
-            return;
-        const count inputSize = remaining.size();
-        filterBuffer.resize(inputSize);
-        count outputSize = 0;
-
-#pragma omp parallel shared(outputSize)
-        {
-            const int thread = omp_get_thread_num();
-            const int threadCount = omp_get_num_threads();
-            const count begin = inputSize * thread / threadCount;
-            const count end = inputSize * (thread + 1) / threadCount;
-            count localCount = 0;
-            for (count i = begin; i < end; ++i) {
-                const node u = remaining[i];
-                if (!active[u].load(std::memory_order_relaxed))
-                    continue;
-                ++localCount;
-                if (buildSparse) {
-                    auto &scratch = threadScratch[thread];
-                    if (degrees[u].load(std::memory_order_relaxed) == level) {
-                        scratch.buckets[0].push_back(u);
-                    }
-                    if (samplingPossible && sampleMode[u].load(std::memory_order_relaxed)
-                        && !sampleIsSafe(u, level + kBucketStride)) {
-                        bool expected = false;
-                        if (recountQueued[u].compare_exchange_strong(expected, true,
-                                                                     std::memory_order_relaxed)) {
-                            scratch.recounts.push_back(u);
-                        }
-                    }
-                }
-            }
-            filterCounts[thread] = localCount;
-
-#pragma omp barrier
-#pragma omp single
-            {
-                outputSize = 0;
-                for (int owner = 0; owner < threadCount; ++owner) {
-                    filterOffsets[owner] = outputSize;
-                    outputSize += filterCounts[owner];
-                }
-            }
-#pragma omp barrier
-
-            count output = filterOffsets[thread];
-            for (count i = begin; i < end; ++i) {
-                const node u = remaining[i];
-                if (active[u].load(std::memory_order_relaxed)) {
-                    filterBuffer[output++] = u;
-                }
-            }
-        }
-
-        filterBuffer.resize(outputSize);
-        remaining.swap(filterBuffer);
     }
 };
 
