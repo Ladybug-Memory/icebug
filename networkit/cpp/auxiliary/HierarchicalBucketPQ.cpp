@@ -139,8 +139,7 @@ void HierarchicalBucketPQ::redistribute(const std::vector<Value> &values) {
     baseKey = minKey & ~(numSingleBuckets - 1);
 
     // Thread t pushes into the bucket set of id t, so at most numIds threads take part.
-    const int numThreads =
-        static_cast<int>(std::min<count>(numIds, omp_get_max_threads()));
+    const int numThreads = static_cast<int>(std::min<count>(numIds, omp_get_max_threads()));
 #pragma omp parallel num_threads(numThreads) if (values.size() >= parallelThreshold)
     {
         BucketSet &set = bucketSets[omp_get_thread_num()];
