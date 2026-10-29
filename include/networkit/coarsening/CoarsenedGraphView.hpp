@@ -304,8 +304,9 @@ private:
     // Estimated aggregation work for @a supernode: sum of its members' base degrees.
     size_t aggregationWork(node supernode) const;
 
-    // Aggregate without consulting the cache; stores the staged pair count in @a workOut.
-    std::vector<std::pair<node, edgeweight>> aggregateNeighbors(node supernode,
+    // Aggregate without consulting the cache; @a workEstimate is the precomputed
+    // aggregationWork() used for the stage-cap branch, @a workOut receives the staged count.
+    std::vector<std::pair<node, edgeweight>> aggregateNeighbors(node supernode, size_t workEstimate,
                                                                 size_t &workOut) const;
 
     // Hash-based aggregateNeighbors() for supernodes above the stage cap. Hashing keeps

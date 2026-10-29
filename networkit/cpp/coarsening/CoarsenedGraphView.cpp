@@ -172,15 +172,16 @@ const std::vector<node> &CoarsenedGraphView::getOriginalNodes(node supernode) co
 }
 
 std::vector<std::pair<node, edgeweight>>
-CoarsenedGraphView::aggregateNeighbors(node supernode, size_t &workOut) const {
+CoarsenedGraphView::aggregateNeighbors(node supernode, size_t workEstimate, size_t &workOut) const {
     // Flat aggregation (InducedSubgraphView-style): stage (supernode, weight) pairs into the
     // phase-scoped thread-local buffer, sort, then combine runs. This avoids per-call
     // std::unordered_map hashing and its per-node bucket allocations; the only allocation
     // left is the returned vector. Sort order also makes the output deterministic.
     // Call releaseThreadScratch() at phase boundaries to shrink after every phase.
-    // Supernodes above the stage cap are hashed, so duplicated edges are removed before being cached.
+    // Supernodes above the stage cap are hashed, so duplicated edges are removed before being
+    // cached.
     workOut = 0;
-    if (aggregationWork(supernode) > stageCapFromEnv())
+    if (workEstimate > stageCapFromEnv())
         return aggregateNeighborsBounded(supernode, workOut);
 
     t_staged.clear();
@@ -260,9 +261,11 @@ CoarsenedGraphView::computeNeighbors(node supernode) const {
             return neighborCache_[supernode];
     }
     // Uncached: aggregate without holding the lock, then publish under it. A loser of the
-    // race recomputes the identical vector and discards it.
+    // race recomputes the identical vector and discards it. The work estimate is hoisted
+    // here so the hot path pays the O(members) scan once.
+    const size_t workEstimate = aggregationWork(supernode);
     size_t work = 0;
-    auto neighbors = aggregateNeighbors(supernode, work);
+    auto neighbors = aggregateNeighbors(supernode, workEstimate, work);
     // Lazy promotion: hot supernodes pay aggregation on every visit, so keep the result.
     if (work >= eagerNeighborThreshold) {
         std::lock_guard<std::mutex> guard(cacheMutexes_[supernode]);
@@ -284,18 +287,20 @@ void CoarsenedGraphView::ensureEagerCache() {
 #pragma omp parallel for schedule(dynamic)
     for (omp_index s = 0; s < static_cast<omp_index>(numSupernodes); ++s) {
         const node supernode = static_cast<node>(s);
-        // Eligibility check under the entry lock; aggregation itself runs unlocked
-        // (t_staged is thread-local) and publishes under the lock.
+        // Hoisted work estimate: O(members) scan once per supernode, reused for eligibility
+        // and the stage-cap branch. Mapping storage is read-only, so computing it outside
+        // the entry lock is safe. Aggregation itself runs unlocked (t_staged is
+        // thread-local) and publishes under the lock.
+        const size_t workEstimate = aggregationWork(supernode);
         bool eligible = false;
         {
             std::lock_guard<std::mutex> guard(cacheMutexes_[supernode]);
-            eligible =
-                !neighborCached_[supernode] && aggregationWork(supernode) >= eagerNeighborThreshold;
+            eligible = !neighborCached_[supernode] && workEstimate >= eagerNeighborThreshold;
         }
         if (!eligible)
             continue;
         size_t work = 0;
-        auto neighbors = aggregateNeighbors(supernode, work);
+        auto neighbors = aggregateNeighbors(supernode, workEstimate, work);
         tlx::unused(work);
         std::lock_guard<std::mutex> guard(cacheMutexes_[supernode]);
         if (!neighborCached_[supernode]) {
