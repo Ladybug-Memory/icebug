@@ -59,7 +59,7 @@ jobs:
           - os: linux
             arch: x86_64
             compiler: llvm-20
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
             cc: clang-20
             cxx: clang++-20
           - os: macos
@@ -261,7 +261,7 @@ jobs:
           - os: linux
             arch: x86_64
             compiler: llvm-20
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
             cc: clang-20
             cxx: clang++-20
             artifact_name: icebug-linux-x86_64-perf
