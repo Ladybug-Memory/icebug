@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 
-import argparse
-import os
 from pathlib import Path
 
-import pyarrow
+import numpy as np
+
 import networkit as nk
 from networkit.scd import ShellStruct
 
@@ -16,14 +15,15 @@ def build_demo_graph():
     G = nk.Graph(14, directed=False)
     for s, t in zip(src, tgt):
         G.addEdge(s, t)
-    return G
+    coredecomp = np.array([2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 3, 3, 3, 3], dtype=np.uint64)
+    return G, coredecomp
 
 
 def main():
-    components = Path("output") / "shellstruct.components.parquet"
-    tree = Path("output") / "shellstruct.tree.parquet"
+    components = Path("output") / "shellstruct.components.feather"
+    tree = Path("output") / "shellstruct.tree.feather"
 
-    graph = build_demo_graph()
+    graph, coredecomp = build_demo_graph()
     shell = ShellStruct(graph)
 
     if components.exists() and tree.exists():
@@ -31,21 +31,28 @@ def main():
         shell.load(components, tree)
     else:
         print("Building shellstruct...")
-        shell.build()
+        shell.build(coredecomp)
 
     seed = {0, 1}
     comm = shell.expandOneCommunity(seed)
+    members = shell.community(seed)
     print(f"Comm for {seed}:", comm)  # 0, 1 connected 2-shell but not 3-shell
+    print(f"Comm for {seed} has size {len(members)} and coreness {shell.score(seed)}")
 
     seed = {3, 4}
     comm = shell.expandOneCommunity(seed)
+    members = shell.community(seed)
     print(f"Comm for {seed}:", comm)  # 3 is in 3-shell, returns just the 4-clique
+    print(f"Comm for {seed} has size {len(members)} and coreness {shell.score(seed)}")
 
     seed = {3, 13}
     comm = shell.expandOneCommunity(seed)
+    members = shell.community(seed)
     print(f"Comm for {seed}:", comm)  # 3, 13 are connected in 2-shell (but not 3-shell)
+    print(f"Comm for {seed} has size {len(members)} and coreness {shell.score(seed)}")
 
     if not components.exists() or not tree.exists():
+        components.parent.mkdir(exist_ok=True)
         shell.save(components, tree, compression="ZSTD")
 
 
