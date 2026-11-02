@@ -42,6 +42,12 @@ constexpr double zipfExponent = 2.0;
 constexpr count decrementsPerValue = 8;
 constexpr uint64_t traceSeed = 1;
 
+struct RestoreThreads {
+    explicit RestoreThreads(int numThreads) { omp_set_num_threads(numThreads); }
+    ~RestoreThreads() { omp_set_num_threads(threads); }
+    int threads = omp_get_max_threads();
+};
+
 std::vector<int64_t> uniformKeys(count maxKey, uint64_t seed) {
     Aux::Random::setSeed(seed, false);
     std::vector<int64_t> keys(numValues);
@@ -219,11 +225,9 @@ TEST_F(HierarchicalBucketPQBenchmark, benchmarkTraceBucketPQ) {
  * Time of the trace on HierarchicalBucketPQ with one thread.
  */
 TEST_F(HierarchicalBucketPQBenchmark, benchmarkTraceSerial) {
-    const int threads = omp_get_max_threads();
-    omp_set_num_threads(1);
+    RestoreThreads restore(1);
     const auto keys = uniformKeys(maxUniformKey, traceSeed);
     benchmarkHierarchical("HierarchicalBucketPQ", keys, uniformTargets(keys, traceSeed));
-    omp_set_num_threads(threads);
 }
 
 /**
@@ -231,12 +235,10 @@ TEST_F(HierarchicalBucketPQBenchmark, benchmarkTraceSerial) {
  * key, as in Aux::BucketPQ.
  */
 TEST_F(HierarchicalBucketPQBenchmark, benchmarkTraceSerialFlat) {
-    const int threads = omp_get_max_threads();
-    omp_set_num_threads(1);
+    RestoreThreads restore(1);
     const auto keys = uniformKeys(maxUniformKey, traceSeed);
     benchmarkHierarchical("HierarchicalBucketPQ flat", keys, uniformTargets(keys, traceSeed),
                           std::bit_width(maxUniformKey), 1);
-    omp_set_num_threads(threads);
 }
 
 /**
@@ -252,11 +254,9 @@ TEST_F(HierarchicalBucketPQBenchmark, benchmarkTraceZipfBucketPQ) {
  * thread.
  */
 TEST_F(HierarchicalBucketPQBenchmark, benchmarkTraceZipfSerial) {
-    const int threads = omp_get_max_threads();
-    omp_set_num_threads(1);
+    RestoreThreads restore(1);
     const auto keys = zipfKeys(maxZipfKey, zipfExponent, traceSeed);
     benchmarkHierarchical("HierarchicalBucketPQ zipf", keys, weightedTargets(keys, traceSeed));
-    omp_set_num_threads(threads);
 }
 
 /**
@@ -264,12 +264,10 @@ TEST_F(HierarchicalBucketPQBenchmark, benchmarkTraceZipfSerial) {
  * thread and a single bucket for every key.
  */
 TEST_F(HierarchicalBucketPQBenchmark, benchmarkTraceZipfSerialFlat) {
-    const int threads = omp_get_max_threads();
-    omp_set_num_threads(1);
+    RestoreThreads restore(1);
     const auto keys = zipfKeys(maxZipfKey, zipfExponent, traceSeed);
     benchmarkHierarchical("HierarchicalBucketPQ zipf flat", keys, weightedTargets(keys, traceSeed),
                           std::bit_width(maxZipfKey), 1);
-    omp_set_num_threads(threads);
 }
 
 /**

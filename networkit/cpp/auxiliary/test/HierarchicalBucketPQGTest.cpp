@@ -9,9 +9,11 @@
 
 #include <algorithm>
 #include <atomic>
+#include <limits>
 #include <omp.h>
 #include <random>
 #include <span>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -104,6 +106,20 @@ void expectSameExtraction(PQ &pq, BucketPQOracle &oracle) {
 } // namespace
 
 class HierarchicalBucketPQGTest : public testing::Test {};
+
+/**
+ * Invalid constructor arguments throw std::invalid_argument, and a queue of capacity zero is empty.
+ */
+TEST_F(HierarchicalBucketPQGTest, testConstructor) {
+    EXPECT_THROW(PQ(count{std::numeric_limits<Value>::max()} + 1), std::invalid_argument);
+    EXPECT_THROW(PQ(1, 0), std::invalid_argument);
+    EXPECT_THROW(PQ(1, 1, 63), std::invalid_argument);
+    EXPECT_THROW(PQ(1, 1, 3, 0), std::invalid_argument);
+
+    PQ pq(0);
+    EXPECT_TRUE(pq.empty());
+    EXPECT_EQ(pq.size(), 0u);
+}
 
 /**
  * Values sharing a key come out together in one batch, separate from values with other keys, and
@@ -326,6 +342,31 @@ TEST_F(HierarchicalBucketPQGTest, testBucketBoundaries) {
 }
 
 /**
+ * Keys up to maxKey can be inserted, lowered and extracted in increasing key order, and a value
+ * extracted at maxKey still reports maxKey.
+ */
+TEST_F(HierarchicalBucketPQGTest, testMaxKey) {
+    PQ pq(4);
+    pq.insert(PQ::maxKey, 0);
+    pq.insert(PQ::maxKey - 1, 1);
+    pq.insert(PQ::maxKey, 2);
+    pq.insert(3, 3);
+    EXPECT_TRUE(pq.decreaseKeyRelative(1, 2));
+    EXPECT_EQ(pq.getKey(0), PQ::maxKey);
+
+    const std::vector<std::pair<Key, std::vector<Value>>> expected = {
+        {3, {3}}, {PQ::maxKey - 1, {1, 2}}, {PQ::maxKey, {0}}};
+    for (const auto &[expectedKey, expectedValues] : expected) {
+        const auto [key, values] = pq.extractMin();
+        EXPECT_EQ(key, expectedKey);
+        EXPECT_EQ(sorted(values), expectedValues);
+    }
+    EXPECT_TRUE(pq.empty());
+    EXPECT_FALSE(pq.contains(0));
+    EXPECT_EQ(pq.getKey(0), PQ::maxKey);
+}
+
+/**
  * Concurrent phases of a single update kind leave the same keys, report the same changes per
  * value, and lead to the same extractions as BucketPQOracle applying those updates one at a time.
  */
@@ -382,6 +423,57 @@ TEST_F(HierarchicalBucketPQGTest, testConcurrentPhasesMatchBucketPQ) {
                  [&](Key delta, Value value) { return oracle.decreaseKeyRelative(delta, value); },
                  64);
     }
+    EXPECT_TRUE(pq.empty());
+}
+
+/**
+ * Concurrent inserts and decreases, with decreases only on values present from the start, match the
+ * sequential BucketPQOracle under any interleaving.
+ */
+TEST_F(HierarchicalBucketPQGTest, testConcurrentInsertAndDecrease) {
+    constexpr count n = 20000;
+    constexpr count ops = 3 * n;
+    constexpr Key maxKey = 5000;
+    std::mt19937_64 rng(5);
+    PQ pq(n, omp_get_max_threads());
+    BucketPQOracle oracle(n, maxKey);
+    for (Value value = 0; value < n; value += 2) {
+        const Key key = rng() % (maxKey + 1);
+        pq.insert(key, value);
+        oracle.insert(key, value);
+    }
+
+    std::vector<Value> values(ops);
+    std::vector<Key> arguments(ops);
+    std::vector<char> isInsert(ops), results(ops);
+    for (count i = 0; i < ops; ++i) {
+        values[i] = static_cast<Value>(rng() % n);
+        arguments[i] = rng() % (maxKey + 1);
+        isInsert[i] = values[i] % 2 == 1 || rng() % 2;
+    }
+#pragma omp parallel for
+    for (omp_index i = 0; i < static_cast<omp_index>(ops); ++i) {
+        const count id = omp_get_thread_num();
+        results[i] = isInsert[i] ? pq.insert(arguments[i], values[i], id)
+                                 : pq.decreaseKey(arguments[i], values[i], id);
+    }
+
+    std::vector<count> inserts(n), expectedInserts(n);
+    for (count i = 0; i < ops; ++i) {
+        if (isInsert[i]) {
+            inserts[values[i]] += results[i];
+            expectedInserts[values[i]] += oracle.insert(arguments[i], values[i]);
+        } else {
+            oracle.decreaseKey(arguments[i], values[i]);
+        }
+    }
+    for (Value value = 0; value < n; ++value) {
+        ASSERT_EQ(pq.getKey(value), oracle.getKey(value));
+        ASSERT_EQ(inserts[value], expectedInserts[value]);
+    }
+
+    while (!oracle.empty())
+        expectSameExtraction(pq, oracle);
     EXPECT_TRUE(pq.empty());
 }
 
