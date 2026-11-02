@@ -30,7 +30,7 @@ namespace NetworKit {
 /**
  * The ShellStruct index for fast online k-core community search.
  * The community of a seed set is the connected component of the k-core containing it, for the
- * largest k in which it is connected.
+ * largest k in which it is connected (undefined if isolated or in separate components).
  *
  * This is an implementation of the algorithm proposed in:
  *
@@ -78,8 +78,8 @@ private:
 public:
     /**
      * @param[in] g the graph
-     * @param[in] validate check the invariants of the files read by load(); has no effect on
-     * build().
+     * @param[in] validate check the invariants of the files read by load(); otherwise they must be
+     * written by save(). Has no effect on build().
      */
     ShellStruct(const Graph &g, bool validate = false);
 

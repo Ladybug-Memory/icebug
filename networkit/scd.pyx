@@ -618,7 +618,7 @@ cdef class ShellStruct(SelectiveCommunityDetector):
 	"""
   	The ShellStruct index for fast online k-core community search.
   	The community of a seed set is the connected component of the k-core containing it, for the
-  	largest k in which it is connected.
+  	largest k in which it is connected (undefined if isolated or in separate components).
  
   	This is an implementation of the algorithm proposed in:
  
@@ -632,7 +632,8 @@ cdef class ShellStruct(SelectiveCommunityDetector):
 	G : networkit.Graph
 		Graph in which the community shell be found.
 	validate : bool, optional
-		Check the invariants of the files read by load(); has no effect on build(). Default: False
+		Check the invariants of the files read by load(); otherwise they must be written by save().
+		Has no effect on build(). Default: False
 	"""
 	def __cinit__(self, Graph G, bool_t validate = False):
 		self._G = G
@@ -640,22 +641,26 @@ cdef class ShellStruct(SelectiveCommunityDetector):
 
 	def build(self, coreness=None):
 		"""
-		build()
+		build(coreness=None)
 
-		Initializes the ShellStruct.
+		Builds the index.
 
-	    Parameters
-	    ----------
-		coreness: numpy.ndarray[uint64], optional
-			Precalculated core numbers for each count.
+		Parameters
+		----------
+		coreness : numpy.ndarray[uint64], optional
+			The core number of every node id; its size must be upperNodeIdBound(). Computed if not
+			given. Default: None
 		"""
-		if coreness is None or coreness.size == 0:
+		if coreness is None:
 			(<_ShellStruct*>(self._this)).build()
 			return
 
 		cdef const uint64_t[::1] mv
 		mv = coreness
-		(<_ShellStruct*>(self._this)).build(span[const_count](&mv[0], <size_t>mv.size))
+		cdef const uint64_t *data = NULL
+		if mv.size:
+			data = &mv[0]
+		(<_ShellStruct*>(self._this)).build(span[const_count](data, <size_t>mv.size))
 
 	def save(self, components_path, tree_path, compression="ZSTD"):
 		"""
@@ -694,15 +699,19 @@ cdef class ShellStruct(SelectiveCommunityDetector):
 
 	def score(self, set[node] seeds):
 		"""
-		score()
+		score(seeds)
 
-     	Finding the coreness of a set of seeds is much faster.
-     	This method does that.
+		Returns the core number of the community without instantiating it.
 
 		Parameters
 		----------
-     	seeds : set[node]
-     		The seed nodes.
+		seeds : set[node]
+			The seed nodes; must not be empty.
+
+		Returns
+		-------
+		int
+			The core number of the community of the seeds.
 		"""
 		return (<_ShellStruct*>(self._this)).score(seeds)
 
