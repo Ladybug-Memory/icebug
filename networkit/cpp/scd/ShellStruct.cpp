@@ -39,7 +39,7 @@ namespace {
 std::pair<std::vector<index>, std::vector<int64_t>> countSort(std::span<const index> keys,
                                                               count numKeys) {
     const count n = keys.size();
-    // ParlayLib's block count keeps the per-block counts to a small fraction of n.
+    // ParlayLib's block count and sequential cutoff.
     count numBlocks = 1 + n * sizeof(index) / std::max<count>(numKeys * 500, 5000);
     if (n < 8192 || Aux::getMaxNumberOfThreads() == 1)
         numBlocks = 1;
@@ -164,8 +164,7 @@ arrow::Status verifyColumns(const arrow::UInt64Array &assignment,
 
 // The size of the subtree of every tree node. With verify, children must be a post-order tree
 // rooted at the last node.
-arrow::Result<std::vector<count>> subtreeSizes(const arrow::LargeListArray &children,
-                                               bool verify) {
+arrow::Result<std::vector<count>> subtreeSizes(const arrow::LargeListArray &children, bool verify) {
     const auto &childValues = static_cast<const arrow::UInt64Array &>(*children.values());
     const auto numNodes = static_cast<node>(children.length());
     std::vector<count> sizes(numNodes, 1);
@@ -211,9 +210,10 @@ void ShellStruct::build(std::span<const count> coredecomp) {
     ConcurrentUnionFind<> uf(n);
     // T_{r,k}: the tree node on top of the component of each union-find root r; none otherwise.
     std::vector<node> treeNode(n, none);
-    // Tree nodes -> coreness and parent, in creation order.
-    std::vector<count> treeCoreness;
-    std::vector<node> treeParent;
+    // Tree nodes -> coreness and parent, in creation order; at most one tree node per vertex.
+    std::vector<count> treeCoreness(n + 1);
+    std::vector<node> treeParent(n + 1, none);
+    std::atomic<node> numTreeNodes = 0;
     // Vertices -> tree nodes.
     std::vector<node> vertexAssignment(n, none);
 
@@ -251,16 +251,22 @@ void ShellStruct::build(std::span<const count> coredecomp) {
         }
     };
 
-    auto createTreeNodes = [&](std::span<const node> shell, count k) {
-#pragma omp single
-        for (node u : shell) {
-            const node r = uf.find(u);
-            if (treeNode[r] != none)
-                continue;
-            treeNode[r] = treeCoreness.size();
-            treeCoreness.push_back(k);
-            treeParent.push_back(none);
-        }
+    auto createTreeNodes = [&](std::span<const node> shell, count k,
+                               std::span<const std::pair<node, node>> touched) {
+        auto createIfRoot = [&](node x) {
+            if (uf.find(x) != x)
+                return;
+            const node t = numTreeNodes.fetch_add(1, std::memory_order_relaxed);
+            treeNode[x] = t;
+            treeCoreness[t] = k;
+        };
+        // Each root is in S_k or a root of P_k, exactly once, so no deduplication is needed.
+#pragma omp for schedule(static) nowait
+        for (omp_index i = 0; i < static_cast<omp_index>(shell.size()); ++i)
+            createIfRoot(shell[i]);
+#pragma omp for schedule(static)
+        for (omp_index i = 0; i < static_cast<omp_index>(touched.size()); ++i)
+            createIfRoot(touched[i].first);
     };
 
     auto assignShell = [&](std::span<const node> shell) {
@@ -287,24 +293,21 @@ void ShellStruct::build(std::span<const count> coredecomp) {
         {
             // 6: parinit P_k <- { (r, T_r) | uv in E, u in S_k, coreness(v) > k, r = UF.find(v) }
             touchedTreeNodes(shell, k, touched);
-
             // 7: parfor uv, u in S_k, coreness(v) >= k: UF.union(u, v)
             unionShell(shell, k);
-
-            // 8: for each distinct UF.find(u), u in S_k: create tree node T_{root,k}
-            //    (tree nodes numbered in creation order, so parents after children)
-            createTreeNodes(shell, k);
-
+            // 8: parfor each distinct UF.find(u), u in S_k: create tree node T_{root,k}
+            createTreeNodes(shell, k, touched);
             // 9: parfor u in S_k: assign u to T_{UF.find(u),k}
             assignShell(shell);
-
             // 10: parfor T in P_k: parent of T <- T_{UF.find(root of T),k}
             setParents(touched);
         }
     }
 
     // 11: root of coreness 0: parent of every remaining parentless node, holds the vertices of S_0
-    const node root = treeCoreness.size();
+    const node root = numTreeNodes;
+    treeCoreness.resize(root);
+    treeParent.resize(root);
     std::ranges::replace(treeParent, none, root);
     treeCoreness.push_back(0);
     treeParent.push_back(none);
@@ -385,9 +388,9 @@ arrow::Status ShellStruct::buildInternal(std::shared_ptr<arrow::UInt64Array> ass
     this->vertices = std::move(vertices);
     this->children = std::move(children);
     subtreeSize = std::move(sizes);
-    tree.emplace(numNodes, true, childValues,
-                 std::make_shared<arrow::UInt64Array>(numNodes + 1,
-                                                      this->children->value_offsets()));
+    tree.emplace(
+        numNodes, true, childValues,
+        std::make_shared<arrow::UInt64Array>(numNodes + 1, this->children->value_offsets()));
     lca = std::make_unique<LeastCommonAncestor>(*tree, numNodes - 1);
     return arrow::Status::OK();
 }
@@ -466,8 +469,7 @@ arrow::Status ShellStruct::loadInternal(const std::string &components_path,
     return buildInternal(std::static_pointer_cast<arrow::UInt64Array>(assignmentColumn),
                          std::static_pointer_cast<arrow::UInt64Array>(corenessColumn),
                          std::static_pointer_cast<arrow::LargeListArray>(verticesColumn),
-                         std::static_pointer_cast<arrow::LargeListArray>(childrenColumn),
-                         validate);
+                         std::static_pointer_cast<arrow::LargeListArray>(childrenColumn), validate);
 }
 
 void ShellStruct::save(const std::string &components_path, const std::string &tree_path,
