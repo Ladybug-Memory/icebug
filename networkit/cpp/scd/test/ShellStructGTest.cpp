@@ -6,8 +6,10 @@
  */
 
 #include <numeric>
+#include <stdexcept>
 #include <vector>
 #include <gtest/gtest.h>
+#include <networkit/centrality/CoreDecomposition.hpp>
 #include <networkit/graph/GraphW.hpp>
 #include <networkit/scd/ShellStruct.hpp>
 
@@ -109,7 +111,7 @@ protected:
     }
 };
 
-TEST_F(ShellStructGTest, SeparatedCores_Singleton) {
+TEST_F(ShellStructGTest, testSeparatedCoresSingleton) {
     std::vector<count> cliques{4, 3, 4};
     GraphW g = getCliqueChain(cliques);
     ShellStruct shell(g);
@@ -117,7 +119,7 @@ TEST_F(ShellStructGTest, SeparatedCores_Singleton) {
     verifySingletons(shell, cliques);
 }
 
-TEST_F(ShellStructGTest, SeparatedCores_Pairs) {
+TEST_F(ShellStructGTest, testSeparatedCoresPairs) {
     std::vector<count> cliques{4, 3, 4};
     GraphW g = getCliqueChain(cliques);
     ShellStruct shell(g);
@@ -125,7 +127,7 @@ TEST_F(ShellStructGTest, SeparatedCores_Pairs) {
     verifyPairs(shell, cliques);
 }
 
-TEST_F(ShellStructGTest, BridgedCore_Singleton) {
+TEST_F(ShellStructGTest, testBridgedCoreSingleton) {
     std::vector<count> cliques{3, 4, 3};
     GraphW g = getCliqueChain(cliques);
     ShellStruct shell(g);
@@ -133,7 +135,7 @@ TEST_F(ShellStructGTest, BridgedCore_Singleton) {
     verifySingletons(shell, cliques);
 }
 
-TEST_F(ShellStructGTest, BridgedCore_Pairs) {
+TEST_F(ShellStructGTest, testBridgedCorePairs) {
     std::vector<count> cliques{3, 4, 3};
     GraphW g = getCliqueChain(cliques);
     ShellStruct shell(g);
@@ -141,7 +143,7 @@ TEST_F(ShellStructGTest, BridgedCore_Pairs) {
     verifyPairs(shell, cliques);
 }
 
-TEST_F(ShellStructGTest, Medium_Singleton) {
+TEST_F(ShellStructGTest, testMediumSingleton) {
     std::vector<count> cliques{3, 5, 4, 3, 6, 5, 4, 6, 3};
     GraphW g = getCliqueChain(cliques);
     ShellStruct shell(g);
@@ -149,7 +151,7 @@ TEST_F(ShellStructGTest, Medium_Singleton) {
     verifySingletons(shell, cliques);
 }
 
-TEST_F(ShellStructGTest, Medium_Pairs) {
+TEST_F(ShellStructGTest, testMediumPairs) {
     std::vector<count> cliques{3, 5, 4, 3, 6, 5, 4, 6, 3};
     GraphW g = getCliqueChain(cliques);
     ShellStruct shell(g);
@@ -157,7 +159,7 @@ TEST_F(ShellStructGTest, Medium_Pairs) {
     verifyPairs(shell, cliques);
 }
 
-TEST_F(ShellStructGTest, Large_Singleton) {
+TEST_F(ShellStructGTest, testLargeSingleton) {
     std::vector<count> cliques{3, 4, 5, 6, 5, 4, 3, 5, 7, 9, 11, 9, 7, 5, 3, 4, 5, 6, 4, 3};
     GraphW g = getCliqueChain(cliques);
     ShellStruct shell(g);
@@ -165,7 +167,7 @@ TEST_F(ShellStructGTest, Large_Singleton) {
     verifySingletons(shell, cliques);
 }
 
-TEST_F(ShellStructGTest, LargePairs) {
+TEST_F(ShellStructGTest, testLargePairs) {
     std::vector<count> cliques{3, 4, 5, 6, 5, 4, 3, 5, 7, 9, 11, 9, 7, 5, 3, 4, 5, 6, 4, 3};
     GraphW g = getCliqueChain(cliques);
     ShellStruct shell(g);
@@ -173,7 +175,7 @@ TEST_F(ShellStructGTest, LargePairs) {
     verifyPairs(shell, cliques);
 }
 
-TEST_F(ShellStructGTest, LoadSave) {
+TEST_F(ShellStructGTest, testLoadSave) {
     std::vector<count> cliques{3, 4, 5, 6, 5, 4, 3, 5, 7, 9, 11, 9, 7, 5, 3, 4, 5, 6, 4, 3};
     GraphW g = getCliqueChain(cliques);
     ShellStruct shell(g);
@@ -185,7 +187,7 @@ TEST_F(ShellStructGTest, LoadSave) {
     verifyPairs(index, cliques);
 }
 
-TEST_F(ShellStructGTest, LoadSaveValidate) {
+TEST_F(ShellStructGTest, testLoadSaveValidate) {
     std::vector<count> cliques{3, 4, 5, 6, 5, 4, 3, 5, 7, 9, 11, 9, 7, 5, 3, 4, 5, 6, 4, 3};
     GraphW g = getCliqueChain(cliques);
     ShellStruct shell(g);
@@ -197,7 +199,7 @@ TEST_F(ShellStructGTest, LoadSaveValidate) {
     verifyPairs(index, cliques);
 }
 
-TEST_F(ShellStructGTest, LoadOtherGraphThrows) {
+TEST_F(ShellStructGTest, testLoadOtherGraphThrows) {
     GraphW g = getCliqueChain({3, 4, 3});
     ShellStruct shell(g);
     shell.build();
@@ -209,7 +211,7 @@ TEST_F(ShellStructGTest, LoadOtherGraphThrows) {
                  std::runtime_error);
 }
 
-TEST_F(ShellStructGTest, EmptyGraph) {
+TEST_F(ShellStructGTest, testEmptyGraph) {
     GraphW g(0, false, false);
     ShellStruct shell(g);
     shell.build();
@@ -221,7 +223,7 @@ TEST_F(ShellStructGTest, EmptyGraph) {
     EXPECT_TRUE(index.expandOneCommunity(std::set<node>{}).empty());
 }
 
-TEST_F(ShellStructGTest, InvalidSeeds) {
+TEST_F(ShellStructGTest, testInvalidSeeds) {
     GraphW g = getCliqueChain({3, 4, 3});
     ShellStruct shell(g);
     EXPECT_THROW(shell.community({0}), std::runtime_error);
@@ -233,7 +235,7 @@ TEST_F(ShellStructGTest, InvalidSeeds) {
 }
 
 // Enough vertices for the parallel path of the shell grouping.
-TEST_F(ShellStructGTest, ManyCliques_Singleton) {
+TEST_F(ShellStructGTest, testManyCliquesSingleton) {
     std::vector<count> cliques(2500);
     for (count i = 0; i < cliques.size(); ++i)
         cliques[i] = 3 + i % 4;
@@ -241,6 +243,45 @@ TEST_F(ShellStructGTest, ManyCliques_Singleton) {
     ShellStruct shell(g);
     shell.build();
     verifySingletons(shell, cliques);
+}
+
+TEST_F(ShellStructGTest, testBuildFromCoreDecomposition) {
+    std::vector<count> cliques{3, 5, 4, 3, 6, 5, 4, 6, 3};
+    GraphW g = getCliqueChain(cliques);
+    CoreDecomposition coreDecomposition(g);
+    coreDecomposition.run();
+    const std::vector<double> &scores = coreDecomposition.scores();
+    ShellStruct shell(g);
+    shell.build(std::vector<count>(scores.begin(), scores.end()));
+    verifyPairs(shell, cliques);
+}
+
+TEST_F(ShellStructGTest, testBuildWrongSizeThrows) {
+    GraphW g = getCliqueChain({3, 4, 3});
+    ShellStruct shell(g);
+    EXPECT_THROW(shell.build(std::vector<count>(g.upperNodeIdBound() - 1)), std::invalid_argument);
+}
+
+// Same vertex count and tree shape, so only validate detects the mismatch.
+TEST_F(ShellStructGTest, testLoadMismatchedValidateThrows) {
+    GraphW g = getCliqueChain({3, 4, 3});
+    ShellStruct shell(g);
+    shell.build();
+    shell.save("output/shellstruct_comp.feather", "output/shellstruct_tree.feather");
+
+    GraphW other = getCliqueChain({4, 3, 3});
+    ShellStruct otherShell(other);
+    otherShell.build();
+    otherShell.save("output/shellstruct_other_comp.feather",
+                    "output/shellstruct_other_tree.feather");
+
+    ShellStruct trusting(g);
+    EXPECT_NO_THROW(
+        trusting.load("output/shellstruct_comp.feather", "output/shellstruct_other_tree.feather"));
+    ShellStruct validating(g, true);
+    EXPECT_THROW(
+        validating.load("output/shellstruct_comp.feather", "output/shellstruct_other_tree.feather"),
+        std::runtime_error);
 }
 
 } /* namespace NetworKit */

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import unittest
 
+import numpy as np
+
 import networkit as nk
 
 
@@ -105,12 +107,7 @@ class TestSCD(unittest.TestCase):
             vbeg = bounds[left - 1] if left else 0
             return set(range(vbeg, bounds[right]))
 
-        src = [0, 0, 1, 2, 3, 3, 3, 4, 4, 5, 6, 7, 7, 8, 9, 10, 10, 10, 11, 11, 12]
-        tgt = [1, 2, 2, 3, 4, 5, 6, 5, 6, 6, 7, 8, 9, 9, 10, 11, 12, 13, 12, 13, 13]
-        G = nk.Graph(14, directed=False)
-        for s, t in zip(src, tgt):
-            G.addEdge(s, t)
-
+        G = self._cliqueChainGraph()
         shell = nk.scd.ShellStruct(G)
         shell.build()
 
@@ -124,6 +121,48 @@ class TestSCD(unittest.TestCase):
                 et_comm = shell.expandOneCommunity({u, v})
                 gt_comm = gt_search([3, 4, 3, 4], {u, v})
                 self.assertEqual(et_comm, gt_comm)
+
+    def _cliqueChainGraph(self):
+        # Cliques of sizes 3, 4, 3, 4, consecutive ones joined by one edge.
+        src = [0, 0, 1, 2, 3, 3, 3, 4, 4, 5, 6, 7, 7, 8, 9, 10, 10, 10, 11, 11, 12]
+        tgt = [1, 2, 2, 3, 4, 5, 6, 5, 6, 6, 7, 8, 9, 9, 10, 11, 12, 13, 12, 13, 13]
+        G = nk.Graph(14, directed=False)
+        for s, t in zip(src, tgt):
+            G.addEdge(s, t)
+        return G
+
+    def testShellStructBuildCoreness(self):
+        G = self._cliqueChainGraph()
+        cd = nk.centrality.CoreDecomposition(G)
+        cd.run()
+        coreness = np.array(cd.scores(), dtype=np.uint64)
+
+        computed = nk.scd.ShellStruct(G)
+        computed.build()
+        given = nk.scd.ShellStruct(G)
+        given.build(coreness)
+        for u in range(G.numberOfNodes()):
+            for v in range(G.numberOfNodes()):
+                self.assertEqual(
+                    given.expandOneCommunity({u, v}), computed.expandOneCommunity({u, v})
+                )
+
+        self.assertRaises(ValueError, given.build, np.empty(0, dtype=np.uint64))
+
+    def testShellStructScoreCommunity(self):
+        G = self._cliqueChainGraph()
+        shell = nk.scd.ShellStruct(G)
+        shell.build()
+        for u in range(G.numberOfNodes()):
+            for v in range(G.numberOfNodes()):
+                self.assertEqual(
+                    set(shell.community({u, v}).tolist()), shell.expandOneCommunity({u, v})
+                )
+
+        self.assertEqual(shell.score({0, 1}), 2)
+        self.assertEqual(shell.score({3, 4}), 3)
+        self.assertEqual(len(shell.community(set())), 0)
+        self.assertRaises(ValueError, shell.score, set())
 
 
 if __name__ == "__main__":
