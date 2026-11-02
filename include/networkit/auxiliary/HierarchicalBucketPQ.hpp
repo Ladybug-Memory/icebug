@@ -33,7 +33,8 @@ using count = NetworKit::count;
  * - updates: insert, decreaseKey, decreaseKeyRelative, tryExtract,
  * - accessors: getKey, contains,
  * - queries: extractMin, getMinKey, empty, size.
- * Updates and accessors may run concurrently. Queries must be serial.
+ * Updates and accessors may run concurrently. Queries must be serial and fenced from
+ * updates/accesses.
  *
  * Implementation: buckets follow the hierarchical bucketing structure of
  *
@@ -51,13 +52,13 @@ public:
     static constexpr Key maxKey = std::numeric_limits<int64_t>::max() - 1;
 
     /**
-     * Create an empty queue for values in [0, @p capacity). Requires @p capacity <=
-     * std::numeric_limits<Value>::max().
+     * Create an empty queue for values in [0, @p capacity).
      * @param capacity number of admissible values
      * @param numIds number of admissible ids; queries use at most @p numIds threads
-     * @param log2SingleBuckets number of buckets spanning a key-range of one.
-     * @param numIntermediateBuckets number of buckets spanning exponentially growing key-ranges;
-     * requires @p numIntermediateBuckets >= 1.
+     * @param log2SingleBuckets log2 of the number of buckets spanning a key-range of one
+     * @param numIntermediateBuckets number of buckets spanning exponentially growing key-ranges
+     * @throws std::invalid_argument if @p capacity > std::numeric_limits<Value>::max(),
+     * @p numIds == 0, @p log2SingleBuckets >= 63, or @p numIntermediateBuckets == 0
      */
     explicit HierarchicalBucketPQ(count capacity, count numIds = 1, count log2SingleBuckets = 3,
                                   count numIntermediateBuckets = 6);
@@ -136,10 +137,10 @@ public:
      * @return number of present values
      */
     count size() const {
-        count total = 0;
+        int64_t total = 0;
         for (const Potential &potential : potentials)
             total += potential.value.load(std::memory_order_relaxed);
-        return total;
+        return static_cast<count>(total);
     }
 
 private:
@@ -154,13 +155,14 @@ private:
     };
     // #inserts - #extracts by calls passing this id; the sum of potentials is size().
     struct alignas(64) Potential {
-        std::atomic<count> value{0};
+        std::atomic<int64_t> value{0};
     };
 
     static bool isPresent(Entry entry) { return 0 <= entry && entry != absentEntry; }
     static Entry extractedEntry(Key key) { return -static_cast<Entry>(key) - 1; }
 
-    // Bucket of key relative to baseKey; keys beyond the range buckets go to the last bucket.
+    // Bucket of key relative to baseKey; the last bucket is a spillover for all keys beyond the
+    // range buckets.
     count bucketOf(Key key) const;
     // Lower the key of a present value to newKey(old entry), pushing the value into the bucket of
     // its new key if that bucket differs. Returns whether the key was lowered.
@@ -188,7 +190,7 @@ private:
 };
 
 inline bool HierarchicalBucketPQ::insert(Key key, Value value, count id) {
-    assert(key <= maxKey && id < numIds);
+    assert(key <= maxKey && value < entries.size() && id < numIds);
     const Entry newKey = static_cast<Entry>(std::max(key, currentKey));
     Entry old = entries[value].load(std::memory_order_relaxed);
     if (old == absentEntry
@@ -203,20 +205,20 @@ inline bool HierarchicalBucketPQ::insert(Key key, Value value, count id) {
 }
 
 inline bool HierarchicalBucketPQ::decreaseKey(Key newKey, Value value, count id) {
-    assert(id < numIds);
+    assert(value < entries.size() && id < numIds);
     const Entry target = static_cast<Entry>(std::clamp(newKey, currentKey, maxKey));
     return lower(value, id, [&](Entry) { return target; });
 }
 
 inline bool HierarchicalBucketPQ::decreaseKeyRelative(Key delta, Value value, count id) {
-    assert(id < numIds);
+    assert(value < entries.size() && id < numIds);
     return lower(value, id, [&](Entry old) {
         return old - static_cast<Entry>(std::min(delta, static_cast<Key>(old) - currentKey));
     });
 }
 
 inline bool HierarchicalBucketPQ::tryExtract(Value value, count id) {
-    assert(id < numIds);
+    assert(value < entries.size() && id < numIds);
     Entry expected = static_cast<Entry>(currentKey);
     if (!entries[value].compare_exchange_strong(expected, extractedEntry(currentKey),
                                                 std::memory_order_relaxed))
@@ -226,6 +228,7 @@ inline bool HierarchicalBucketPQ::tryExtract(Value value, count id) {
 }
 
 inline HierarchicalBucketPQ::Key HierarchicalBucketPQ::getKey(Value value) const {
+    assert(value < entries.size());
     const Entry entry = entries[value].load(std::memory_order_relaxed);
     if (entry == absentEntry)
         return infiniteKey;
@@ -233,10 +236,11 @@ inline HierarchicalBucketPQ::Key HierarchicalBucketPQ::getKey(Value value) const
 }
 
 inline bool HierarchicalBucketPQ::contains(Value value) const {
-    return isPresent(entries[value].load(std::memory_order_relaxed));
+    return value < entries.size() && isPresent(entries[value].load(std::memory_order_relaxed));
 }
 
 inline count HierarchicalBucketPQ::bucketOf(Key key) const {
+    assert(key >= baseKey);
     if (key < baseKey + numSingleBuckets)
         return key - baseKey;
     const count differingBit = std::bit_width(key ^ baseKey) - 1;
