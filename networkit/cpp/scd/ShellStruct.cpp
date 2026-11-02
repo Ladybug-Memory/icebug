@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <atomic>
 #include <initializer_list>
+#include <iostream>
 #include <stdexcept>
 #include <utility>
 
@@ -39,6 +40,15 @@ namespace {
 std::pair<std::vector<index>, std::vector<int64_t>> countSort(std::span<const index> keys,
                                                               count numKeys) {
     const count n = keys.size();
+    // TEMP-DEBUG-WIN-OOB: catch out-of-range keys (would be silent UB on Linux,
+    // MSVC debug vector assert on Windows).
+    for (index i = 0; i < n; ++i) {
+        if (keys[i] >= numKeys) {
+            std::cerr << "[shellstruct-debug] countSort OOB: keys[" << i << "]=" << keys[i]
+                      << " numKeys=" << numKeys << " n=" << n << std::endl;
+            throw std::out_of_range("ShellStruct-debug: countSort key >= numKeys");
+        }
+    }
     // ParlayLib's block count and sequential cutoff.
     count numBlocks = 1 + n * sizeof(index) / std::max<count>(numKeys * 500, 5000);
     if (n < 8192 || Aux::getMaxNumberOfThreads() == 1)
@@ -72,6 +82,14 @@ std::pair<std::vector<index>, std::vector<int64_t>> countSort(std::span<const in
 // Post-order ids of a tree whose nodes are numbered children before parents, with the root last.
 std::vector<node> postOrder(std::span<const node> parent) {
     const count numNodes = parent.size();
+    // TEMP-DEBUG-WIN-OOB: parent ids must be < numNodes except the root's (last) entry.
+    for (node t = 0; t + 1 < numNodes; ++t) {
+        if (parent[t] >= numNodes) {
+            std::cerr << "[shellstruct-debug] postOrder OOB: parent[" << t << "]=" << parent[t]
+                      << " numNodes=" << numNodes << std::endl;
+            throw std::out_of_range("ShellStruct-debug: parent id out of range (none leak?)");
+        }
+    }
     std::vector<count> size(numNodes, 1);
     for (node t = 0; t + 1 < numNodes; ++t)
         size[parent[t]] += size[t];
@@ -168,6 +186,17 @@ arrow::Result<std::vector<count>> subtreeSizes(const arrow::LargeListArray &chil
     const auto &childValues = static_cast<const arrow::UInt64Array &>(*children.values());
     const auto numNodes = static_cast<node>(children.length());
     std::vector<count> sizes(numNodes, 1);
+    // TEMP-DEBUG-WIN-OOB: child ids must be < numNodes.
+    for (node t = 0; t < numNodes; ++t) {
+        for (int64_t j = children.value_offset(t); j < children.value_offset(t + 1); ++j) {
+            const node c = childValues.Value(j);
+            if (c >= numNodes) {
+                std::cerr << "[shellstruct-debug] subtreeSizes OOB: children[" << t << "][" << j
+                          << "]=" << c << " numNodes=" << numNodes << std::endl;
+                throw std::out_of_range("ShellStruct-debug: child id out of range");
+            }
+        }
+    }
     for (node t = 0; t < numNodes; ++t) {
         node next = t;
         for (int64_t j = children.value_offset(t + 1); j-- > children.value_offset(t);) {
@@ -324,6 +353,13 @@ arrow::Status ShellStruct::prepareAndBuild(std::vector<node> vertexAssignment,
                                            std::span<const node> treeParent) {
     // post <- the post-order id of each tree node; renumber coreness, parent and assignment by post
     const count numTreeNodes = treeCoreness.size();
+    std::cerr << "[shellstruct-debug] prepareAndBuild: numTreeNodes=" << numTreeNodes
+              << " treeParent.size()=" << treeParent.size() << std::endl;
+    for (node t = 0; t + 1 < numTreeNodes; ++t) {
+        if (treeParent[t] == none)
+            std::cerr << "[shellstruct-debug] prepareAndBuild: treeParent[" << t
+                      << "]=none (orphan?)" << std::endl;
+    }
     const std::vector<node> post = postOrder(treeParent);
     std::vector<count> postCoreness(numTreeNodes);
     for (node t = 0; t < numTreeNodes; ++t)
@@ -379,9 +415,16 @@ arrow::Status ShellStruct::buildInternal(std::shared_ptr<arrow::UInt64Array> ass
         return arrow::Status::Invalid(
             "ShellStruct: the tree must list every vertex and have one edge less than nodes");
 
+    std::cerr << "[shellstruct-debug] buildInternal: n=" << n << " numNodes=" << numNodes
+              << " assign.len=" << assignment->length() << " vertices.len=" << vertices->length()
+              << " children.len=" << children->length() << " vertexVals.len="
+              << vertexValues->length() << " childVals.len=" << childValues->length()
+              << " verify=" << verify << std::endl;
     if (verify)
         ARROW_RETURN_NOT_OK(verifyColumns(*assignment, *coreness, *vertices, *children));
     ARROW_ASSIGN_OR_RAISE(auto sizes, subtreeSizes(*children, verify));
+    std::cerr << "[shellstruct-debug] buildInternal: subtreeSizes ok, sizes.size()="
+              << sizes.size() << std::endl;
 
     this->assignment = std::move(assignment);
     this->coreness = std::move(coreness);
@@ -396,8 +439,15 @@ arrow::Status ShellStruct::buildInternal(std::shared_ptr<arrow::UInt64Array> ass
 }
 
 node ShellStruct::treeNodeOf(const std::set<node> &s) {
-    if (*s.rbegin() >= static_cast<node>(assignment->length()))
+    std::cerr << "[shellstruct-debug] treeNodeOf: numSeeds=" << s.size()
+              << " assignment.len=" << (assignment ? assignment->length() : -1) << std::endl;
+    if (s.empty())
+        throw std::invalid_argument("ShellStruct-debug: treeNodeOf got empty seed set");
+    if (*s.rbegin() >= static_cast<node>(assignment->length())) {
+        std::cerr << "[shellstruct-debug] treeNodeOf OOB seed: maxSeed=" << *s.rbegin()
+                  << " assignment.len=" << assignment->length() << std::endl;
         throw std::out_of_range("ShellStruct: seed is not a node id");
+    }
     std::vector<node> nodes;
     nodes.reserve(s.size());
     for (node u : s)
@@ -411,6 +461,20 @@ std::span<const node> ShellStruct::community(const std::set<node> &s) {
     if (s.empty())
         return {};
     const node t = treeNodeOf(s);
+    std::cerr << "[shellstruct-debug] community: t=" << t << " subtreeSize.size()="
+              << subtreeSize.size();
+    if (t < subtreeSize.size())
+        std::cerr << " subtreeSize[t]=" << subtreeSize[t];
+    std::cerr << " vertices.len=" << vertices->length() << std::endl;
+    if (t >= subtreeSize.size() || t >= static_cast<node>(vertices->length())) {
+        std::cerr << "[shellstruct-debug] community OOB: t out of range" << std::endl;
+        throw std::out_of_range("ShellStruct-debug: tree node out of range");
+    }
+    if (subtreeSize[t] == 0 || subtreeSize[t] > t + 1) {
+        std::cerr << "[shellstruct-debug] community OOB: subtreeSize[t]=" << subtreeSize[t]
+                  << " t=" << t << std::endl;
+        throw std::out_of_range("ShellStruct-debug: bad subtree size");
+    }
     const uint64_t *values =
         std::static_pointer_cast<arrow::UInt64Array>(vertices->values())->raw_values();
     return {values + vertices->value_offset(t + 1 - subtreeSize[t]),
