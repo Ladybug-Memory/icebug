@@ -7,6 +7,7 @@
 
 #include <numeric>
 #include <omp.h>
+#include <stdexcept>
 
 #include <networkit/auxiliary/HierarchicalBucketPQ.hpp>
 
@@ -15,12 +16,13 @@ using namespace NetworKit;
 namespace Aux {
 
 namespace {
-constexpr count parallelThreshold = 4096;
+constexpr count parallelThreshold = 4096; // below this, OpenMP overhead outweighs the work
 
 // Minimum of key(i) over i in [0, n), or the maximum count if n is 0.
 template <typename F>
 count parallelMin(count n, F key) {
     count result = std::numeric_limits<count>::max();
+    // OpenMP 2.0 has no min reduction.
 #ifndef NETWORKIT_OMP2
 #pragma omp parallel for reduction(min : result) if (n >= parallelThreshold)
     for (omp_index i = 0; i < static_cast<omp_index>(n); ++i)
@@ -43,11 +45,18 @@ count parallelMin(count n, F key) {
 HierarchicalBucketPQ::HierarchicalBucketPQ(count capacity, count numIds, count log2SingleBuckets,
                                            count numIntermediateBuckets)
     : log2SingleBuckets(log2SingleBuckets), numSingleBuckets(count{1} << log2SingleBuckets),
-      numBuckets(numSingleBuckets + numIntermediateBuckets), numIds(numIds), entries(capacity),
-      bucketSets(numIds, BucketSet{std::vector<std::vector<Value>>(numBuckets)}),
-      potentials(numIds) {
-    assert(capacity <= std::numeric_limits<Value>::max());
-    assert(log2SingleBuckets < 63 && numIntermediateBuckets >= 1);
+      numBuckets(numSingleBuckets + numIntermediateBuckets), numIds(numIds), potentials(numIds) {
+    if (capacity > std::numeric_limits<Value>::max())
+        throw std::invalid_argument("capacity cannot exceed the largest Value");
+    if (numIds == 0)
+        throw std::invalid_argument("numIds must be at least 1");
+    if (log2SingleBuckets >= 63)
+        throw std::invalid_argument("log2SingleBuckets must be below 63");
+    if (numIntermediateBuckets == 0)
+        throw std::invalid_argument("numIntermediateBuckets must be at least 1");
+
+    entries = std::vector<std::atomic<Entry>>(capacity);
+    bucketSets.assign(numIds, BucketSet{std::vector<std::vector<Value>>(numBuckets)});
 #pragma omp parallel for
     for (omp_index value = 0; value < static_cast<omp_index>(capacity); ++value)
         entries[value].store(absentEntry, std::memory_order_relaxed);
@@ -68,7 +77,7 @@ HierarchicalBucketPQ::extractMin() {
 #pragma omp parallel for if (frontier.size() >= parallelThreshold)
     for (omp_index i = 0; i < static_cast<omp_index>(frontier.size()); ++i)
         entries[frontier[i]].store(extractedEntry(currentKey), std::memory_order_relaxed);
-    potentials[0].value.fetch_sub(frontier.size(), std::memory_order_relaxed);
+    potentials[0].value.fetch_sub(static_cast<int64_t>(frontier.size()), std::memory_order_relaxed);
     return {currentKey, frontier};
 }
 
