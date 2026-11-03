@@ -340,6 +340,20 @@ void ShellStruct::build(std::span<const count> coredecomp) {
         }
         std::cerr << "[shellstruct-debug] build: k=" << k
                   << " left parallel touched.size()=" << touched.size() << std::endl;
+        std::cerr << "[shellstruct-debug] k=" << k << " treeNode{";
+        for (node u = 0; u < n; ++u)
+            if (treeNode[u] != none)
+                std::cerr << " " << u << "->" << treeNode[u];
+        std::cerr << " }";
+        std::cerr << " unassigned{";
+        for (node u = 0; u < n; ++u)
+            if (vertexAssignment[u] == none)
+                std::cerr << " " << u;
+        std::cerr << " }";
+        std::cerr << " shellroots{";
+        for (node u : shell)
+            std::cerr << " " << u << ":" << uf.find(u) << "=";
+        std::cerr << " }" << std::endl;
     }
 
     // 11: root of coreness 0: parent of every remaining parentless node, holds the vertices of
