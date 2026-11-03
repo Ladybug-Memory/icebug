@@ -340,9 +340,10 @@ void ShellStruct::build(std::span<const count> coredecomp) {
         }
         std::cerr << "[shellstruct-debug] build: k=" << k
                   << " left parallel touched.size()=" << touched.size() << std::endl;
+    }
 
-        // 11: root of coreness 0: parent of every remaining parentless node, holds the vertices of
-        // S_0
+    // 11: root of coreness 0: parent of every remaining parentless node, holds the vertices of
+    // S_0
         const node root = numTreeNodes;
         treeCoreness.resize(root);
         treeParent.resize(root);
