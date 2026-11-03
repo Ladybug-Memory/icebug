@@ -372,14 +372,33 @@ void ShellStruct::build(std::span<const count> coredecomp) {
                           << "]=none (orphan?)" << std::endl;
         }
         const std::vector<node> post = postOrder(treeParent);
+        for (node t = 0; t < numTreeNodes; ++t)
+            std::cerr << "[shellstruct-debug] post[" << t << "]=" << post[t]
+                      << " parent[" << t << "]=" << treeParent[t] << std::endl;
+        for (node t = 0; t < numTreeNodes; ++t) {
+            if (post[t] >= numTreeNodes) {
+                std::cerr << "[shellstruct-debug] post OOB: post[" << t << "]=" << post[t]
+                          << std::endl;
+                throw std::out_of_range("ShellStruct-debug: post id out of range");
+            }
+        }
         std::vector<count> postCoreness(numTreeNodes);
         for (node t = 0; t < numTreeNodes; ++t)
             postCoreness[post[t]] = treeCoreness[t];
+        std::cerr << "[shellstruct-debug] prepareAndBuild: postCoreness done" << std::endl;
         std::vector<node> postParent(numTreeNodes - 1);
         for (node t = 0; t + 1 < numTreeNodes; ++t)
             postParent[post[t]] = post[treeParent[t]];
+        std::cerr << "[shellstruct-debug] prepareAndBuild: postParent done" << std::endl;
+        for (node u : vertexAssignment) {
+            if (u >= numTreeNodes) {
+                std::cerr << "[shellstruct-debug] assignment OOB: " << u << std::endl;
+                throw std::out_of_range("ShellStruct-debug: assignment out of range");
+            }
+        }
         std::ranges::transform(vertexAssignment, vertexAssignment.begin(),
                                [&](node t) { return post[t]; });
+        std::cerr << "[shellstruct-debug] prepareAndBuild: transform done" << std::endl;
         // vertices <- the vertices grouped by assignment; children <- the tree nodes grouped by
         // parent
         auto [vertexValues, vertexOffsets] = countSort(vertexAssignment, numTreeNodes);
