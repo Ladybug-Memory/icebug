@@ -5,6 +5,7 @@
  *      Author: Ian Chen (ianchen3@illinois.edu)
  */
 
+#include <iostream>
 #include <numeric>
 #include <stdexcept>
 #include <vector>
@@ -18,6 +19,8 @@ namespace NetworKit {
 class ShellStructGTest : public ::testing::Test {
 protected:
     GraphW getCliqueChain(const std::vector<count> &cliqueSizes) {
+        std::cerr << "[shellstruct-debug] getCliqueChain: numCliques=" << cliqueSizes.size()
+                  << std::endl;
         count totalNodes = 0;
         for (count size : cliqueSizes)
             totalNodes += size;
@@ -120,19 +123,26 @@ TEST_F(ShellStructGTest, testSeparatedCoresSingleton) {
 }
 
 TEST_F(ShellStructGTest, testSeparatedCoresPairs) {
+    std::cerr << "[shellstruct-debug] TEST testSeparatedCoresPairs start" << std::endl;
     std::vector<count> cliques{4, 3, 4};
     GraphW g = getCliqueChain(cliques);
     ShellStruct shell(g);
     shell.build();
     verifyPairs(shell, cliques);
+    std::cerr << "[shellstruct-debug] TEST testSeparatedCoresPairs end" << std::endl;
 }
 
 TEST_F(ShellStructGTest, testBridgedCoreSingleton) {
+    std::cerr << "[shellstruct-debug] TEST testBridgedCoreSingleton start" << std::endl;
     std::vector<count> cliques{3, 4, 3};
     GraphW g = getCliqueChain(cliques);
+    std::cerr << "[shellstruct-debug] TEST testBridgedCoreSingleton graph built" << std::endl;
     ShellStruct shell(g);
+    std::cerr << "[shellstruct-debug] TEST testBridgedCoreSingleton shell ctor done" << std::endl;
     shell.build();
+    std::cerr << "[shellstruct-debug] TEST testBridgedCoreSingleton build done" << std::endl;
     verifySingletons(shell, cliques);
+    std::cerr << "[shellstruct-debug] TEST testBridgedCoreSingleton end" << std::endl;
 }
 
 TEST_F(ShellStructGTest, testBridgedCorePairs) {

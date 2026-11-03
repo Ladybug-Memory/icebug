@@ -227,6 +227,8 @@ void ShellStruct::build() {
 void ShellStruct::build(std::span<const count> coredecomp) {
     // 3: compute coreness, the core decomposition of G (given)
     const count n = g->upperNodeIdBound();
+    std::cerr << "[shellstruct-debug] build: n=" << n << " coredecomp.size()=" << coredecomp.size()
+              << std::endl;
     if (coredecomp.size() != n)
         throw std::invalid_argument("ShellStruct: coredecomp must have one entry per node id");
 
@@ -234,6 +236,8 @@ void ShellStruct::build(std::span<const count> coredecomp) {
     const count maxK =
         n == 0 ? 0 : *Aux::Parallel::max_element(coredecomp.begin(), coredecomp.end());
     const auto [shellNodes, shellOffsets] = countSort(coredecomp, maxK + 1);
+    std::cerr << "[shellstruct-debug] build: maxK=" << maxK
+              << " shellNodes.size()=" << shellNodes.size() << std::endl;
 
     // 4: UF <- UnionFind(V)
     ConcurrentUnionFind<> uf(n);
@@ -316,8 +320,11 @@ void ShellStruct::build(std::span<const count> coredecomp) {
                                           shellOffsets[k + 1] - shellOffsets[k]);
         if (shell.empty())
             continue;
+        std::cerr << "[shellstruct-debug] build: k=" << k << " shell.size()=" << shell.size()
+                  << std::endl;
 
         std::vector<std::pair<node, node>> touched;
+        std::cerr << "[shellstruct-debug] build: k=" << k << " entering parallel" << std::endl;
 #pragma omp parallel
         {
             // 6: parinit P_k <- { (r, T_r) | uv in E, u in S_k, coreness(v) > k, r = UF.find(v) }
@@ -331,222 +338,232 @@ void ShellStruct::build(std::span<const count> coredecomp) {
             // 10: parfor T in P_k: parent of T <- T_{UF.find(root of T),k}
             setParents(touched);
         }
+        std::cerr << "[shellstruct-debug] build: k=" << k
+                  << " left parallel touched.size()=" << touched.size() << std::endl;
+
+        // 11: root of coreness 0: parent of every remaining parentless node, holds the vertices of
+        // S_0
+        const node root = numTreeNodes;
+        treeCoreness.resize(root);
+        treeParent.resize(root);
+        std::ranges::replace(treeParent, none, root);
+        treeCoreness.push_back(0);
+        treeParent.push_back(none);
+        for (node u : std::span(shellNodes).first(shellOffsets[1]))
+            vertexAssignment[u] = root;
+
+        if (auto status = prepareAndBuild(std::move(vertexAssignment), treeCoreness, treeParent);
+            !status.ok())
+            throw std::logic_error("ShellStruct: " + status.ToString());
     }
 
-    // 11: root of coreness 0: parent of every remaining parentless node, holds the vertices of S_0
-    const node root = numTreeNodes;
-    treeCoreness.resize(root);
-    treeParent.resize(root);
-    std::ranges::replace(treeParent, none, root);
-    treeCoreness.push_back(0);
-    treeParent.push_back(none);
-    for (node u : std::span(shellNodes).first(shellOffsets[1]))
-        vertexAssignment[u] = root;
+    arrow::Status ShellStruct::prepareAndBuild(std::vector<node> vertexAssignment,
+                                               std::span<const count> treeCoreness,
+                                               std::span<const node> treeParent) {
+        // post <- the post-order id of each tree node; renumber coreness, parent and assignment by
+        // post
+        const count numTreeNodes = treeCoreness.size();
+        std::cerr << "[shellstruct-debug] prepareAndBuild: numTreeNodes=" << numTreeNodes
+                  << " treeParent.size()=" << treeParent.size() << std::endl;
+        for (node t = 0; t + 1 < numTreeNodes; ++t) {
+            if (treeParent[t] == none)
+                std::cerr << "[shellstruct-debug] prepareAndBuild: treeParent[" << t
+                          << "]=none (orphan?)" << std::endl;
+        }
+        const std::vector<node> post = postOrder(treeParent);
+        std::vector<count> postCoreness(numTreeNodes);
+        for (node t = 0; t < numTreeNodes; ++t)
+            postCoreness[post[t]] = treeCoreness[t];
+        std::vector<node> postParent(numTreeNodes - 1);
+        for (node t = 0; t + 1 < numTreeNodes; ++t)
+            postParent[post[t]] = post[treeParent[t]];
+        std::ranges::transform(vertexAssignment, vertexAssignment.begin(),
+                               [&](node t) { return post[t]; });
+        // vertices <- the vertices grouped by assignment; children <- the tree nodes grouped by
+        // parent
+        auto [vertexValues, vertexOffsets] = countSort(vertexAssignment, numTreeNodes);
+        auto [childValues, childOffsets] = countSort(postParent, numTreeNodes);
 
-    if (auto status = prepareAndBuild(std::move(vertexAssignment), treeCoreness, treeParent);
-        !status.ok())
-        throw std::logic_error("ShellStruct: " + status.ToString());
-}
+        // Lengths are taken first: the vectors are moved into the buffers below.
+        const auto numVertices = static_cast<int64_t>(vertexAssignment.size());
+        const auto numNodes = static_cast<int64_t>(numTreeNodes);
+        const auto listType = arrow::large_list(arrow::uint64());
+        auto assignmentArray = std::make_shared<arrow::UInt64Array>(
+            numVertices, arrow::Buffer::FromVector(std::move(vertexAssignment)));
+        auto corenessArray = std::make_shared<arrow::UInt64Array>(
+            numNodes, arrow::Buffer::FromVector(std::move(postCoreness)));
+        auto verticesArray = std::make_shared<arrow::LargeListArray>(
+            listType, numNodes, arrow::Buffer::FromVector(std::move(vertexOffsets)),
+            std::make_shared<arrow::UInt64Array>(
+                numVertices, arrow::Buffer::FromVector(std::move(vertexValues))));
+        auto childrenArray = std::make_shared<arrow::LargeListArray>(
+            listType, numNodes, arrow::Buffer::FromVector(std::move(childOffsets)),
+            std::make_shared<arrow::UInt64Array>(
+                numNodes - 1, arrow::Buffer::FromVector(std::move(childValues))));
 
-arrow::Status ShellStruct::prepareAndBuild(std::vector<node> vertexAssignment,
-                                           std::span<const count> treeCoreness,
-                                           std::span<const node> treeParent) {
-    // post <- the post-order id of each tree node; renumber coreness, parent and assignment by post
-    const count numTreeNodes = treeCoreness.size();
-    std::cerr << "[shellstruct-debug] prepareAndBuild: numTreeNodes=" << numTreeNodes
-              << " treeParent.size()=" << treeParent.size() << std::endl;
-    for (node t = 0; t + 1 < numTreeNodes; ++t) {
-        if (treeParent[t] == none)
-            std::cerr << "[shellstruct-debug] prepareAndBuild: treeParent[" << t
-                      << "]=none (orphan?)" << std::endl;
+        return buildInternal(std::move(assignmentArray), std::move(corenessArray),
+                             std::move(verticesArray), std::move(childrenArray), false);
     }
-    const std::vector<node> post = postOrder(treeParent);
-    std::vector<count> postCoreness(numTreeNodes);
-    for (node t = 0; t < numTreeNodes; ++t)
-        postCoreness[post[t]] = treeCoreness[t];
-    std::vector<node> postParent(numTreeNodes - 1);
-    for (node t = 0; t + 1 < numTreeNodes; ++t)
-        postParent[post[t]] = post[treeParent[t]];
-    std::ranges::transform(vertexAssignment, vertexAssignment.begin(),
-                           [&](node t) { return post[t]; });
-    // vertices <- the vertices grouped by assignment; children <- the tree nodes grouped by parent
-    auto [vertexValues, vertexOffsets] = countSort(vertexAssignment, numTreeNodes);
-    auto [childValues, childOffsets] = countSort(postParent, numTreeNodes);
 
-    // Lengths are taken first: the vectors are moved into the buffers below.
-    const auto numVertices = static_cast<int64_t>(vertexAssignment.size());
-    const auto numNodes = static_cast<int64_t>(numTreeNodes);
-    const auto listType = arrow::large_list(arrow::uint64());
-    auto assignmentArray = std::make_shared<arrow::UInt64Array>(
-        numVertices, arrow::Buffer::FromVector(std::move(vertexAssignment)));
-    auto corenessArray = std::make_shared<arrow::UInt64Array>(
-        numNodes, arrow::Buffer::FromVector(std::move(postCoreness)));
-    auto verticesArray = std::make_shared<arrow::LargeListArray>(
-        listType, numNodes, arrow::Buffer::FromVector(std::move(vertexOffsets)),
-        std::make_shared<arrow::UInt64Array>(numVertices,
-                                             arrow::Buffer::FromVector(std::move(vertexValues))));
-    auto childrenArray = std::make_shared<arrow::LargeListArray>(
-        listType, numNodes, arrow::Buffer::FromVector(std::move(childOffsets)),
-        std::make_shared<arrow::UInt64Array>(numNodes - 1,
-                                             arrow::Buffer::FromVector(std::move(childValues))));
+    arrow::Status ShellStruct::buildInternal(std::shared_ptr<arrow::UInt64Array> assignment,
+                                             std::shared_ptr<arrow::UInt64Array> coreness,
+                                             std::shared_ptr<arrow::LargeListArray> vertices,
+                                             std::shared_ptr<arrow::LargeListArray> children,
+                                             bool verify) {
+        const auto n = static_cast<int64_t>(g->upperNodeIdBound());
+        const int64_t numNodes = coreness->length();
+        const auto vertexValues = std::static_pointer_cast<arrow::UInt64Array>(vertices->values());
+        const auto childValues = std::static_pointer_cast<arrow::UInt64Array>(children->values());
+        if (assignment->length() != n)
+            return arrow::Status::Invalid(
+                "ShellStruct: assignment must have one entry per node id");
+        if (numNodes == 0 || vertices->length() != numNodes || children->length() != numNodes)
+            return arrow::Status::Invalid(
+                "ShellStruct: coreness, vertices and children must have the same nonzero length");
+        if (vertices->value_offset(numNodes) - vertices->value_offset(0) != n
+            || children->value_offset(numNodes) - children->value_offset(0) != numNodes - 1
+            || vertices->value_offset(numNodes) > vertexValues->length()
+            || children->value_offset(numNodes) > childValues->length())
+            return arrow::Status::Invalid(
+                "ShellStruct: the tree must list every vertex and have one edge less than nodes");
 
-    return buildInternal(std::move(assignmentArray), std::move(corenessArray),
-                         std::move(verticesArray), std::move(childrenArray), false);
-}
+        std::cerr << "[shellstruct-debug] buildInternal: n=" << n << " numNodes=" << numNodes
+                  << " assign.len=" << assignment->length()
+                  << " vertices.len=" << vertices->length()
+                  << " children.len=" << children->length()
+                  << " vertexVals.len=" << vertexValues->length()
+                  << " childVals.len=" << childValues->length() << " verify=" << verify
+                  << std::endl;
+        if (verify)
+            ARROW_RETURN_NOT_OK(verifyColumns(*assignment, *coreness, *vertices, *children));
+        ARROW_ASSIGN_OR_RAISE(auto sizes, subtreeSizes(*children, verify));
+        std::cerr << "[shellstruct-debug] buildInternal: subtreeSizes ok, sizes.size()="
+                  << sizes.size() << std::endl;
 
-arrow::Status ShellStruct::buildInternal(std::shared_ptr<arrow::UInt64Array> assignment,
-                                         std::shared_ptr<arrow::UInt64Array> coreness,
-                                         std::shared_ptr<arrow::LargeListArray> vertices,
-                                         std::shared_ptr<arrow::LargeListArray> children,
-                                         bool verify) {
-    const auto n = static_cast<int64_t>(g->upperNodeIdBound());
-    const int64_t numNodes = coreness->length();
-    const auto vertexValues = std::static_pointer_cast<arrow::UInt64Array>(vertices->values());
-    const auto childValues = std::static_pointer_cast<arrow::UInt64Array>(children->values());
-    if (assignment->length() != n)
-        return arrow::Status::Invalid("ShellStruct: assignment must have one entry per node id");
-    if (numNodes == 0 || vertices->length() != numNodes || children->length() != numNodes)
-        return arrow::Status::Invalid(
-            "ShellStruct: coreness, vertices and children must have the same nonzero length");
-    if (vertices->value_offset(numNodes) - vertices->value_offset(0) != n
-        || children->value_offset(numNodes) - children->value_offset(0) != numNodes - 1
-        || vertices->value_offset(numNodes) > vertexValues->length()
-        || children->value_offset(numNodes) > childValues->length())
-        return arrow::Status::Invalid(
-            "ShellStruct: the tree must list every vertex and have one edge less than nodes");
-
-    std::cerr << "[shellstruct-debug] buildInternal: n=" << n << " numNodes=" << numNodes
-              << " assign.len=" << assignment->length() << " vertices.len=" << vertices->length()
-              << " children.len=" << children->length() << " vertexVals.len="
-              << vertexValues->length() << " childVals.len=" << childValues->length()
-              << " verify=" << verify << std::endl;
-    if (verify)
-        ARROW_RETURN_NOT_OK(verifyColumns(*assignment, *coreness, *vertices, *children));
-    ARROW_ASSIGN_OR_RAISE(auto sizes, subtreeSizes(*children, verify));
-    std::cerr << "[shellstruct-debug] buildInternal: subtreeSizes ok, sizes.size()="
-              << sizes.size() << std::endl;
-
-    this->assignment = std::move(assignment);
-    this->coreness = std::move(coreness);
-    this->vertices = std::move(vertices);
-    this->children = std::move(children);
-    subtreeSize = std::move(sizes);
-    tree.emplace(
-        numNodes, true, childValues,
-        std::make_shared<arrow::UInt64Array>(numNodes + 1, this->children->value_offsets()));
-    lca = std::make_unique<LeastCommonAncestor>(*tree, numNodes - 1);
-    return arrow::Status::OK();
-}
-
-node ShellStruct::treeNodeOf(const std::set<node> &s) {
-    std::cerr << "[shellstruct-debug] treeNodeOf: numSeeds=" << s.size()
-              << " assignment.len=" << (assignment ? assignment->length() : -1) << std::endl;
-    if (s.empty())
-        throw std::invalid_argument("ShellStruct-debug: treeNodeOf got empty seed set");
-    if (*s.rbegin() >= static_cast<node>(assignment->length())) {
-        std::cerr << "[shellstruct-debug] treeNodeOf OOB seed: maxSeed=" << *s.rbegin()
-                  << " assignment.len=" << assignment->length() << std::endl;
-        throw std::out_of_range("ShellStruct: seed is not a node id");
+        this->assignment = std::move(assignment);
+        this->coreness = std::move(coreness);
+        this->vertices = std::move(vertices);
+        this->children = std::move(children);
+        subtreeSize = std::move(sizes);
+        tree.emplace(
+            numNodes, true, childValues,
+            std::make_shared<arrow::UInt64Array>(numNodes + 1, this->children->value_offsets()));
+        lca = std::make_unique<LeastCommonAncestor>(*tree, numNodes - 1);
+        return arrow::Status::OK();
     }
-    std::vector<node> nodes;
-    nodes.reserve(s.size());
-    for (node u : s)
-        nodes.push_back(assignment->Value(u));
-    return lca->Query(nodes);
-}
 
-std::span<const node> ShellStruct::community(const std::set<node> &s) {
-    if (!lca)
-        throw std::runtime_error("ShellStruct: call build() or load() first");
-    if (s.empty())
-        return {};
-    const node t = treeNodeOf(s);
-    std::cerr << "[shellstruct-debug] community: t=" << t << " subtreeSize.size()="
-              << subtreeSize.size();
-    if (t < subtreeSize.size())
-        std::cerr << " subtreeSize[t]=" << subtreeSize[t];
-    std::cerr << " vertices.len=" << vertices->length() << std::endl;
-    if (t >= subtreeSize.size() || t >= static_cast<node>(vertices->length())) {
-        std::cerr << "[shellstruct-debug] community OOB: t out of range" << std::endl;
-        throw std::out_of_range("ShellStruct-debug: tree node out of range");
+    node ShellStruct::treeNodeOf(const std::set<node> &s) {
+        std::cerr << "[shellstruct-debug] treeNodeOf: numSeeds=" << s.size()
+                  << " assignment.len=" << (assignment ? assignment->length() : -1) << std::endl;
+        if (s.empty())
+            throw std::invalid_argument("ShellStruct-debug: treeNodeOf got empty seed set");
+        if (*s.rbegin() >= static_cast<node>(assignment->length())) {
+            std::cerr << "[shellstruct-debug] treeNodeOf OOB seed: maxSeed=" << *s.rbegin()
+                      << " assignment.len=" << assignment->length() << std::endl;
+            throw std::out_of_range("ShellStruct: seed is not a node id");
+        }
+        std::vector<node> nodes;
+        nodes.reserve(s.size());
+        for (node u : s)
+            nodes.push_back(assignment->Value(u));
+        return lca->Query(nodes);
     }
-    if (subtreeSize[t] == 0 || subtreeSize[t] > t + 1) {
-        std::cerr << "[shellstruct-debug] community OOB: subtreeSize[t]=" << subtreeSize[t]
-                  << " t=" << t << std::endl;
-        throw std::out_of_range("ShellStruct-debug: bad subtree size");
+
+    std::span<const node> ShellStruct::community(const std::set<node> &s) {
+        if (!lca)
+            throw std::runtime_error("ShellStruct: call build() or load() first");
+        if (s.empty())
+            return {};
+        const node t = treeNodeOf(s);
+        std::cerr << "[shellstruct-debug] community: t=" << t
+                  << " subtreeSize.size()=" << subtreeSize.size();
+        if (t < subtreeSize.size())
+            std::cerr << " subtreeSize[t]=" << subtreeSize[t];
+        std::cerr << " vertices.len=" << vertices->length() << std::endl;
+        if (t >= subtreeSize.size() || t >= static_cast<node>(vertices->length())) {
+            std::cerr << "[shellstruct-debug] community OOB: t out of range" << std::endl;
+            throw std::out_of_range("ShellStruct-debug: tree node out of range");
+        }
+        if (subtreeSize[t] == 0 || subtreeSize[t] > t + 1) {
+            std::cerr << "[shellstruct-debug] community OOB: subtreeSize[t]=" << subtreeSize[t]
+                      << " t=" << t << std::endl;
+            throw std::out_of_range("ShellStruct-debug: bad subtree size");
+        }
+        const uint64_t *values =
+            std::static_pointer_cast<arrow::UInt64Array>(vertices->values())->raw_values();
+        return {values + vertices->value_offset(t + 1 - subtreeSize[t]),
+                values + vertices->value_offset(t + 1)};
     }
-    const uint64_t *values =
-        std::static_pointer_cast<arrow::UInt64Array>(vertices->values())->raw_values();
-    return {values + vertices->value_offset(t + 1 - subtreeSize[t]),
-            values + vertices->value_offset(t + 1)};
-}
 
-std::set<node> ShellStruct::expandOneCommunity(const std::set<node> &s) {
-    const std::span<const node> members = community(s);
-    return {members.begin(), members.end()};
-}
-
-count ShellStruct::score(const std::set<node> &s) {
-    if (!lca)
-        throw std::runtime_error("ShellStruct: call build() or load() first");
-    if (s.empty())
-        throw std::invalid_argument("ShellStruct: score needs at least one seed");
-    return coreness->Value(treeNodeOf(s));
-}
-
-arrow::Status ShellStruct::saveInternal(const std::string &components_path,
-                                        const std::string &tree_path,
-                                        const std::string &compression) const {
-    {
-        auto schema = arrow::schema({arrow::field("assignment", arrow::uint64())});
-        auto table = arrow::Table::Make(schema, {assignment});
-        ARROW_RETURN_NOT_OK(writeTable(table, components_path, compression));
+    std::set<node> ShellStruct::expandOneCommunity(const std::set<node> &s) {
+        const std::span<const node> members = community(s);
+        return {members.begin(), members.end()};
     }
-    {
-        auto schema = arrow::schema({
-            arrow::field("coreness", arrow::uint64()),
-            arrow::field("vertices", arrow::large_list(arrow::uint64())),
-            arrow::field("children", arrow::large_list(arrow::uint64())),
-        });
-        auto table = arrow::Table::Make(schema, {
-                                                    std::make_shared<arrow::ChunkedArray>(coreness),
-                                                    std::make_shared<arrow::ChunkedArray>(vertices),
-                                                    std::make_shared<arrow::ChunkedArray>(children),
-                                                });
-        ARROW_RETURN_NOT_OK(writeTable(table, tree_path, compression));
+
+    count ShellStruct::score(const std::set<node> &s) {
+        if (!lca)
+            throw std::runtime_error("ShellStruct: call build() or load() first");
+        if (s.empty())
+            throw std::invalid_argument("ShellStruct: score needs at least one seed");
+        return coreness->Value(treeNodeOf(s));
     }
-    return arrow::Status::OK();
-}
 
-arrow::Status ShellStruct::loadInternal(const std::string &components_path,
-                                        const std::string &tree_path) {
-    std::shared_ptr<arrow::Table> components, treeTable;
-    ARROW_RETURN_NOT_OK(readTable(components_path, &components));
-    ARROW_RETURN_NOT_OK(readTable(tree_path, &treeTable));
+    arrow::Status ShellStruct::saveInternal(const std::string &components_path,
+                                            const std::string &tree_path,
+                                            const std::string &compression) const {
+        {
+            auto schema = arrow::schema({arrow::field("assignment", arrow::uint64())});
+            auto table = arrow::Table::Make(schema, {assignment});
+            ARROW_RETURN_NOT_OK(writeTable(table, components_path, compression));
+        }
+        {
+            auto schema = arrow::schema({
+                arrow::field("coreness", arrow::uint64()),
+                arrow::field("vertices", arrow::large_list(arrow::uint64())),
+                arrow::field("children", arrow::large_list(arrow::uint64())),
+            });
+            auto table =
+                arrow::Table::Make(schema, {
+                                               std::make_shared<arrow::ChunkedArray>(coreness),
+                                               std::make_shared<arrow::ChunkedArray>(vertices),
+                                               std::make_shared<arrow::ChunkedArray>(children),
+                                           });
+            ARROW_RETURN_NOT_OK(writeTable(table, tree_path, compression));
+        }
+        return arrow::Status::OK();
+    }
 
-    const auto listType = arrow::large_list(arrow::uint64());
-    ARROW_ASSIGN_OR_RAISE(auto assignmentColumn,
-                          readColumn(*components, "assignment", arrow::uint64()));
-    ARROW_ASSIGN_OR_RAISE(auto corenessColumn, readColumn(*treeTable, "coreness", arrow::uint64()));
-    ARROW_ASSIGN_OR_RAISE(auto verticesColumn, readColumn(*treeTable, "vertices", listType));
-    ARROW_ASSIGN_OR_RAISE(auto childrenColumn, readColumn(*treeTable, "children", listType));
-    return buildInternal(std::static_pointer_cast<arrow::UInt64Array>(assignmentColumn),
-                         std::static_pointer_cast<arrow::UInt64Array>(corenessColumn),
-                         std::static_pointer_cast<arrow::LargeListArray>(verticesColumn),
-                         std::static_pointer_cast<arrow::LargeListArray>(childrenColumn), validate);
-}
+    arrow::Status ShellStruct::loadInternal(const std::string &components_path,
+                                            const std::string &tree_path) {
+        std::shared_ptr<arrow::Table> components, treeTable;
+        ARROW_RETURN_NOT_OK(readTable(components_path, &components));
+        ARROW_RETURN_NOT_OK(readTable(tree_path, &treeTable));
 
-void ShellStruct::save(const std::string &components_path, const std::string &tree_path,
-                       const std::string &compression) const {
-    if (!lca)
-        throw std::runtime_error("ShellStruct: call build() or load() first");
-    if (auto status = saveInternal(components_path, tree_path, compression); !status.ok())
-        throw std::runtime_error("ShellStruct: save failed: " + status.ToString());
-}
+        const auto listType = arrow::large_list(arrow::uint64());
+        ARROW_ASSIGN_OR_RAISE(auto assignmentColumn,
+                              readColumn(*components, "assignment", arrow::uint64()));
+        ARROW_ASSIGN_OR_RAISE(auto corenessColumn,
+                              readColumn(*treeTable, "coreness", arrow::uint64()));
+        ARROW_ASSIGN_OR_RAISE(auto verticesColumn, readColumn(*treeTable, "vertices", listType));
+        ARROW_ASSIGN_OR_RAISE(auto childrenColumn, readColumn(*treeTable, "children", listType));
+        return buildInternal(std::static_pointer_cast<arrow::UInt64Array>(assignmentColumn),
+                             std::static_pointer_cast<arrow::UInt64Array>(corenessColumn),
+                             std::static_pointer_cast<arrow::LargeListArray>(verticesColumn),
+                             std::static_pointer_cast<arrow::LargeListArray>(childrenColumn),
+                             validate);
+    }
 
-void ShellStruct::load(const std::string &components_path, const std::string &tree_path) {
-    if (auto status = loadInternal(components_path, tree_path); !status.ok())
-        throw std::runtime_error("ShellStruct: load failed: " + status.ToString());
-}
+    void ShellStruct::save(const std::string &components_path, const std::string &tree_path,
+                           const std::string &compression) const {
+        if (!lca)
+            throw std::runtime_error("ShellStruct: call build() or load() first");
+        if (auto status = saveInternal(components_path, tree_path, compression); !status.ok())
+            throw std::runtime_error("ShellStruct: save failed: " + status.ToString());
+    }
+
+    void ShellStruct::load(const std::string &components_path, const std::string &tree_path) {
+        if (auto status = loadInternal(components_path, tree_path); !status.ok())
+            throw std::runtime_error("ShellStruct: load failed: " + status.ToString());
+    }
 
 } // namespace NetworKit
