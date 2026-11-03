@@ -264,9 +264,10 @@ void ShellStruct::build(std::span<const count> coredecomp) {
 #pragma omp for schedule(static) nowait
         for (omp_index i = 0; i < static_cast<omp_index>(shell.size()); ++i)
             createIfRoot(shell[i]);
-#pragma omp for schedule(static)
+#pragma omp for schedule(static) nowait
         for (omp_index i = 0; i < static_cast<omp_index>(touched.size()); ++i)
             createIfRoot(touched[i].first);
+#pragma omp barrier // Explicit: MSVC skips the implicit barrier of an omp for without iterations.
     };
 
     auto assignShell = [&](std::span<const node> shell) {
