@@ -5,36 +5,32 @@
 
 namespace NetworKit {
 
-template <bool ReleaseConsistency>
-ConcurrentUnionFind<ReleaseConsistency>::ConcurrentUnionFind(index max_element)
-    : parent(max_element) {
+ConcurrentUnionFind::ConcurrentUnionFind(index max_element) : parent(max_element) {
 #pragma omp parallel for schedule(static)
     for (omp_index i = 0; i < max_element; ++i) {
         parent[i].store(-1, std::memory_order_relaxed);
     }
 }
 
-template <bool ReleaseConsistency>
-index ConcurrentUnionFind<ReleaseConsistency>::find(index i) {
+index ConcurrentUnionFind::find(index i) {
     while (1) {
-        element p = parent[i].load(LoadOrder);
-        if (p < 0 && (p = parent[i].load(std::memory_order_acquire)) < 0)
+        element p = parent[i].load();
+        if (p < 0)
             return i;
 
         // path halving
-        element gp = parent[p].load(LoadOrder);
-        if (gp < 0 && (gp = parent[p].load(std::memory_order_acquire)) < 0)
+        element gp = parent[p].load();
+        if (gp < 0)
             return p;
 
-        parent[i].store((element)gp, std::memory_order_relaxed);
+        parent[i].store((element)gp, std::memory_order_release);
         i = gp;
     }
 }
 
-template <bool ReleaseConsistency>
-bool ConcurrentUnionFind<ReleaseConsistency>::merge(index u, index v) {
-    element pu = parent[u].load(std::memory_order_relaxed);
-    element pv = parent[v].load(std::memory_order_relaxed);
+bool ConcurrentUnionFind::merge(index u, index v) {
+    element pu = parent[u].load();
+    element pv = parent[v].load();
 
     // immediate parent check
     if (pu == pv && pu >= 0) {
@@ -50,8 +46,8 @@ bool ConcurrentUnionFind<ReleaseConsistency>::merge(index u, index v) {
         }
 
         // both elements should be roots
-        element val_u = parent[root_u].load(std::memory_order_acquire);
-        element val_v = parent[root_v].load(std::memory_order_acquire);
+        element val_u = parent[root_u].load();
+        element val_v = parent[root_v].load();
         if (val_u >= 0 || val_v >= 0) {
             continue;
         }
@@ -63,23 +59,17 @@ bool ConcurrentUnionFind<ReleaseConsistency>::merge(index u, index v) {
         }
 
         element expected = val_v;
-        if (parent[root_v].compare_exchange_weak(expected, root_u, StoreOrder,
-                                                 std::memory_order_relaxed)) {
+        if (parent[root_v].compare_exchange_weak(expected, root_u)) {
             // increment rank
             if (val_u == val_v) {
                 element expected_rank = val_u;
                 while (expected_rank < 0
-                       && !parent[root_u].compare_exchange_weak(expected_rank, expected_rank - 1,
-                                                                std::memory_order_relaxed,
-                                                                std::memory_order_relaxed)) {
+                       && !parent[root_u].compare_exchange_weak(expected_rank, expected_rank - 1)) {
                 }
             }
             return true;
         }
     }
 }
-
-template class NetworKit::ConcurrentUnionFind<false>;
-template class NetworKit::ConcurrentUnionFind<true>;
 
 } /* namespace NetworKit */
