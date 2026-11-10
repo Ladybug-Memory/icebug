@@ -207,7 +207,7 @@ void ShellStruct::build(std::span<const count> coredecomp) {
     const auto [shellNodes, shellOffsets] = countSort(coredecomp, maxK + 1);
 
     // 4: UF <- UnionFind(V)
-    ConcurrentUnionFind<> uf(n);
+    ConcurrentUnionFind uf(n);
     // T_{r,k}: the tree node on top of the component of each union-find root r; none otherwise.
     std::vector<node> treeNode(n, none);
     // Tree nodes -> coreness and parent, in creation order; at most one tree node per vertex.
