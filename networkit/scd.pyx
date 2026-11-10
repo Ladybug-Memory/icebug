@@ -2,10 +2,12 @@ from libc.stdint cimport uint64_t
 from libcpp cimport bool as bool_t
 from libcpp.map cimport map
 from libcpp.set cimport set
-from libcpp.utility cimport pair
+from libcpp.utility cimport pair, move
 from libcpp.vector cimport vector
 from libcpp.string cimport string
 from libcpp.span cimport span
+from cpython.ref cimport Py_INCREF
+cimport numpy as cnp
 
 from cython.operator import dereference
 
@@ -15,6 +17,8 @@ from .helpers import stdstring
 
 import os
 import numpy as np
+
+cnp.import_array()
 
 ## workaround of Cython parser
 ## this is fixed in v3.3.0a1 (https://github.com/cython/cython/issues/6294)
@@ -735,3 +739,97 @@ cdef class ShellStruct(SelectiveCommunityDetector):
 		if members.size() == 0:
 			return np.empty(0, dtype=np.uint64)
 		return np.array(<uint64_t[:members.size()]> <uint64_t*> members.data())
+
+cdef extern from "<networkit/scd/SteinerKCore.hpp>":
+
+	cdef cppclass _SteinerKCore "NetworKit::SteinerKCore"(_SelectiveCommunityDetector):
+		_SteinerKCore(_Graph &G) except +
+		_SteinerKCore(_Graph &G, span[const_count] coreness) except +
+		_Communities communities(const vector[set[node]] &s) except + nogil
+
+	cdef cppclass _Communities "NetworKit::SteinerKCore::Communities":
+		vector[span[const_count]] communities
+		vector[count] coreness
+
+# For lifetimes of the _Communities buffer
+cdef class _CommunitiesOwner:
+	cdef _Communities c
+
+cdef class SteinerKCore(SelectiveCommunityDetector):
+	"""
+	SteinerKCore(G, coreness)
+
+	The Steiner KCore algorithm, for batched multi-set k-core community search queries.
+
+	This is an implementation of the algorithm proposed in:
+
+	Chen, I., Yi, H., Sharma, A., Chacko, G., & Warnow, T. (2026).
+	Improved Methods for k-core Community Search.
+	arXiv preprint arXiv:2609.17822.
+	https://arxiv.org/abs/2609.17822
+
+	Parameters
+	----------
+	G : networkit.Graph
+		Graph in which the community shell be found.
+	coreness: numpy.ndarray[uint64], optional
+		Precalculated core numbers for each count.
+	"""
+	
+	# increment refcount for any coreness
+	cdef object _ownedCoreness
+		
+	def __cinit__(self, Graph G, coreness=None):
+		cdef const uint64_t[::1] mv
+		self._G = G
+
+		if coreness is None:
+			self._this = new _SteinerKCore(dereference(G._view()))
+			return
+
+		mv = coreness
+		self._ownedCoreness = coreness
+		if mv.shape[0] == 0:
+			self._this = new _SteinerKCore(dereference(G._view()), span[const_count]())
+		else:
+			self._this = new _SteinerKCore(dereference(G._view()), span[const_count](&mv[0], <size_t>mv.shape[0]))
+
+	def communities(self, list[set[node]] seeds):
+		"""
+		communities(seeds):
+
+		Detect one community for each of the given seed sets.
+
+		Parameters
+		----------
+		seeds : list(set(int))
+			The list of seed sets for which communities shall be detected.
+
+		Returns
+		-------
+		tuple(list(numpy.ndarray[uint64]), numpy.ndarray[uint64])
+			For each seed, the members and the coreness of the communiy.
+			Seeds that are not in one connected component have empty members and coreness -1.
+		"""
+		cdef _SteinerKCore *this = <_SteinerKCore*>self._this
+		cdef vector[set[node]] cseeds = seeds
+		cdef _Communities result
+		cdef _CommunitiesOwner owner = _CommunitiesOwner()
+		cdef cnp.npy_intp size
+		cdef size_t i
+		with nogil:
+			result = this.communities(cseeds)
+		owner.c = move(result)
+		communities = []
+		for i in range(owner.c.communities.size()):
+			size = owner.c.communities[i].size()
+			if size == 0:
+				view = np.empty(0, dtype=np.uint64)
+			else:
+				view = cnp.PyArray_SimpleNewFromData(1, &size, cnp.NPY_UINT64,
+					<void*> owner.c.communities[i].data())
+				Py_INCREF(owner) # PyArray_SetBaseObject steals it
+				cnp.PyArray_SetBaseObject(view, owner)
+			view.setflags(write=False)
+			communities.append(view)
+		return communities, np.array(owner.c.coreness, dtype=np.uint64)
