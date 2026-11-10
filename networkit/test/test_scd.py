@@ -164,6 +164,25 @@ class TestSCD(unittest.TestCase):
         self.assertEqual(len(shell.community(set())), 0)
         self.assertRaises(ValueError, shell.score, set())
 
+    def testSteinerKCoreQuery(self):
+        src = [0, 0, 1, 2, 3, 3, 3, 4, 4, 5, 6, 7, 7, 8, 9, 10, 10, 10, 11, 11, 12]
+        tgt = [1, 2, 2, 3, 4, 5, 6, 5, 6, 6, 7, 8, 9, 9, 10, 11, 12, 13, 12, 13, 13]
+        G = nk.Graph(14, directed=False)
+        for s, t in zip(src, tgt):
+            G.addEdge(s, t)
+        coreness = np.array([2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 3, 3, 3, 3], dtype=np.uint64)
+
+        shell = nk.scd.ShellStruct(G)
+        shell.build()
+        queries = [{u, v} for u in range(G.numberOfNodes()) for v in range(G.numberOfNodes())]
+        expected = [shell.expandOneCommunity(q) for q in queries]
+
+        for steiner in [nk.scd.SteinerKCore(G), nk.scd.SteinerKCore(G, coreness)]:
+            members, coreness = steiner.communities(queries)
+            self.assertEqual([set(m.tolist()) for m in members], expected)
+            self.assertEqual(coreness.tolist(), [shell.score(q) for q in queries])
+            self.assertEqual(steiner.expandOneCommunity({0, 13}), expected[13])
+
 
 if __name__ == "__main__":
     unittest.main()
