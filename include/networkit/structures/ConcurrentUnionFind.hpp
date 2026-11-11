@@ -9,6 +9,7 @@
 #define NETWORKIT_STRUCTURES_CONCURRENT_UNION_FIND_HPP_
 
 #include <atomic>
+#include <utility>
 #include <vector>
 
 #include <networkit/Globals.hpp>
@@ -22,9 +23,8 @@ namespace NetworKit {
  * immediate parent optimization, compression by rank.
  * We use a (sign) bit to distinguish roots.
  *
- * By default, we guarantee weak-consistency ordering (not causal).
- * This follows the plain-write optimization specified below.
- * A template option is provided to use release-acquire ordering.
+ * Concurrent calls to find and merge are linearizable: all calls appear to take effect in a
+ * single total order, each at some instant during the call.
  *
  * Optimizations are based off of:
  *
@@ -33,15 +33,8 @@ namespace NetworKit {
  * arXiv preprint arXiv:1911.06347 (2019).
  * https://doi.org/10.48550/arXiv.1911.06347
  */
-template <bool ReleaseConsistency = false>
 class ConcurrentUnionFind {
 private:
-    static constexpr auto LoadOrder =
-        ReleaseConsistency ? std::memory_order_acquire : std::memory_order_relaxed;
-
-    static constexpr auto StoreOrder =
-        ReleaseConsistency ? std::memory_order_release : std::memory_order_relaxed;
-
     using element = int64_t; // signed to distinguish roots
     std::vector<std::atomic<element>> parent;
 
