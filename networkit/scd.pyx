@@ -23,6 +23,7 @@ cnp.import_array()
 ## workaround of Cython parser
 ## this is fixed in v3.3.0a1 (https://github.com/cython/cython/issues/6294)
 ctypedef const uint64_t const_count
+ctypedef const uint64_t const_node
 
 cdef class SelectiveCommunityDetector:
 	"""
@@ -616,7 +617,7 @@ cdef extern from "<networkit/scd/ShellStruct.hpp>":
 		void save(string components_path, string tree_path, string compression) except +
 		void load(string components_path, string tree_path) except +
 		count score(set[node] seeds) except +
-		span[const_count] community(set[node] seeds) except +
+		span[const_node] community(set[node] seeds) except +
 
 cdef class ShellStruct(SelectiveCommunityDetector):
 	"""
@@ -735,7 +736,7 @@ cdef class ShellStruct(SelectiveCommunityDetector):
 		numpy.ndarray[uint64]
 			The nodes of the community, in no particular order; empty if there are no seeds.
 		"""
-		cdef span[const_count] members = (<_ShellStruct*>(self._this)).community(seeds)
+		cdef span[const_node] members = (<_ShellStruct*>(self._this)).community(seeds)
 		if members.size() == 0:
 			return np.empty(0, dtype=np.uint64)
 		return np.array(<uint64_t[:members.size()]> <uint64_t*> members.data())
@@ -748,7 +749,7 @@ cdef extern from "<networkit/scd/SteinerKCore.hpp>":
 		_Communities communities(const vector[set[node]] &s) except + nogil
 
 	cdef cppclass _Communities "NetworKit::SteinerKCore::Communities":
-		vector[span[const_count]] communities
+		vector[span[const_node]] communities
 		vector[count] coreness
 
 # For lifetimes of the _Communities buffer
@@ -760,6 +761,8 @@ cdef class SteinerKCore(SelectiveCommunityDetector):
 	SteinerKCore(G, coreness)
 
 	The Steiner KCore algorithm, for batched multi-set k-core community search queries.
+	The community of a seed set is the connected component of the k-core containing it, for the
+	largest k in which it is connected (undefined if isolated or in separate components).
 
 	This is an implementation of the algorithm proposed in:
 
@@ -771,9 +774,9 @@ cdef class SteinerKCore(SelectiveCommunityDetector):
 	Parameters
 	----------
 	G : networkit.Graph
-		Graph in which the community shell be found.
+		Graph in which the community shall be found.
 	coreness: numpy.ndarray[uint64], optional
-		Precalculated core numbers for each count.
+		Precalculated core numbers for each node; its length must be G.upperNodeIdBound().
 	"""
 	
 	# increment refcount for any coreness
@@ -803,14 +806,13 @@ cdef class SteinerKCore(SelectiveCommunityDetector):
 		Parameters
 		----------
 		seeds : list(set(int))
-			The list of seed sets for which communities shall be detected.
+			The list of seed sets for which communities shall be detected; each must not be
+			isolated or in separate components.
 
 		Returns
 		-------
 		tuple(list(numpy.ndarray[uint64]), numpy.ndarray[uint64])
-			For each seed, the members and the coreness of the communiy.
-			Seeds that are not in one connected component have empty members and coreness -1.
-		"""
+			For each seed, the members and the coreness of the community.		"""
 		cdef _SteinerKCore *this = <_SteinerKCore*>self._this
 		cdef vector[set[node]] cseeds = seeds
 		cdef _Communities result

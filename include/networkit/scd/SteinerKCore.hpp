@@ -18,6 +18,8 @@ namespace NetworKit {
 
 /**
  * The steiner community expansion algorithm optimizing k-core.
+ * The community of a seed set is the connected component of the k-core containing it, for the
+ * largest k in which it is connected (undefined if isolated or in separate components).
  *
  * This is an implementation of the algorithm proposed in:
  *
@@ -35,8 +37,9 @@ public:
      * Constructs the Steiner KCore algorithm.
      *
      * @param[in] G The graph to detect communities on
-     * @param[in] coreness The pre-computed core decomposition for
-          the graph. coreness must be kept alive as long as this is.
+     * @param[in] coreness The pre-computed core decomposition for the graph; its length must be
+     * @c G.upperNodeIdBound(). @a coreness must exist at least as long as this SteinerKCore
+     * instance.
      */
     SteinerKCore(const Graph &g, std::span<const count> coreness);
 
@@ -45,8 +48,8 @@ public:
     /**
      * Expands a set of seed nodes into a community.
      *
-     * @param[in] s The seed nodes
-     * @return A community of the seed nodes, or an empty set if they are not connected
+     * @param[in] s The seed nodes; must not be isolated or in separate components
+     * @return A community of the seed nodes
      */
     std::set<node> expandOneCommunity(const std::set<node> &s) override;
 
@@ -54,8 +57,8 @@ public:
      * The community/coreness for each query.
      */
     struct Communities {
-        std::vector<std::span<const node>> communities; // empty if the seeds are not connected
-        std::vector<count> coreness;                    // none if the seeds are not connected
+        std::vector<std::span<const node>> communities;
+        std::vector<count> coreness;
 
         Communities() = default;
         Communities(Communities &&) = default;

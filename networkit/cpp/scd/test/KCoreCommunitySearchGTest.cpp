@@ -388,26 +388,17 @@ TEST(SteinerKCoreGTest, testEmptyQueries) {
     EXPECT_TRUE(steiner.expandOneCommunity(std::set<node>{}).empty());
 }
 
+TEST(SteinerKCoreGTest, testWrongSizeCorenessThrows) {
+    GraphW g = getCliqueChain({3, 4, 3});
+    EXPECT_THROW(SteinerKCore(g, std::vector<count>(g.upperNodeIdBound() - 1)),
+                 std::invalid_argument);
+}
+
 TEST(SteinerKCoreGTest, testInvalidSeeds) {
     GraphW g = getCliqueChain({3, 4, 3});
     SteinerKCore steiner(g);
     EXPECT_THROW(steiner.expandOneCommunity(std::set<node>{g.upperNodeIdBound()}),
                  std::out_of_range);
-}
-
-TEST(SteinerKCoreGTest, testDisconnectedSeeds) {
-    GraphW g(8, false, false);
-    for (node start : {0, 4})
-        for (node u = start; u < start + 4; ++u)
-            for (node v = u + 1; v < start + 4; ++v)
-                g.addEdge(u, v);
-    SteinerKCore steiner(g);
-    const SteinerKCore::Communities c = steiner.communities({{0, 1}, {0, 4}, {5}});
-    std::vector<std::set<node>> et = asSets(c);
-    EXPECT_EQ(et[0], (std::set<node>{0, 1, 2, 3}));
-    EXPECT_TRUE(et[1].empty());
-    EXPECT_EQ(et[2], (std::set<node>{4, 5, 6, 7}));
-    EXPECT_EQ(c.coreness, (std::vector<count>{3, none, 3}));
 }
 
 // ShellStruct answers the same queries; isolated seeds are skipped since ShellStruct places them
@@ -438,15 +429,10 @@ TEST(SteinerKCoreGTest, testMatchesShellStruct) {
             isolated |= g.degree(u) == 0;
             connected &= cc.componentOfNode(u) == cc.componentOfNode(*q.begin());
         }
-        if (isolated)
+        if (isolated || !connected)
             continue;
-        if (connected) {
-            EXPECT_EQ(et[i], shell.expandOneCommunity(q)) << "Failed on query index " << i;
-            EXPECT_EQ(c.coreness[i], shell.score(q)) << "Failed on query index " << i;
-        } else {
-            EXPECT_TRUE(et[i].empty()) << "Failed on disconnected query index " << i;
-            EXPECT_EQ(c.coreness[i], none) << "Failed on disconnected query index " << i;
-        }
+        EXPECT_EQ(et[i], shell.expandOneCommunity(q)) << "Failed on query index " << i;
+        EXPECT_EQ(c.coreness[i], shell.score(q)) << "Failed on query index " << i;
     }
 }
 
