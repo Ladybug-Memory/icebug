@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cassert>
 #include <limits>
 #include <numeric>
 #include <omp.h>
@@ -109,7 +110,10 @@ SteinerKCore::Communities SteinerKCore::getComms(
 }
 
 SteinerKCore::SteinerKCore(const Graph &g, std::span<const count> coreness)
-    : SelectiveCommunityDetector(g), coreness(coreness) {}
+    : SelectiveCommunityDetector(g), coreness(coreness) {
+    if (coreness.size() != g.upperNodeIdBound())
+        throw std::invalid_argument("SteinerKCore: coreness must have one entry per node id");
+}
 
 SteinerKCore::SteinerKCore(const Graph &g) : SelectiveCommunityDetector(g) {
     CoreDecomposition cd(g);
@@ -141,8 +145,10 @@ SteinerKCore::Communities SteinerKCore::communities(const std::vector<std::set<n
     // Keys are flipped so that the min-PQ extracts the highest coreness first.
     count maxKey = 0;
     for (const auto &q : s)
-        for (node u : q)
+        for (node u : q) {
+            assert(coreness[u] < n);
             maxKey = std::max(maxKey, coreness[u]);
+        }
     auto flip = [&](count k) { return maxKey - k; };
     HBS pq(n, numThreads, static_cast<count>(std::bit_width(maxKey)), 1);
 
