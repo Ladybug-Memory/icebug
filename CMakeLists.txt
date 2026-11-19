@@ -145,11 +145,12 @@ find_package(OpenMP)
 # Find Apache Arrow
 find_package(Arrow REQUIRED)
 
-# The Python wheels must be built against Arrow 26. Linux/macOS vendor the
-# build-time Arrow into the wheel, but on Windows the wheel reuses pyarrow's
+# The Windows wheel must be built against Arrow 26: unlike Linux/macOS, which
+# vendor the build-time Arrow into the wheel, the Windows wheel reuses pyarrow's
 # bundled arrow.dll at runtime (see the pyarrow pin in pyproject.toml), so a
 # build-time/runtime Arrow mismatch breaks imports. Only enforced for Python
-# builds so plain C++ builds keep working with any Arrow.
+# builds so plain C++ builds keep working with any Arrow. Other platforms
+# vendor whatever they build against, so a mismatch there is only warned about.
 if(NETWORKIT_PYTHON)
 	if(DEFINED Arrow_VERSION)
 		set(_nk_arrow_version "${Arrow_VERSION}")
@@ -159,7 +160,11 @@ if(NETWORKIT_PYTHON)
 		message(WARNING "Could not determine Arrow version; skipping Arrow 26 pin check.")
 	endif()
 	if(DEFINED _nk_arrow_version AND NOT _nk_arrow_version MATCHES "^26\\.")
-		message(FATAL_ERROR "Arrow 26.x is required to build the Python module, but found '${_nk_arrow_version}'.")
+		if(WIN32)
+			message(FATAL_ERROR "Arrow 26.x is required to build the Python module on Windows, but found '${_nk_arrow_version}'.")
+		else()
+			message(WARNING "Building the Python module against Arrow '${_nk_arrow_version}' (Windows requires 26.x; this platform vendors its own Arrow, so this is safe).")
+		endif()
 	endif()
 	unset(_nk_arrow_version)
 endif()
