@@ -145,6 +145,25 @@ find_package(OpenMP)
 # Find Apache Arrow
 find_package(Arrow REQUIRED)
 
+# The Python wheels must be built against Arrow 26. Linux/macOS vendor the
+# build-time Arrow into the wheel, but on Windows the wheel reuses pyarrow's
+# bundled arrow.dll at runtime (see the pyarrow pin in pyproject.toml), so a
+# build-time/runtime Arrow mismatch breaks imports. Only enforced for Python
+# builds so plain C++ builds keep working with any Arrow.
+if(NETWORKIT_PYTHON)
+	if(DEFINED Arrow_VERSION)
+		set(_nk_arrow_version "${Arrow_VERSION}")
+	elseif(DEFINED ARROW_VERSION)
+		set(_nk_arrow_version "${ARROW_VERSION}")
+	else()
+		message(WARNING "Could not determine Arrow version; skipping Arrow 26 pin check.")
+	endif()
+	if(DEFINED _nk_arrow_version AND NOT _nk_arrow_version MATCHES "^26\\.")
+		message(FATAL_ERROR "Arrow 26.x is required to build the Python module, but found '${_nk_arrow_version}'.")
+	endif()
+	unset(_nk_arrow_version)
+endif()
+
 # FindOpenMP.cmake does not reliably find a user installed openmp library for clang/llvm on
 # both Linux- and macOS-systems (even for CMake Version >= 3.12). The following section
 # manually sets the required fields for clang-like compiler.

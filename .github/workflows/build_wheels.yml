@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   # Gate: skip the cp313-only smoke build when this commit carries a version
-  # tag (e.g. 13.5). The release event then does the full cp310-314 build, so
+  # tag (e.g. 13.5). The release event then does the full cp311-315 build, so
   # nothing needs cancelling and the release commit stays green.
   # Skipped != cancelled: skipped jobs don't produce a red X.
   check-release-tag:
@@ -82,9 +82,9 @@ jobs:
           CIBW_BEFORE_ALL: |
             yum install -y epel-release || yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1).noarch.rpm
             yum install -y https://apache.jfrog.io/artifactory/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe)/apache-arrow-release-latest.rpm
-            # Arrow 25.0.0 RPMs have a GPG key mismatch, so we use --nogpgcheck
+            # Arrow RPMs have a GPG key mismatch, so we use --nogpgcheck
             # See https://github.com/apache/arrow/issues/50648
-            yum install -y --nogpgcheck --enablerepo=epel arrow-devel arrow-compute-devel ccache
+            yum install -y --nogpgcheck --enablerepo=epel 'arrow-devel-26*' 'arrow-compute-devel-26*' ccache
             export CCACHE_DIR=/root/.ccache
             mkdir -p /tmp/nk_core_build /tmp/nk_core_install
             cmake -S {project} -B /tmp/nk_core_build \
@@ -104,15 +104,9 @@ jobs:
             CMAKE_CXX_COMPILER_LAUNCHER=ccache
           CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.manylinux_image }}
           CIBW_ARCHS_LINUX: ${{ matrix.cibw_archs }}
-          CIBW_BUILD: ${{ github.event_name == 'release' && 'cp310-* cp311-* cp312-* cp313-* cp314-*' || 'cp313-*' }}
+          CIBW_BUILD: ${{ github.event_name == 'release' && 'cp311-* cp312-* cp313-* cp314-* cp315-*' || 'cp313-*' }}
           CIBW_SKIP: "pp* *-musllinux_*"
           CIBW_TEST_COMMAND: python3 -c 'import networkit'
-      - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/main' || github.event_name == 'release'
-        with:
-          name: 'linux-${{ matrix.cibw_archs }}-cp310-${{ github.run_id }}'
-          path: ./wheelhouse/*cp310*.whl
-          retention-days: ${{ env.ARTIFACT_RETENTION }}
       - uses: actions/upload-artifact@v4
         if: github.ref == 'refs/heads/main' || github.event_name == 'release'
         with:
@@ -135,6 +129,12 @@ jobs:
         with:
           name: 'linux-${{ matrix.cibw_archs }}-cp314-${{ github.run_id }}'
           path: ./wheelhouse/*cp314*.whl
+          retention-days: ${{ env.ARTIFACT_RETENTION }}
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main' || github.event_name == 'release'
+        with:
+          name: 'linux-${{ matrix.cibw_archs }}-cp315-${{ github.run_id }}'
+          path: ./wheelhouse/*cp315*.whl
           retention-days: ${{ env.ARTIFACT_RETENTION }}
 
   cpython-linux-aarch64:
@@ -169,9 +169,9 @@ jobs:
           CIBW_BEFORE_ALL: |
             yum install -y epel-release || yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1).noarch.rpm
             yum install -y https://apache.jfrog.io/artifactory/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe)/apache-arrow-release-latest.rpm
-            # Arrow 25.0.0 RPMs have a GPG key mismatch, so we use --nogpgcheck
+            # Arrow RPMs have a GPG key mismatch, so we use --nogpgcheck
             # See https://github.com/apache/arrow/issues/50648
-            yum install -y --nogpgcheck --enablerepo=epel arrow-devel arrow-compute-devel ccache
+            yum install -y --nogpgcheck --enablerepo=epel 'arrow-devel-26*' 'arrow-compute-devel-26*' ccache
             export CCACHE_DIR=/root/.ccache
             mkdir -p /tmp/nk_core_build /tmp/nk_core_install
             cmake -S {project} -B /tmp/nk_core_build \
@@ -191,15 +191,9 @@ jobs:
             CMAKE_CXX_COMPILER_LAUNCHER=ccache
           CIBW_MANYLINUX_AARCH64_IMAGE: ${{ matrix.manylinux_image }}
           CIBW_ARCHS_LINUX: ${{ matrix.cibw_archs }}
-          CIBW_BUILD: ${{ github.event_name == 'release' && 'cp310-* cp311-* cp312-* cp313-* cp314-*' || 'cp313-*' }}
+          CIBW_BUILD: ${{ github.event_name == 'release' && 'cp311-* cp312-* cp313-* cp314-* cp315-*' || 'cp313-*' }}
           CIBW_SKIP: "pp* *-musllinux_*"
           CIBW_TEST_COMMAND: python3 -c 'import networkit'
-      - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/main' || github.event_name == 'release'
-        with:
-          name: 'linux-${{ matrix.cibw_archs }}-cp310-${{ github.run_id }}'
-          path: ./wheelhouse/*cp310*.whl
-          retention-days: ${{ env.ARTIFACT_RETENTION }}
       - uses: actions/upload-artifact@v4
         if: github.ref == 'refs/heads/main' || github.event_name == 'release'
         with:
@@ -223,6 +217,12 @@ jobs:
         with:
           name: 'linux-${{ matrix.cibw_archs }}-cp314-${{ github.run_id }}'
           path: ./wheelhouse/*cp314*.whl
+          retention-days: ${{ env.ARTIFACT_RETENTION }}
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main' || github.event_name == 'release'
+        with:
+          name: 'linux-${{ matrix.cibw_archs }}-cp315-${{ github.run_id }}'
+          path: ./wheelhouse/*cp315*.whl
           retention-days: ${{ env.ARTIFACT_RETENTION }}
 
   cpython-macos:
@@ -268,7 +268,7 @@ jobs:
           CIBW_BEFORE_BUILD: |
             pip install cython delocate
           CIBW_ARCHS_MACOS: ${{ matrix.buildplat[1] }}
-          CIBW_BUILD: ${{ github.event_name == 'release' && 'cp310-* cp311-* cp312-* cp313-* cp314-*' || 'cp313-*' }}
+          CIBW_BUILD: ${{ github.event_name == 'release' && 'cp311-* cp312-* cp313-* cp314-* cp315-*' || 'cp313-*' }}
           CIBW_ENVIRONMENT: >
             CXX='c++'
             ${{ matrix.buildplat[2] }}
@@ -284,12 +284,6 @@ jobs:
           CIBW_SKIP: "pp* *-musllinux_*"
           CIBW_TEST_COMMAND: python3 -c 'import networkit'
           CIBW_TEST_SKIP: "*-macosx_x86_64 *-macosx_universal2:x86_64"
-      - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/main' || github.event_name == 'release'
-        with:
-          name: 'macos-${{ matrix.buildplat[1] }}-cp310-${{ github.run_id }}'
-          path: ./wheelhouse/*cp310*.whl
-          retention-days: ${{ env.ARTIFACT_RETENTION }}
       - uses: actions/upload-artifact@v4
         if: github.ref == 'refs/heads/main' || github.event_name == 'release'
         with:
@@ -312,6 +306,12 @@ jobs:
         with:
           name: 'macos-${{ matrix.buildplat[1] }}-cp314-${{ github.run_id }}'
           path: ./wheelhouse/*cp314*.whl
+          retention-days: ${{ env.ARTIFACT_RETENTION }}
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main' || github.event_name == 'release'
+        with:
+          name: 'macos-${{ matrix.buildplat[1] }}-cp315-${{ github.run_id }}'
+          path: ./wheelhouse/*cp315*.whl
           retention-days: ${{ env.ARTIFACT_RETENTION }}
 
   cpython-windows:
@@ -381,7 +381,7 @@ jobs:
         env:
           CIBW_BEFORE_BUILD: pip install cython ipython delvewheel
           CIBW_ARCHS: "AMD64"
-          CIBW_BUILD: ${{ github.event_name == 'release' && 'cp310-* cp311-* cp312-* cp313-* cp314-*' || 'cp313-*' }}
+          CIBW_BUILD: ${{ github.event_name == 'release' && 'cp311-* cp312-* cp313-* cp314-* cp315-*' || 'cp313-*' }}
           CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: >
             python -m delvewheel repair --ignore-existing --analyze-existing --no-dll arrow.dll --add-path "%GITHUB_WORKSPACE%\vcpkg_installed\x64-windows\bin;%VCPKG_INSTALLATION_ROOT%\installed\x64-windows\bin" -w {dest_dir} {wheel}
           CIBW_ENVIRONMENT: >
@@ -393,12 +393,6 @@ jobs:
           CIBW_SKIP: pp*
           VCPKG_BINARY_SOURCES: 'clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite'
           CIBW_TEST_COMMAND: python -c "import networkit"
-      - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/main' || github.event_name == 'release'
-        with:
-          name: 'win-${{ matrix.cibw_archs }}-cp310-${{ github.run_id }}'
-          path: ./wheelhouse/*cp310*.whl
-          retention-days: ${{ env.ARTIFACT_RETENTION }}
       - uses: actions/upload-artifact@v4
         if: github.ref == 'refs/heads/main' || github.event_name == 'release'
         with:
@@ -421,6 +415,12 @@ jobs:
         with:
           name: 'win-${{ matrix.cibw_archs }}-cp314-${{ github.run_id }}'
           path: ./wheelhouse/*cp314*.whl
+          retention-days: ${{ env.ARTIFACT_RETENTION }}
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main' || github.event_name == 'release'
+        with:
+          name: 'win-${{ matrix.cibw_archs }}-cp315-${{ github.run_id }}'
+          path: ./wheelhouse/*cp315*.whl
           retention-days: ${{ env.ARTIFACT_RETENTION }}
 
   source-distribution:
