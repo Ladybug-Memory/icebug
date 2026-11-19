@@ -256,6 +256,9 @@ jobs:
         env:
           CIBW_BEFORE_ALL: |
             brew install ninja ccache apache-arrow libomp
+            # The intel runner image ships a stale apache-arrow; `install` alone
+            # is a no-op when any version is present, so upgrade explicitly.
+            brew upgrade apache-arrow
             export CCACHE_DIR=$HOME/.ccache
             mkdir -p /tmp/nk_core_build /tmp/nk_core_install
             cmake -S {project} -B /tmp/nk_core_build \
