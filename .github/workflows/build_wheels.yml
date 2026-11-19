@@ -318,7 +318,7 @@ jobs:
     needs: check-release-tag
     if: github.event_name != 'push' || needs.check-release-tag.outputs.is_release_commit != 'true'
     name: 'Windows CPython (${{ matrix.cibw_archs }})'
-    runs-on: windows-latest
+    runs-on: windows-2022
     permissions:
       contents: read
       packages: write
@@ -351,7 +351,7 @@ jobs:
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: '5ad42ec00d7723dde08c0df0910d9044e54ef032'
+          vcpkgGitCommitId: 'cd61e1e26a038e82d6550a3ebbe0fbbfe7da78e3'
 
       - name: Authenticate vcpkg NuGet
         shell: pwsh
